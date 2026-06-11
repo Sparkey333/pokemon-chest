@@ -1,7 +1,7 @@
 /* ===================== Pokémon Chest ===================== */
 'use strict';
 
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.2.0';
 const APP_REPO = 'https://github.com/Sparkey333/pokemon-chest';
 
 /* ---------- tiny helpers ---------- */
@@ -52,17 +52,21 @@ init();
 async function init() {
   try {
     const grab = (u) => fetch(u + '?_=' + Date.now()).then(r => r.ok ? r.json() : null).catch(() => null);
-    const [col, intel, gintel, merch] = await Promise.all([
+    const [col, intel, gintel, merch, lab, submit] = await Promise.all([
       fetch('data/collection.json?_=' + Date.now()).then(r => r.json()),
       fetch('data/selling-intel.json?_=' + Date.now()).then(r => r.json()),
       grab('data/grade-intel.json'),   // grade ratios / pop intel (research-verified)
       grab('data/merch-guide.json'),   // merch categories & sealed rules
+      grab('data/grade-lab.json'),     // PSA process replica + rig specs (research-verified)
+      grab('data/submit-guide.json'),  // submission walkthrough + turnaround status
     ]);
     State.cards = col.cards;
     State.meta = col.meta;
     State.intel = intel;
     State.gintel = gintel;
     State.merch = merch;
+    State.lab = lab;
+    State.submit = submit;
     recordSnapshot(col.meta.totalValue);
     State.live = await loadLiveConfig();
     updateLiveBtn();
@@ -76,6 +80,9 @@ async function init() {
     renderSell();
     renderGuide();
     renderMerch();
+    renderLab();
+    renderSubmit();
+    renderAdmin();
   } catch (e) {
     $('#main').innerHTML = `<div class="panel" style="margin-top:30px"><h3>Couldn’t load your collection</h3>
       <p class="muted">Open this page through the <b>start.command</b> launcher (a local server), not by double-clicking index.html — browsers block data files on <code>file://</code>.</p>
@@ -883,6 +890,310 @@ function renderMerch() {
     const items2 = merchItems(); items2[+b.dataset.msold].soldFor = +v;
     items2[+b.dataset.msold].soldDate = new Date().toISOString().slice(0, 10);
     merchSave(items2); renderMerch(); toast('Nice flip — recorded.');
+  });
+}
+
+/* ================= GRADE LAB ================= */
+const LS_PREGRADE = 'pokechest.pregrade.v1';
+const LAB_FALLBACK_STANDARDS = [
+  { grade: 'PSA 10', front: '55/45 or better', back: '75/25 or better', note: 'Gem Mint (fallback — verified standards load with data update)' },
+  { grade: 'PSA 9', front: '60/40 or better', back: '90/10 or better', note: 'Mint' },
+  { grade: 'PSA 8', front: '65/35 or better', back: '90/10 or better', note: 'NM-Mint' },
+  { grade: 'PSA 7', front: '70/30 or better', back: '90/10 or better', note: 'Near Mint' },
+];
+function labData() { return State.lab || null; }
+function labStandards() { return (labData() && labData().centeringStandards) || LAB_FALLBACK_STANDARDS; }
+function labDowngraders() {
+  return (labData() && labData().downgraders) || [
+    { flaw: 'Print line through holo or artwork', dropsTo: 'PSA 9 or lower', howToDetect: 'Raking light at a low angle across the surface', severityRule: 'Any visible line caps at 9 (fallback list — verified data loads with update)' },
+    { flaw: 'Surface scratch on holofoil', dropsTo: 'PSA 9 or lower', howToDetect: 'Tilt under a single bright point light', severityRule: 'Light scuffs cap at 9; clusters go lower' },
+    { flaw: 'Whitening on back edges/corners', dropsTo: 'PSA 8-9', howToDetect: 'Dark background, angled light on the card back', severityRule: 'One tiny fleck may survive a 9; multiple spots cap at 8' },
+    { flaw: 'Soft / non-sharp corner', dropsTo: 'PSA 8-9', howToDetect: '10x loupe on each corner', severityRule: 'All four corners must be sharp for a 10' },
+  ];
+}
+function parseGradeNum(s) { const m = String(s).match(/(\d+(?:\.\d)?)/); return m ? +m[1] : 7; }
+function parseDropCap(s) {
+  // "10 → 9", "10 → 9 (8 if naked-eye)", "Caps below 10 (usually 9)", "PSA 8-9"
+  // → the grade the flaw caps at = second-highest distinct number mentioned
+  const nums = [...String(s).matchAll(/\d+(?:\.\d)?/g)].map(m => +m[0]).filter(n => n <= 10);
+  if (!nums.length) return 9;
+  const uniq = [...new Set(nums)].sort((a, b) => b - a);
+  return uniq.length === 1 ? uniq[0] : uniq[1];
+}
+function parseAllow(frontStr) { const m = String(frontStr).match(/(\d+)\s*\/\s*\d+/); return m ? +m[1] : 60; }
+function centeringFromBorders(a, b) {
+  // a, b: opposite border widths in any consistent unit → worst-side percentage
+  if (!(a > 0) || !(b > 0)) return null;
+  const worst = Math.max(a, b) / (a + b) * 100;
+  const w = Math.round(worst);
+  return { worst, label: `${w}/${100 - w}` };
+}
+function centeringCeiling(worstPct) {
+  const rows = labStandards().map(r => ({ g: parseGradeNum(r.grade), allow: parseAllow(r.front), row: r }))
+    .sort((x, y) => y.g - x.g);
+  for (const r of rows) if (worstPct <= r.allow + 0.0001) return r;
+  return null; // worse than the lowest listed grade
+}
+function pregradeAll() { return loadJSON(LS_PREGRADE, {}); }
+function pregradeSet(pcId, rec) {
+  const all = pregradeAll();
+  if (rec) all[pcId] = rec; else delete all[pcId];
+  localStorage.setItem(LS_PREGRADE, JSON.stringify(all));
+}
+
+function renderLab() {
+  const L = labData();
+  State.labTab = State.labTab || 'bench';
+  const tabs = [['bench', 'The grading bench'], ['pregrade', 'Pre-grade a card'], ['standards', 'Standards & downgraders']];
+  let body = '';
+  if (State.labTab === 'bench') body = labBenchHTML(L);
+  else if (State.labTab === 'pregrade') body = labPregradeHTML();
+  else body = labStandardsHTML(L);
+  $('#view-lab').innerHTML = `
+    <div class="section-head"><h2>Grade Lab</h2>
+      <span class="sub">Replicate the PSA bench at home — judge a card the way a grader will before you pay to find out.</span></div>
+    <div class="tabbar">${tabs.map(([v, l]) => `<button class="${State.labTab === v ? 'active' : ''}" data-lt="${v}">${l}</button>`).join('')}</div>
+    ${body}`;
+  $$('#view-lab .tabbar button').forEach(b => b.onclick = () => { State.labTab = b.dataset.lt; renderLab(); });
+  if (State.labTab === 'pregrade') wirePregrade();
+}
+
+function labBenchHTML(L) {
+  const bench = L && L.graderBench;
+  const steps = (L && L.processSteps) || [];
+  return `
+    ${bench ? `<div class="cols two">
+      <div class="panel"><h3>How a PSA grader actually looks at your card</h3>
+        <ul class="bullets">
+          <li><b>Lighting:</b> ${esc(bench.lighting)}</li>
+          <li><b>Magnification:</b> ${esc(bench.magnification)}</li>
+          <li><b>Handling:</b> ${esc(bench.handling)}</li>
+          <li><b>Time per card:</b> ${esc(bench.timePerCard)}</li>
+        </ul>
+      </div>
+      <div class="panel"><h3>Recreate it at home</h3>
+        <ul class="bullets">
+          ${((L && L.rigSpecs && L.rigSpecs.lightingSpec) || ['Verified lighting spec loads with the data update.']).map(x => `<li>${esc(x)}</li>`).join('')}
+        </ul>
+        <p class="reason" style="margin-top:8px">The <b>GradeStage rig</b> (🛠 Admin tab) 3D-prints the exact geometry: raking-light bars for scratches/print lines, 45° bars for color & centering shots, and a phone tower for repeatable framing.</p>
+      </div>
+    </div>` : `<div class="panel"><h3>Verified bench details load with the next data update</h3><p class="muted" style="font-size:13px">The pre-grade workflow below already works.</p></div>`}
+    ${steps.length ? `<div class="panel" style="margin-top:16px"><h3>What happens inside PSA</h3>
+      <ol class="bullets" style="padding-left:20px">${steps.map(s => `<li><b>${esc(s.step)}.</b> ${esc(s.detail)}</li>`).join('')}</ol></div>` : ''}`;
+}
+
+function labPregradeHTML() {
+  const cards = State.cards.filter(c => c.game === 'Pokémon' && !c.graded).sort((a, b) => b.value - a.value).slice(0, 400);
+  const dg = labDowngraders();
+  return `
+    <div class="cols side">
+      <div class="panel"><h3>1 · Pick the card</h3>
+        <input id="pg-search" class="s-inp" list="pg-list" placeholder="Type a card name…">
+        <datalist id="pg-list">${cards.map(c => `<option value="${esc(c.name)} — ${esc(c.set)}${c.number ? ' #' + esc(c.number) : ''}" data-i="${c.i}">`).join('')}</datalist>
+        <div id="pg-cardbox" class="muted" style="font-size:13px">No card selected — you can still use the centering calculator below.</div>
+      </div>
+      <div class="panel"><h3>2 · Centering calculator</h3>
+        <p class="reason">Photograph the card straight-on (GradeStage crosshairs help), then measure the four borders in any unit — mm, or pixels from a screenshot.</p>
+        <div class="merch-form" style="margin-top:6px">
+          <input id="pg-left" type="number" step="0.1" min="0" placeholder="Left" style="width:74px">
+          <input id="pg-right" type="number" step="0.1" min="0" placeholder="Right" style="width:74px">
+          <input id="pg-top" type="number" step="0.1" min="0" placeholder="Top" style="width:74px">
+          <input id="pg-bottom" type="number" step="0.1" min="0" placeholder="Bottom" style="width:74px">
+        </div>
+        <div id="pg-centering" class="rb muted" style="font-size:13px;margin-top:8px">Enter borders to compute centering.</div>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:16px"><h3>3 · Flaw checklist <span class="hint">— check anything you can see using the listed light technique</span></h3>
+      <div id="pg-checks">${dg.map((d, i) => `
+        <label class="pg-check"><input type="checkbox" data-di="${i}">
+          <span><b>${esc(d.flaw)}</b> <span class="reason">(caps at ${esc(d.dropsTo)})</span><br>
+          <span class="reason">Detect: ${esc(d.howToDetect)} · ${esc(d.severityRule)}</span></span></label>`).join('')}
+      </div>
+    </div>
+    <div id="pg-verdict" class="rec-box no" style="margin-top:16px"><div class="rh">○ Estimated grade appears here</div>
+      <div class="rb">Pick a card, enter centering, and check any flaws — the verdict combines them against PSA standards and your card’s grade ladder.</div></div>`;
+}
+
+function wirePregrade() {
+  let current = null;
+  const saved = pregradeAll();
+  const findCard = (val) => {
+    const opt = [...$('#pg-list').options].find(o => o.value === val);
+    return opt ? State.cards[+opt.dataset.i] : null;
+  };
+  const update = () => {
+    const L = +($('#pg-left').value || 0), R = +($('#pg-right').value || 0);
+    const T = +($('#pg-top').value || 0), B = +($('#pg-bottom').value || 0);
+    const lr = centeringFromBorders(L, R), tb = centeringFromBorders(T, B);
+    let centCeil = null, centTxt = 'Enter borders to compute centering.';
+    if (lr || tb) {
+      const worst = Math.max(lr ? lr.worst : 0, tb ? tb.worst : 0);
+      const ceil = centeringCeiling(worst);
+      centCeil = ceil ? ceil.g : 6;
+      const w = Math.round(worst);
+      centTxt = `L/R <b>${lr ? lr.label : '—'}</b> · T/B <b>${tb ? tb.label : '—'}</b> → worst axis <b>${w}/${100 - w}</b> → centering supports <b style="color:var(--gold)">${ceil ? esc(ceil.row.grade) : 'below PSA 7'}</b>`;
+    }
+    $('#pg-centering').innerHTML = centTxt;
+    const dg = labDowngraders();
+    let checkCeil = 10;
+    $$('#pg-checks input:checked').forEach(cb => {
+      checkCeil = Math.min(checkCeil, parseDropCap(dg[+cb.dataset.di].dropsTo));
+    });
+    const est = Math.min(centCeil == null ? 10 : centCeil, checkCeil);
+    const box = $('#pg-verdict');
+    if (centCeil == null && checkCeil === 10 && !current) return;
+    let cls = est >= 10 ? 'strong' : est >= 9 ? 'maybe' : 'no';
+    let head = est >= 10 ? '★ Looks like a 10 candidate' : est >= 9 ? `◐ Tops out around PSA ${est}` : `○ Caps at PSA ${est} — think raw`;
+    let body = `Centering ceiling: <b>${centCeil == null ? 'not measured' : 'PSA ' + centCeil}</b> · flaw ceiling: <b>PSA ${checkCeil}</b>.`;
+    if (current) {
+      const lad = gradeLadder(current);
+      const vals = { 10: lad.psa10, 9: lad.psa9, 8: lad.psa8 };
+      const est$ = vals[Math.min(10, Math.max(8, est))] || lad.psa8;
+      const net = est$ * (1 - 0.136) - (State.intel.thresholds.allInGradingCost || 35);
+      const beats = net > (current.price || 0);
+      body += ` For <b>${esc(current.name)}</b>: a PSA ${est} ≈ <b>${money(est$)}</b>, netting ≈ ${money(net)} after fees+grading vs <b>${money(current.price)}</b> raw → <b style="color:${beats ? 'var(--green)' : 'var(--red)'}">${beats ? 'grading still wins at this grade' : 'sell raw unless it grades higher'}</b>.`;
+      pregradeSet(current.pcId, { est, centering: centCeil, flaws: $$('#pg-checks input:checked').length, date: new Date().toISOString().slice(0, 10) });
+    }
+    box.className = 'rec-box ' + cls;
+    box.innerHTML = `<div class="rh">${head}</div><div class="rb">${body}</div>`;
+  };
+  $('#pg-search').oninput = () => {
+    const c = findCard($('#pg-search').value);
+    current = c;
+    if (c) {
+      const pre = saved[c.pcId];
+      $('#pg-cardbox').innerHTML = `<div class="mini" style="cursor:default">${c.img ? `<img class="thumb" src="${c.img}">` : ''}<div class="mtext"><div class="mname">${esc(c.name)}</div><div class="mset">${esc(c.set)} · raw ${money(c.price)}${pre ? ` · last pre-grade: PSA ${pre.est} (${pre.date})` : ''}</div></div></div>`;
+      update();
+    }
+  };
+  ['pg-left', 'pg-right', 'pg-top', 'pg-bottom'].forEach(id => $('#' + id).oninput = update);
+  $$('#pg-checks input').forEach(cb => cb.onchange = update);
+}
+
+function labStandardsHTML(L) {
+  const dg = labDowngraders();
+  return `
+    <div class="cols two">
+      <div class="panel"><h3>PSA centering standards</h3>
+        <table class="guide-table"><thead><tr><th>Grade</th><th>Front</th><th>Back</th><th></th></tr></thead><tbody>
+          ${labStandards().map(r => `<tr><td><b>${esc(r.grade)}</b></td><td>${esc(r.front)}</td><td>${esc(r.back)}</td><td class="reason">${esc(r.note)}</td></tr>`).join('')}
+        </tbody></table>
+      </div>
+      <div class="panel"><h3>Arguing a grade / pre-screening</h3>
+        <ul class="bullets">${((L && L.reviewOptions) || ['Verified review/appeal mechanics load with the data update.']).map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+        ${L && L.jpHoloNotes && L.jpHoloNotes.length ? `<div class="subhead">Japanese & holo-era notes</div><ul class="bullets">${L.jpHoloNotes.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+      </div>
+    </div>
+    <div class="panel" style="margin-top:16px"><h3>What knocks a 10 down — ranked</h3>
+      <table class="guide-table"><thead><tr><th>Flaw</th><th>Caps at</th><th>How to detect it</th><th>Severity rule</th></tr></thead><tbody>
+        ${dg.map(d => `<tr><td><b>${esc(d.flaw)}</b></td><td style="white-space:nowrap">${esc(d.dropsTo)}</td><td class="reason">${esc(d.howToDetect)}</td><td class="reason">${esc(d.severityRule)}</td></tr>`).join('')}
+      </tbody></table>
+    </div>`;
+}
+
+/* ================= SUBMIT ================= */
+function renderSubmit() {
+  const S = State.submit;
+  if (!S) {
+    $('#view-submit').innerHTML = `<div class="section-head"><h2>Submit</h2></div>
+      <div class="panel"><h3>Submission guide loads with the next data update</h3>
+      <p class="muted" style="font-size:13px">Meanwhile: <a href="https://www.psacard.com/services/tradingcardgrading" target="_blank" rel="noopener">PSA grading</a> · <a href="https://www.cgccards.com" target="_blank" rel="noopener">CGC</a> · <a href="https://taggrading.com" target="_blank" rel="noopener">TAG</a></p></div>`;
+    return;
+  }
+  const lk = S.links || {};
+  const linkBtn = (label, sub, url) => url ? `<a class="linkbtn" href="${esc(url)}" target="_blank" rel="noopener"><span class="lb-t">${esc(label)} ↗</span><span class="lb-s">${esc(sub)}</span></a>` : '';
+  $('#view-submit').innerHTML = `
+    <div class="section-head"><h2>Submit for grading</h2>
+      <span class="sub">The PSA process end-to-end, what turnarounds actually look like right now, and when to route elsewhere.</span></div>
+    <div class="linkgrid" style="margin-bottom:16px">
+      ${linkBtn('PSA — start a submission', 'Official submission portal', lk.psaSubmit)}
+      ${linkBtn('PSA — pricing & service levels', 'Current tiers and costs', lk.psaPricing)}
+      ${linkBtn('PSA — grading standards', 'The official rubric', lk.psaStandards)}
+      ${linkBtn('PSA — track your order', 'Order status stages', lk.psaTracking)}
+      ${linkBtn('CGC Cards', 'Submission portal', lk.cgc)}
+      ${linkBtn('TAG Grading', 'Submission portal', lk.tag)}
+      ${linkBtn('Beckett (BGS)', 'Submission portal', lk.bgs)}
+    </div>
+    <div class="cols two">
+      <div class="panel"><h3>PSA step-by-step</h3>
+        <ol class="bullets" style="padding-left:20px">${(S.psaSteps || []).map(s => `<li><b>${esc(s.step)}.</b> ${esc(s.detail)}</li>`).join('')}</ol>
+      </div>
+      <div class="panel"><h3>Packaging rules <span class="hint">— get this wrong and cards come back ungraded</span></h3>
+        <ul class="bullets">${(S.packagingRules || []).map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:16px"><h3>Service levels — advertised vs actual (mid-2026)</h3>
+      <table class="guide-table"><thead><tr><th>Service</th><th>Tier</th><th>Cost</th><th>Advertised</th><th>Actual</th><th>Status</th></tr></thead><tbody>
+        ${(S.serviceStatus || []).map(r => `<tr><td><b>${esc(r.service)}</b></td><td>${esc(r.tier)}</td><td>${esc(r.cost)}</td><td>${esc(r.advertised)}</td><td>${esc(r.actual)}</td><td class="reason">${esc(r.status)}</td></tr>`).join('')}
+      </tbody></table>
+    </div>
+    <div class="cols two" style="margin-top:16px">
+      <div class="panel"><h3>Beating the backlog</h3>
+        <ul class="bullets">${(S.delayGuidance || []).map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+      </div>
+      <div class="panel"><h3>When to use someone else</h3>
+        ${(S.alternatives || []).map(a => `<div class="subhead">${esc(a.service)}</div><p class="reason" style="margin:0 0 6px">${esc(a.whenToUse)} · ${esc(a.costTurnaround)} · ${esc(a.resaleTradeoff)}</p>`).join('')}
+      </div>
+    </div>`;
+}
+
+/* ================= ADMIN (DarkHearts R&D) ================= */
+const LS_RND = 'pokechest.rnd.v1';
+const RND_ROADMAP = [
+  ['print-proto', 'Print GradeStage prototype (base + 2 LED bars + 4 columns + bridge)'],
+  ['source-leds', 'Order BOM: CRI-90+ LED strips, polarizing film, 10x loupe, calipers'],
+  ['polar-test', 'Test cross-polarization on a holo (film on LEDs + CPL on phone)'],
+  ['baseline', 'Shoot 10 cards, pre-grade them, submit 2-3 and compare PSA results'],
+  ['iterate', 'v2 geometry tweaks from real use (angles, phone height, bay fit)'],
+  ['listing', 'Package as a sellable kit: prints + BOM + guide (Etsy/eBay listing)'],
+];
+function renderAdmin() {
+  const R = (State.lab && State.lab.rigSpecs) || null;
+  const done = loadJSON(LS_RND, {});
+  const stls = ['gradestage-base.stl', 'gradestage-ledbar.stl (print 2)', 'gradestage-column.stl (print 4)', 'gradestage-bridge.stl'];
+  $('#view-admin').innerHTML = `
+    <div class="section-head"><h2>🛠 Admin — DarkHearts R&D</h2>
+      <span class="sub">GradeStage: a 3D-printed card imaging rig — from collection scans to PSA-bench-grade capture. Build it, prove it, sell it.</span></div>
+    <div class="cols side">
+      <div class="panel"><h3>Product brief</h3>
+        <p class="muted" style="font-size:13.5px;line-height:1.6">
+        <b style="color:var(--text)">GradeStage</b> is a printable stage that makes card photos <i>repeatable</i>: a recessed bay holds a raw card, penny sleeve, or Card Saver 1 dead-center under engraved crosshairs; snap-in LED bars give <b>20° raking light</b> (the angle that exposes print lines and holo scratches — the stuff that turns a 10 into a 9) and <b>45° even light</b> (true color + centering shots); a stacking tower holds the phone at a fixed height so every card is framed identically — which is exactly what the in-app centering calculator wants.</p>
+        <p class="muted" style="font-size:13.5px;line-height:1.6">Sell as: <b>STL files + BOM + guide</b> (digital, ~$12-19), or <b>printed kit with LEDs + polarizer film</b> (~$49-69). Companion app angle: Pokémon Chest's Grade Lab is the software half.</p>
+        <div class="subhead">Print files (in repo: hardware/gradestage/)</div>
+        <ul class="bullets">
+          <li><code>gradestage.scad</code> — parametric source (OpenSCAD, free)</li>
+          ${stls.map(s => `<li><code>stl/${esc(s)}</code></li>`).join('')}
+        </ul>
+        <p class="reason">PLA fine; PETG for the LED bars if strips run warm. 0.2mm layers, no supports needed except bridge (or print bridge upside-down).</p>
+        <div class="subhead">Assembly</div>
+        <ul class="bullets">
+          <li>Stick two ~110mm LED strip segments into the bar channels, wires out the end holes</li>
+          <li>Drop bars into the inner sockets (20° raking) for flaw-hunting; outer sockets (45°) for color/centering shots</li>
+          <li>Stack 4 columns per side into the corner sockets, seat the bridge, phone in the slot — camera over the window</li>
+          <li>For holos: polarizing film over the strips + CPL (or second film, rotated 90°) over the lens kills glare completely</li>
+        </ul>
+      </div>
+      <div class="panel"><h3>R&D roadmap</h3>
+        ${RND_ROADMAP.map(([id, label]) => `<label class="pg-check"><input type="checkbox" data-rnd="${id}" ${done[id] ? 'checked' : ''}><span>${esc(label)}</span></label>`).join('')}
+        <div class="subhead" style="margin-top:14px">Bench specs (research-verified)</div>
+        <ul class="bullets">${((R && R.lightingSpec) || ['Verified lighting + capture specs load with the data update.']).slice(0, 5).map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+        ${R && R.centeringMath ? `<div class="subhead">Centering math</div><p class="reason">${esc(R.centeringMath)}</p>` : ''}
+      </div>
+    </div>
+    ${R ? `<div class="cols two" style="margin-top:16px">
+      <div class="panel"><h3>Bill of materials</h3>
+        <table class="guide-table"><thead><tr><th>Item</th><th>Spec</th><th>Price</th></tr></thead><tbody>
+          ${R.bom.map(b => `<tr><td><b>${esc(b.item)}</b></td><td class="reason">${esc(b.spec)}</td><td style="white-space:nowrap">${esc(b.price)}</td></tr>`).join('')}
+        </tbody></table>
+      </div>
+      <div class="panel"><h3>Competing products to beat</h3>
+        <table class="guide-table"><thead><tr><th>Product</th><th>Price</th></tr></thead><tbody>
+          ${R.benchmarks.map(b => `<tr><td><b>${esc(b.product)}</b><br><span class="reason">${esc(b.note)}</span></td><td style="white-space:nowrap">${esc(b.price)}</td></tr>`).join('')}
+        </tbody></table>
+      </div>
+    </div>` : ''}`;
+  $$('#view-admin [data-rnd]').forEach(cb => cb.onchange = () => {
+    const d = loadJSON(LS_RND, {}); d[cb.dataset.rnd] = cb.checked; localStorage.setItem(LS_RND, JSON.stringify(d));
   });
 }
 

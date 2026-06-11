@@ -1,0 +1,340 @@
+{
+ "updated": "2026-06",
+ "disclaimer": "Compiled and verified from PSA's published standards plus credible grading-room accounts (June 2026). PSA's own wording includes 'approximately' — grader judgment exists at the margins.",
+ "processSteps": [
+  {
+   "step": "1. Intake & logging",
+   "detail": "PSA logs each card against the submission form, verifies counts, and assigns tracking/cert numbers. Since November 2025 the turnaround clock starts the moment the package physically arrives. Home replication: log the card into the app with an internal ID before touching anything else."
+  },
+  {
+   "step": "2. 'First View' imaging",
+   "detail": "Cards are photographed front and back early in the workflow, before grading. Home replication: capture the flat, even-light archival record first (scanner at 600 DPI or fixed copy-stand) — this is the image you measure centering from."
+  },
+  {
+   "step": "3. Research, ID & authentication",
+   "detail": "A researcher identifies the exact card, set, and variant against checklists; authenticators check print quality, card stock/thickness, color registration, dimensions, and fonts against known authentic examples, using black (UV) light and texture checks. Failures get 'Authentic – Altered' or 'Not Authentic' and no numeric grade. Home replication: confirm set/variant in the app's checklist; UV-light and texture sanity check on anything valuable."
+  },
+  {
+   "step": "4. Pillar grading (first grader)",
+   "detail": "A grader independently scores the four pillars — centering, corners, edges, surface — under their own lighting and magnification. The final grade is effectively the LOWEST of the four pillars (the weakest pillar caps the card). Home replication: score each pillar separately — calipers/ImageJ for centering, 10x loupe on all four corners both sides, raking LED for edges and surface — then take the minimum."
+  },
+  {
+   "step": "5. Second grade / QC consensus",
+   "detail": "Every card is examined by at minimum two graders; the second pass doubles as QC. If the two grades disagree, a senior/finalizer grader resolves and normalizes the outcome. Hobby accounts cite a ~0.1% internal error target (est., not official). Home replication: re-grade the card blind on a different day (or have a second person grade it) and reconcile disagreements toward the lower grade."
+  },
+  {
+   "step": "6. Encapsulation & final imaging",
+   "detail": "Label printed (card name, grade, cert #), card placed in the tamper-evident holder and ultrasonically (sonic) sealed, slab imaged, then return-shipped via FedEx/UPS with declared-value coverage. Home replication: record the final predicted grade in the app and route the card to a decision — submit, hold for Value-tier reopening, or sleeve-and-store."
+  }
+ ],
+ "graderBench": {
+  "lighting": "Bright directional LED held at multiple raking angles — low grazing angles (~20–40° off the card surface) reveal scratches, print lines, and edge whitening invisible under flat room light; rotate the card 90° and repeat since scratches parallel to the light disappear. Black (UV) light for authentication. Diffused ~45° light is for even viewing/color, not defect hunting.",
+  "magnification": "~10x loupe (triplet) used to inspect all four corners on both sides; microscopic fuzzing or rounding visible only under the loupe is enough to drop a 10 to a 9.",
+  "handling": "Cards handled raw (out of sleeves); centering is measured, not eyeballed — ruler or digital calipers on border ratios top-to-bottom and left-to-right. At home, add lint-free microfiber gloves to avoid adding fingerprints while grading.",
+  "timePerCard": "Roughly ~1 minute of direct grading attention per card (~650 cards/day per grader over a ~10-hour shift), plus the second QC pass (est. — hobby-sourced, not an official PSA figure)."
+ },
+ "centeringStandards": [
+  {
+   "grade": "PSA 10 Gem Mint",
+   "front": "55/45 or better",
+   "back": "75/25 or better",
+   "note": "PSA's own standards wording: centering 'within a tolerance not to exceed approximately 55/45 percent on the front, and 75/25 percent on the reverse.' The word 'approximately' is PSA's — there is grader judgment at the margins. (One imaging-lane source reports the front Gem-Mint bar tightened from 60/40 to 55/45 in early 2025.)"
+  },
+  {
+   "grade": "PSA 9 Mint",
+   "front": "60/40 or better",
+   "back": "90/10 or better",
+   "note": "The back tolerance is much looser than the front and stays at 90/10 from PSA 7 through PSA 9, tightening to 75/25 only at PSA 10."
+  },
+  {
+   "grade": "PSA 8 NM-MT",
+   "front": "65/35 or better",
+   "back": "90/10 or better",
+   "note": "A front around 65/35 is the classic 9→8 centering threshold; flaws at the 8 level may be visible to the naked eye but must remain minor."
+  },
+  {
+   "grade": "PSA 7 NM",
+   "front": "70/30 or better",
+   "back": "90/10 or better",
+   "note": "Worse-axis governs: whichever axis (left/right or top/bottom) measures more off-center determines the centering grade."
+  }
+ ],
+ "downgraders": [
+  {
+   "flaw": "Centering just over tolerance",
+   "dropsTo": "10 → 9",
+   "howToDetect": "Digital calipers (0.01 mm) on the raw card, or a flat 600 DPI scan deskewed and measured in pixels (ImageJ). Measure both axes; the worse axis governs.",
+   "severityRule": "The single most common 10→9 killer. A front measuring 56/44 — just past 55/45 — with otherwise flawless pillars lands a 9. 'Dead center' to the eye often measures 57/43; a fraction of a millimeter decides it."
+  },
+  {
+   "flaw": "Corner softening / micro-fuzz",
+   "dropsTo": "10 → 9",
+   "howToDetect": "10x triplet loupe on all four corners, both sides — does not need to be visible to the naked eye.",
+   "severityRule": "Any rounding, fraying, or fuzz visible only under magnification caps the card at 9. PSA 10 corners must be sharp and crisp even under the loupe; more pronounced, naked-eye corner wear pushes toward 8."
+  },
+  {
+   "flaw": "Edge / back-corner whitening",
+   "dropsTo": "10 → 9 (8 if visible at arm's length)",
+   "howToDetect": "Raking LED at a low grazing angle (~20–40°) run along all four edges; small white flecks pop against dark borders. Check back corners specifically.",
+   "severityRule": "Visible whitening typically caps at 9; manufacturing-roughness whitening is treated slightly more leniently than handling whitening. Mild whitening visible at arm's length drops to 8. Dark-bordered cards show it far more obviously."
+  },
+  {
+   "flaw": "Surface scratches",
+   "dropsTo": "10 → 9 (8 if naked-eye)",
+   "howToDetect": "Single oblique hard light at ~20–40° off the card surface (45° is too high — that's the even-lighting angle); slowly rotate the card and repeat at 90°, since scratches parallel to the light only appear when perpendicular.",
+   "severityRule": "Invisible in flat light, obvious under raking light: a single light scratch that catches the light kills the 10. A scratch you can see without a loupe is an 8-level flaw."
+  },
+  {
+   "flaw": "Print lines",
+   "dropsTo": "10 → 9 (8 if obvious)",
+   "howToDetect": "Bright direct light; tilt the card through angles until the line catches. Cross-check multiple cards from the same print run — consistent lines confirm a factory line.",
+   "severityRule": "Thin factory lines count against the surface grade even though they're baked in at printing. A faint line caps at 9; a more obvious naked-eye line pushes to 8."
+  },
+  {
+   "flaw": "Holo / foil scratches and scuff",
+   "dropsTo": "10 → 9",
+   "howToDetect": "Tilt the holo under angled light and watch for the rainbow pattern to 'break'; raking light at 20–40° plus 90° rotation. Cross-polarized capture documents the surface without glare.",
+   "severityRule": "The #1 surface killer for holo-era Pokémon — the holo layer is a scratch magnet, and even pulling a card from a penny sleeve can leave micro-scratches that cap at 9. Pack-fresh, never-sleeved holos are far more likely to 10."
+  },
+  {
+   "flaw": "Print dots / 'snow' / print spots",
+   "dropsTo": "10 → 9",
+   "howToDetect": "10x loupe plus angled light over the full surface, front and back; small ink or debris specks show as bright or dark points.",
+   "severityRule": "One tiny spot can drop a 10. Multiple or naked-eye-obvious spots push toward 8."
+  },
+  {
+   "flaw": "Silvering (WOTC holo edge foil)",
+   "dropsTo": "Caps below 10 (usually 9)",
+   "howToDetect": "Raking light run along the card edges — the foil layer shows as a silver/metallic line at the edge, reading like edge whitening.",
+   "severityRule": "A manufacturing artifact common on WOTC-era holos (and some modern sets), but it is graded like edge whitening and frequently caps these cards below 10."
+  },
+  {
+   "flaw": "Fingerprints / surface oils",
+   "dropsTo": "10 → 9",
+   "howToDetect": "Bright light at an angle — prints show as smudging or a texture/gloss change across the surface.",
+   "severityRule": "Graded against the card if embedded in the surface; only slab-exterior smudges are wipe-removable. Handle with lint-free gloves to avoid creating this flaw during pre-grading."
+  },
+  {
+   "flaw": "Holo foil separation / lifting",
+   "dropsTo": "10 → 9 or lower",
+   "howToDetect": "10x loupe plus angled light where the foil meets the card stock near the edges; look for lifting or separation lines.",
+   "severityRule": "Graders specifically check the foil/stock junction on holos; any separation near edges counts against the card."
+  },
+  {
+   "flaw": "Factory defects (registration, gloss, indents)",
+   "dropsTo": "10 → 9 (8 if pronounced)",
+   "howToDetect": "Even diffuse 45° light for color/registration comparison against known examples of the same card; angled light for indents and gloss inconsistency.",
+   "severityRule": "Color mis-registration, gloss/focus inconsistency, and factory indents count against the grade even though factory-induced. PSA 9 allows a single very minor surface flaw; PSA 8 allows a slight flaw visible to the naked eye."
+  }
+ ],
+ "reviewOptions": [
+  "Review (PSA-slabbed card, hoping for a bump): submit the card still in its PSA holder. The cert number stays the same and, per PSA's own page, 'there's no risk of losing your original labeling and grade if your trading card does not upgrade' — the modern Review service is upside-only. Priced like a grading submission tied to declared value; ~$40 + return shipping is a dated floor (est.). Community-reported bump rate is roughly ~15% (est.) — PSA rarely swings big without clear cause. Best candidates: a genuinely under-graded card, a surface issue that cleaned up, or a card graded in a different era.",
+  "Caution on terminology: older 'reconsideration/regrade' paths COULD move a grade down (one collector reported a PSA 9 Charizard regraded to a 7). PSA's financial guarantee reimburses the grade-differential value, fee, and shipping if a card is downgraded. Only chase a regrade if you're confident the card is 1–2 grades higher than its slab — don't gamble a borderline card.",
+  "Crossover (BGS/CGC/SGC → PSA): PSA evaluates the card inside its existing competitor holder and only cracks and re-slabs it if it meets or exceeds your stated minimum grade; miss the minimum and it comes back in the original holder — but you are still charged. $75 at Regular (declared value up to $1,499), ~10-day estimated turnaround. Note general PSA price increases hit Feb 10, 2026 — confirm live pricing.",
+  "Minimum Grade (MG) on raw submissions: reinstated May 8, 2025 after being suspended since ~2021. You set the lowest grade you'll accept (e.g., 'only slab a 10'); below it, the card comes back raw or as 'PSA Authentic' — but the full grading fee still applies even on a miss. MG is available on Value Plus and above only; with the Value tiers paused since June 2, 2026, the cheapest open tier offering MG is effectively Regular.",
+  "Best practice: pair MG with the Grade Lab pre-screen (calipers for centering, 10x loupe on corners, raking LED on surface/holo) so you only submit likely 9s/10s — on modern chase cards where anything below a 9 destroys resale, set MG to 9 or 10 so you never pay to encase an under-performer in a value-killing slab."
+ ],
+ "jpHoloNotes": [
+  "Japanese cards tend to have better/tighter centering on average than English — a real edge toward 10s — but the front 55/45 bar still rules.",
+  "WOTC-era English and vintage prints are notoriously inconsistent on centering; centering is the dominant 10-killer for that era. Measure every vintage candidate, never eyeball.",
+  "Japanese card stock differs from English and shows edge wear/whitening differently — inspect Japanese edges on their own terms rather than assuming English patterns.",
+  "Silvering on WOTC holos (and some modern sets): the foil layer shows as a silver/metallic line along card edges. It's a manufacturing artifact but reads as edge whitening and frequently caps these cards below 10.",
+  "The holo layer is a scratch magnet — even pulling from a penny sleeve can leave micro-scratches. Detected by tilting under angled light; this is the #1 surface killer for holo-era cards, and why pack-fresh, never-sleeved holos 10 so much more often.",
+  "On holos, also check where the foil meets the card stock near the edges for separation or lifting.",
+  "Dark-bordered cards (e.g., Base Set Charizard) show whitening dramatically more — corners and edges become the binding constraint far more often than on light-bordered cards.",
+  "Print lines on vintage holos are common factory artifacts running through the holo pattern; they count against the surface grade despite being factory-induced."
+ ],
+ "rigSpecs": {
+  "lightingSpec": [
+   "Two LED panels at 5000–5600K daylight-neutral, CRI ≥ 95 (90 is the floor); bi-color 3300–5600K panels (e.g., VILTROX L116T) let you match ambient.",
+   "EVEN MODE (color + centering record): soft, diffused light at ~45° from each side — two panels or a light tent — reveals texture while minimizing glare.",
+   "RAKING MODE (defect hunting): a single, oblique, directional hard source at a low grazing angle ~20–40° off the card surface (inspectors use ~25° and ~35° from two sides). Lower/harsher = more scratches revealed; 45° is too high for scratch-hunting. Slowly rotate the card and repeat at 90° — scratches parallel to the light only appear when perpendicular. For print lines: bright direct light, tilt the card until the line catches.",
+   "CROSS-POLARIZATION MODE (glare-free holo documentation): linear polarizing film sheet taped over each LED, plus a CPL on the lens rotated to ~90° (crossed) relative to the film until glare hits extinction. Costs ~3.5–5 stops of light — needs brighter panels, a tripod, longer exposure/higher ISO. Caveat: it flattens the holo entirely — a documentation/defect tool, not a beauty shot.",
+   "SLABS: raise lights higher and push them wider to the sides, nothing directly overhead; dark matte background; CPL to knock down the glossy shell. Photograph raw cards out of sleeves/top-loaders whenever possible — plastic = reflections."
+  ],
+  "captureSpec": [
+   "Two captures per card, minimum: a flat/even archival record (scanner or fixed copy-stand) for color and centering, plus an angled raking-light pass for surface condition. No single capture reveals everything — graders rotate the card under light, and the rig must replicate that motion.",
+   "Scanner: 600 DPI is the practical sweet spot for grading-relevant defects and zoom inspection (replaces a loupe); 1200 DPI only for premium vintage archival; 300 DPI for web listings. Above the scanner's native optical resolution is interpolation — no real new detail.",
+   "Sensor matters more than DPI for slabs: CCD scanners (Epson Perfection V600) resolve through the ~4–5 mm of slab plastic; CIS scanners (Epson V39) sit flush with shallow depth of field and produce soft slab scans at any DPI — fine for raw cards only.",
+   "Phone capture: no digital zoom (move closer or macro mode), tap-to-focus, lowest ISO, 2-sec timer or remote, tripod/copy-stand, lens parallel to the card and centered overhead. DSLR/mirrorless: f/5.6–f/8 for full-card sharpness, low ISO, daylight white balance.",
+   "Repeatable centering: overhead copy-stand with lens centered and parallel (any tilt = keystone distortion that corrupts the border ratio), card dropped into a fixed jig/template so every card lands at the same spot and scale, frame filled without cropping edges. Same distance + same framing every time = comparable measurements — this jig is the core of the 3D-printed rig product.",
+   "Backgrounds: neutral dark matte (black/dark gray) to cut reflections and make edge whitening pop; white/light-gray poster board for color-accurate beauty shots.",
+   "Market note: there is no dominant commercial card-photo rig — it's a DIY/STL space (Printables, MakerWorld, Thingiverse, Yeggi), which is the gap a printed phone-mount + card-jig + light-angle-guide product fills."
+  ],
+  "centeringMath": "Measure the two opposite borders on each axis (left vs. right, then top vs. bottom). Larger margin ÷ (larger + smaller) × 100 = the bigger number in the ratio. Worked example: left 2.75 mm, right 2.25 mm → 2.75/5.0 = 55% → 55/45. Another: top 2.8 mm, bottom 3.4 mm → 2.8/6.2 = 45.2% → ≈55/45. The WORSE (more off-center) of the two axes determines the centering grade. Compare against PSA tolerances: PSA 10 = 55/45 front, 75/25 back; PSA 9 = 60/40 front; PSA 8 = 65/35; PSA 7 = 70/30 (back 90/10 for grades 7–9). Measure with 0.01 mm digital calipers on the raw card, or — the accurate route — scan flat at 600 DPI (no perspective error), deskew/straighten, and measure border widths in pixels with ImageJ (draw a known-distance line → Analyze → Set Scale, then measure ROIs in real units).",
+  "benchmarks": [
+   {
+    "product": "Mr. Minty Card Centering Tool",
+    "price": "~$15–20 (est.)",
+    "note": "Printed acrylic/overlay grid with scoring chart; Mr. Minty also sells an 11-piece grading cleaning/prep kit. Sold at mrminty.com, Walmart, eBay."
+   },
+   {
+    "product": "Card Centering Calculator (iOS + Google Play)",
+    "price": "Free",
+    "note": "Auto border-detect with manual nudge; supports PSA/BGS/CGC/SGC/TAG ratios."
+   },
+   {
+    "product": "Gradeon 'Card Centering & Grading Tool' (App Store)",
+    "price": "Free (est.)",
+    "note": "AI + manual measurement, predicts grades."
+   },
+   {
+    "product": "CardGrade.io centering tool / cardgrader.ai / cardgrading.app",
+    "price": "Free",
+    "note": "Web upload-and-measure tools that auto-detect borders and compute ratio + predicted grade; CardGrade.io also has an edge-grading calculator."
+   },
+   {
+    "product": "Epson Perfection V600 (CCD flatbed)",
+    "price": "~$349.99 new / ~$299.99 Epson Certified ReNew (reported)",
+    "note": "Hobby-standard scanner for graded slabs — CCD lens-and-mirror path resolves through slab plastic."
+   },
+   {
+    "product": "Epson V39 II (CIS flatbed)",
+    "price": "~$130 (reported)",
+    "note": "Fine for raw cards and documents; blurry on slabs at any DPI (CIS shallow depth of field)."
+   },
+   {
+    "product": "3D-printed rigs (Printables / MakerWorld / Thingiverse / Yeggi STLs)",
+    "price": "Free STLs",
+    "note": "No dominant commercial card-photo rig exists — current offerings are graded-slab display stands (often magnetic) and phone-holder/card-scanner jigs. eBay sellers typically improvise with a light tent + overhead phone stand + Epson flatbed. This is the product gap."
+   },
+   {
+    "product": "Zeiss 10x triplet loupe",
+    "price": "~$40+ (est.)",
+    "note": "Premium benchmark for the inspection loupe; triplet (3-element) gives color-corrected, distortion-free edge/surface viewing."
+   }
+  ],
+  "bom": [
+   {
+    "item": "2× LED panels",
+    "spec": "CRI ≥ 95, bi-color 3300–5600K (e.g., VILTROX L116T) or USB CRI90+ LED strip/panel ~6000K",
+    "price": "~$40–50 each (est.)"
+   },
+   {
+    "item": "Linear polarizing film sheets",
+    "spec": "A4 / ~7–12 in non-adhesive (PATIKIL, Selens) — tape one over each light for cross-pol mode",
+    "price": "~$10–15 per set (est.)"
+   },
+   {
+    "item": "CPL / lens polarizer",
+    "spec": "Circular polarizer in the camera's thread size, or clip-on phone CPL; rotate ~90° crossed to the light film",
+    "price": "~$10–20 (est.)"
+   },
+   {
+    "item": "10x triplet jeweler's loupe",
+    "spec": "Triplet (3-element, color-corrected) with built-in LED, e.g., Rongon",
+    "price": "~$10–15 (est.)"
+   },
+   {
+    "item": "Digital caliper",
+    "spec": "150 mm, 0.01 mm resolution, stainless steel",
+    "price": "~$15–25 (est.)"
+   },
+   {
+    "item": "Microfiber gloves + cloths",
+    "spec": "Lint-free, for handling and cleaning",
+    "price": "~$8–10 (est.)"
+   },
+   {
+    "item": "Card stands / acrylic easels",
+    "spec": "Multi-pack, for upright shooting and display",
+    "price": "~$8 (est.)"
+   },
+   {
+    "item": "Overhead phone/camera copy-stand",
+    "spec": "Fixes lens distance, keeps lens parallel and centered — the centering-repeatability backbone (3D-printed version is the rig product)",
+    "price": "~$20–30 (est.)"
+   },
+   {
+    "item": "Background cards",
+    "spec": "Matte black + neutral-gray, non-reflective",
+    "price": "~$5–10 (est.)"
+   },
+   {
+    "item": "Light tent/box (optional)",
+    "spec": "For the even diffuse mode",
+    "price": "~$20–40 (est.)"
+   },
+   {
+    "item": "Flatbed scanner (optional)",
+    "spec": "Epson Perfection V600 (CCD — slabs) or Epson V39 (CIS — raw cards only)",
+    "price": "~$350 / ~$130 (reported)"
+   },
+   {
+    "item": "TOTAL — core kit excluding scanner",
+    "spec": "Panels + polarizers + loupe + caliper + copy-stand + handling + backgrounds",
+    "price": "~$120–180 (est.)"
+   }
+  ]
+ },
+ "sources": [
+  "PSA — Grading Standards (official): https://www.psacard.com/gradingstandards",
+  "PSA — Trading Card Review (official): https://www.psacard.com/services/tradingcardgrading/review",
+  "PSA — Trading Card Crossover (official): https://www.psacard.com/services/tradingcardgrading/crossover",
+  "PSA Support — Minimum Grade (official): https://support.psacard.com/s/article/Minimum-Grade",
+  "PSA — Journey of a PSA Card (official): https://www.psacard.com/articles/articleview/10241/psa-update-journey-card",
+  "PSA — Service Level Update May 2026 (official): https://www.psacard.com/articles/articleview/15210/service-level-update-may-2026",
+  "PSA — Ship Guide (official): https://www.psacard.com/info/shipguide",
+  "PSA — submission updates (official): https://www.psacard.com/info/submission-updates",
+  "PSA — Group Submissions (official): https://www.psacard.com/dealers/groupsubmissions",
+  "PSA Support — How much does it cost: https://support.psacard.com/s/article/how-much-does-it-cost",
+  "PSA — How-To-Submit PDF: https://resources.psacard.com/PSA-How-To-Submit.pdf",
+  "Cardhound Vintage — Behind the Scenes at PSA: https://cardhoundvintage.com/behind-the-scenes-at-psa-the-card-grading-process/",
+  "ORB Sports Cards — How PSA Grading Works: https://orbsportscards.com/how-psa-grading-works/",
+  "Card Chasers MTL — PSA Grading Process 2025 Step-by-Step: https://www.cardchasersmtl.com/en-us/blogs/blog/psa-grading-process-2025-step-by-step-guide",
+  "Coffee & Fun — How PSA Grades Pokemon Cards: https://www.coffeeandfun.com/blog/how-psa-grades-pokemon-cards-research-guide/",
+  "Phantom Display — PSA Grading Standards 2026 Insider Guide: https://phantomdisplay.com/blogs/blog/psa-grading-standards-2026-insider-guide-to-card-evaluation",
+  "CardGrader.ai — PSA 10 Requirements: https://cardgrader.ai/blog/psa-10-requirements",
+  "Ball Card Genius — PSA Crossover Cost & Grading Info: https://ballcardgenius.com/blog/psa-crossover-cost-grading-information/",
+  "Ball Card Genius — PSA Grading Stages Explained: https://ballcardgenius.com/blog/psa-grading-stages-explained/",
+  "cllct — PSA brings back minimum-grade submissions: https://www.cllct.com/sports-collectibles/sports-cards/psa-brings-back-minimum-grade-submissions",
+  "SI — PSA Reverses Course on Minimum Grades: https://www.si.com/collectibles/news/psa-reverses-course-on-minimum-grades",
+  "SI — Where card grading companies stand after PSA/TAG pauses: https://www.si.com/collectibles/where-card-grading-companies-stand-after-psa-tag-pauses",
+  "Elite Fourum — PSA Review Service thread: https://www.elitefourum.com/t/psa-review-service/21008",
+  "Collectors Universe forum — Does PSA re-grade from their own slabs: https://forums.collectors.com/discussion/1115704/does-psa-re-grade-cards-from-their-own-slabs-they-screwed-me-on-this-one",
+  "ICv2 — PSA temporarily shuts down Value grading tiers: https://icv2.com/articles/news/view/62495/psa-will-temporarily-shuts-down-value-grading-tiers",
+  "Athlon Sports — PSA Value tier pause 2026: https://athlonsports.com/collectibles/collectibles-psa-value-tier-pause-2026",
+  "Cardlines — PSA pauses Value submissions amid record demand: https://cardlines.com/psa-pauses-value-submissions-amid-record-demand-what-the-may-2026-service-level-update-means-for-collectors/",
+  "Yahoo Sports — PSA pausing submissions, backlog near 10M: https://sports.yahoo.com/collectibles/article/psa-announces-its-pausing-new-card-submissions-after-seeing-20-percent-spike-with-backlog-already-near-10m-190800938.html",
+  "cardgrade.io — PSA Value tiers paused 2026: https://cardgrade.io/blog/psa-value-tiers-paused-2026",
+  "cardgrade.io — Card grading backlog 2026: https://cardgrade.io/blog/card-grading-backlog-2026",
+  "cardgrade.io — BGS grading cost breakdown: https://cardgrade.io/blog/bgs-grading-cost-breakdown",
+  "The Grading Report — PSA grading cost: https://thegradingreport.com/psa-grading-cost/",
+  "All Vintage Cards — PSA grading costs: https://allvintagecards.com/psa-grading-costs/",
+  "TCG Protectors — Semi-rigid card holders for PSA grading: https://tcgprotectors.com/blogs/pokemon-tcg-accessories/how-to-use-semi-rigid-card-holders-psa-grading",
+  "Boxed Vinyl — How to package cards for PSA submission: https://www.boxedvinyl.com/blogs/news/how-to-package-cards-for-psa-submission",
+  "Grokipedia — PSA Grading Service Levels: https://grokipedia.com/page/PSA_Grading_Service_Levels",
+  "Wax Zone — PSA brings back minimum grade submissions: https://waxzonesports.com/blogs/news/psa-brings-back-minimum-grade-submissions-what-it-means-for-the-hobby-in-2025",
+  "Sports Card Dad — PSA grading upcharges: https://sportscarddad.com/psa-grading-upcharges-what-to-know/",
+  "CGC Cards — Services & Fees (official): https://www.cgccards.com/submit/services-fees/cgc-grading/",
+  "CGC — Price updates 2026: https://www.cgccomics.com/news/article/14659/cgc-price-updates-2026/",
+  "TAG — Available grading services (official help): https://help.taggrading.com/en/articles/10692075-what-are-tag-s-available-grading-services",
+  "TAG — New Era update (official): https://taggrading.com/blogs/news/new-era-tag-update",
+  "Beckett — Grading (official): https://www.beckett.com/grading",
+  "CollectorStore — PSA submissions: https://collectorstore.com/pages/psa-submissions",
+  "Bent Cardboard: https://bentcardboard.com/",
+  "Level Up Subs: https://www.levelupsubs.com/",
+  "Goat Armor — How to Photograph Trading Cards: https://goatarmor.com/blogs/resources/how-to-photograph-trading-cards-like-a-pro-a-step-by-step-guide",
+  "ProEdu — Cross Polarization: https://proedu.com/blogs/news/crushing-hotspots-cross-polarization-photo",
+  "Omega Optical — Crossed polarizers / extinction: https://omega-optical.com/blog/understanding-wire-grid-polarizers/",
+  "Advanced Illumination — Polarizing filters in machine vision: https://advancedillumination.com/application-notes/using-polarizing-filters-in-machine-vision/",
+  "CardPreGrading — Surface scratches & raking light: https://www.cardpregrading.com/learn/surface-scratches-psa-grade",
+  "CardPreGrading — PSA centering requirements (formula): https://www.cardpregrading.com/learn/psa-centering-requirements",
+  "Conservation Wiki — Raking light: https://www.conservation-wiki.com/wiki/Raking_light",
+  "Poke Therapy — Pokemon card lighting/angles: https://poketherapy.com/blogs/news/how-to-take-stunning-pokemon-cards-pictures-lighting-angles-editing-tips",
+  "Card Capsule — Best scanners for graded cards (V600 CCD vs CIS): https://cardcapsule.com/blogs/blog/best-scanners-graded-sports-cards",
+  "Bat Flip Sports — How to scan baseball cards (600 DPI): https://batflipsports.com/how-to-scan-baseball-cards/",
+  "Rookie Collector — Best scanner for sports cards: https://www.rookiecollector.com/best-scanner-for-sports-cards/",
+  "Collectors Universe forum — Epson V39 for slabs: https://forums.collectors.com/discussion/1045183/epson-v39-for-scanning-slabs",
+  "CardGrading.app — PSA centering standards: https://cardgrading.app/blog/psa-centering-standards-explained",
+  "CardGrade.io — Centering tool: https://cardgrade.io/tools/centering",
+  "ImageJ — Measure / Set Scale / Straighten: https://imagej.net/ij/docs/guide/146-30.html",
+  "Mr. Minty — Card Centering Tool: https://www.mrminty.com/products/card-centering-tool",
+  "VILTROX L116T CRI95 panel (Amazon): https://www.amazon.com/VILTROX-L116T-Dimmable-Bi-Color-3300K-5600K/dp/B01KZLM3QC",
+  "PATIKIL linear polarizing film sheets (Amazon): https://www.amazon.com/Polarized-Polarizing-Non-Adhesive-Educational-Photography/dp/B08Q767R82",
+  "Esslinger — 150mm 0.01mm digital caliper: https://www.esslinger.com/jewelry-and-watch-digital-caliper-6-150mm-x-01mm-precision-micrometer-gauge/",
+  "HealthyDadHacks — Best jeweler's loupe for raw cards: https://healthydadhacks.com/best-jewelers-loupe-inspecting-raw-cards-grading-review/",
+  "Printables — Graded card display stand (3D STL): https://www.printables.com/model/752081-graded-trading-card-display-stand",
+  "Yeggi — phone holder / card scanner jigs: https://www.yeggi.com/q/phone+holder+tcg+card+scanner/"
+ ]
+}

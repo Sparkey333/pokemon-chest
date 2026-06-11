@@ -1,0 +1,252 @@
+{
+ "updated": "2026-06",
+ "disclaimer": "Process and turnaround data verified June 2026; tiers, prices, and backlogs move — always confirm on the linked official pages before shipping cards.",
+ "psaSteps": [
+  {
+   "step": "1. Create a free PSA account",
+   "detail": "A free PSA account (Collectors.com login) is required for the Online Submission Center. A paid Collectors Club membership is NOT required for most retail tiers — it's required only for Value Bulk and unlocks member pricing (~$99/yr entry historically with a grading voucher (est.), up to $149 Standard / $199 Premium)."
+  },
+  {
+   "step": "2. Choose a service level",
+   "detail": "On the online form (psacard.com/submit), the service level sets your price and turnaround. As of mid-June 2026, all four Value tiers are paused — Regular (~$79.99/card) is the cheapest open path."
+  },
+  {
+   "step": "3. Enter each card",
+   "detail": "Year, set, card number, character/player, and variation for every card, in the order you will stack them."
+  },
+  {
+   "step": "4. Set Declared Value (DV) per card",
+   "detail": "DV is your estimate of the card's value AFTER grading and acts as PSA's insurance cap. Each tier has a max DV ceiling (Value ~$499; Regular ~$1,499–$1,500; Express and up higher). If a card grades higher than expected and its market value exceeds the tier cap, PSA upcharges/bumps it to a higher tier and bills the difference — pick a tier whose cap covers the realistic graded value."
+  },
+  {
+   "step": "5. Optionally set a Minimum Grade",
+   "detail": "Available on Value Plus and higher (the base Value tier does not offer it). Cards below your minimum come back ungraded/raw or as 'PSA Authentic' — but the full fee still applies. With Value tiers paused, the cheapest tier offering minimum-grade is Regular."
+  },
+  {
+   "step": "6. Package the cards",
+   "detail": "Penny sleeve + Card Saver I per card, stacked in exact form order — see packaging rules. Non-compliant holders trigger a 5% processing-and-handling penalty."
+  },
+  {
+   "step": "7. Ship tracked and insured",
+   "detail": "Sturdy box (never just an envelope) to PSA's California facility — the address prints on your packing slip. Use a tracked, insured carrier (USPS Registered/Priority, UPS, FedEx) and insure for your total declared value: PSA does not insure your package in transit TO them; their liability begins only at 'Order Prep'."
+  },
+  {
+   "step": "8. Track the order stages",
+   "detail": "Order Arrived/Received → Order Prep (PSA liability and the turnaround clock start here) → Research & ID → Grading (longest stage) → Assembly (encapsulation) → Quality Assurance → Awaiting Accounting Release → Shipped."
+  },
+  {
+   "step": "9. Pay and receive",
+   "detail": "Grading fees are pre-paid at submission; return shipping + insurance (scaled to declared value) is billed at completion before the order ships. You can view grades in 'My Orders' before release."
+  }
+ ],
+ "packagingRules": [
+  "Penny sleeve first — clear, never opaque — then a Card Saver I semi-rigid holder (Card Saver II for thicker cards). Card Saver, NOT a toploader.",
+  "Prohibited: toploaders, screw-downs, magnetic/snap cases, tape, tabs, sticky notes, and writing on holders — any of these triggers a 5% processing-and-handling penalty on the order.",
+  "Stack cards in the exact order listed on the submission form, Item #1 on top.",
+  "Sandwich the stack between two pieces of cardboard and secure with 2–3 rubber bands.",
+  "Ship in a sturdy box, not an envelope, via a tracked and insured carrier, insured for the full total declared value."
+ ],
+ "serviceStatus": [
+  {
+   "service": "PSA",
+   "tier": "Value Bulk (20+ cards, Collectors Club required)",
+   "cost": "Per-card price not captured in research (tier paused)",
+   "advertised": "n/a while paused",
+   "actual": "n/a — paused since June 2, 2026",
+   "status": "PAUSED (backlog ~10M cards)"
+  },
+  {
+   "service": "PSA",
+   "tier": "Value (max DV ~$499)",
+   "cost": "Per-card price not captured in research (tier paused); no minimum-grade option on this tier",
+   "advertised": "n/a while paused",
+   "actual": "n/a — paused since June 2, 2026",
+   "status": "PAUSED"
+  },
+  {
+   "service": "PSA",
+   "tier": "Value Plus (cheapest minimum-grade tier when open)",
+   "cost": "Per-card price not captured in research (tier paused)",
+   "advertised": "n/a while paused",
+   "actual": "n/a — paused since June 2, 2026",
+   "status": "PAUSED"
+  },
+  {
+   "service": "PSA",
+   "tier": "Value Max",
+   "cost": "Per-card price not captured in research (tier paused)",
+   "advertised": "n/a while paused",
+   "actual": "n/a — paused since June 2, 2026",
+   "status": "PAUSED"
+  },
+  {
+   "service": "PSA",
+   "tier": "Regular (max DV ~$1,500)",
+   "cost": "~$79.99/card; ~$85–95/card all-in with insured shipping for a small lot (est.)",
+   "advertised": "30–40 business days",
+   "actual": "Extended to ~40–50 (some sources 40–60) business days; community reports run at or beyond the high end (est.)",
+   "status": "OPEN — cheapest open path right now"
+  },
+  {
+   "service": "PSA",
+   "tier": "Express",
+   "cost": "Not captured in research — check PSA pricing page (Feb 10, 2026 price increases apply)",
+   "advertised": "Not captured in research",
+   "actual": "Open; backlog pressure industry-wide (est.)",
+   "status": "OPEN"
+  },
+  {
+   "service": "PSA",
+   "tier": "Super Express",
+   "cost": "Not captured in research — check PSA pricing page",
+   "advertised": "Not captured in research",
+   "actual": "Open (est.)",
+   "status": "OPEN"
+  },
+  {
+   "service": "PSA",
+   "tier": "Walkthrough (and premium high-DV tiers)",
+   "cost": "Not captured in research — check PSA pricing page",
+   "advertised": "Not captured in research",
+   "actual": "Open (est.)",
+   "status": "OPEN"
+  },
+  {
+   "service": "CGC",
+   "tier": "Bulk / Economy / Standard / Express / Walkthrough",
+   "cost": "Bulk $17, Economy $20, Standard $55, Express $100, Walkthrough $300, Unlimited Value $300 + 1% FMV; members save 10–20% (fees updated Mar 24, 2026)",
+   "advertised": "Per published tier schedule",
+   "actual": "Mid-2026: Economy ~65 working days, Bulk ~120 working days (est., congested)",
+   "status": "OPEN but congested"
+  },
+  {
+   "service": "TAG",
+   "tier": "Economy / Standard / Express / Priority / Walkthrough",
+   "cost": "Express $59, Priority $149 ($2,500 cap), Walkthrough $299 ($5,000 cap); Standard has a $1,000 insurance cap; Economy ~$12–15 when slots open (est.)",
+   "advertised": "Express ~45+ biz days, Standard ~15 biz days, Priority ~5 days, Walkthrough ~2–3 days",
+   "actual": "Express/Basic/Standard closed in late May 2026; Express reopening at a lower price; fastest of the group when open (~15–30 biz days)",
+   "status": "PARTIALLY CLOSED — premium tiers open"
+  },
+  {
+   "service": "BGS (Beckett)",
+   "tier": "Economy / Standard / Express / Priority",
+   "cost": "Economy $22 (DV ≤ $499), Standard $34.95, Express $79.95, Priority $124.95; no annual membership fee; free sub-grades on every card",
+   "advertised": "Standard ~45 days, Express ~15 days, Priority ~5 days",
+   "actual": "Economy currently ~60–120 calendar days (est., congested)",
+   "status": "OPEN but congested"
+  }
+ ],
+ "delayGuidance": [
+  "The pause is real and still in effect: effective June 2, 2026, PSA temporarily paused all four Value tiers (Value Bulk, Value, Value Plus, Value Max) after a ~20% submission surge pushed the active backlog to nearly 10 million cards.",
+  "PSA's stated plan: reopen Value tiers once the backlog drops from ~10M to 5M cards, projected to take up to ~4 months — a tentative reopening window around Q3–Q4 2026 (~October). This is PSA's projection, not a guarantee.",
+  "PSA launched a public monthly Backlog Tracker and extended existing Collectors Club memberships to compensate for the pause — watch the tracker before planning a bulk submission.",
+  "Practical math: a 10-card lot that would have been Value is now ~$800 minimum at Regular before shipping (~$85–95/card all-in). For sub-$200 cards, the rational moves are: hold and pre-grade with the Grade Lab until Value reopens, use a group submitter for dealer pricing, or pick an alternative grader.",
+  "'Switch graders' is not a clean escape: the whole industry hit capacity within days in late May 2026 — TAG closed Express/Basic/Standard, and CGC turnaround stretched to ~65–120 working days.",
+  "Group submissions (PSA Authorized Dealers / online submitters like Bent Cardboard, Level Up Subs, CollectorStore, CardsHQ, Filthbomb) let you skip the $99+ Collectors Club membership and access bulk/dealer pricing, often at or below PSA's retail single-card rate (magnitude varies, est.). Risks: third-party custody (loss/theft/mix-ups), the dealer's declared value and insurance governs, batch-fill delays, possible service markups, and the same open-tier constraints during the pause. Use established submitters and get written terms on insurance, DV, fees, and timing."
+ ],
+ "alternatives": [
+  {
+   "service": "CGC",
+   "whenToUse": "Cheapest published bulk/economy sticker price; good for modern/Pokémon volume when PSA Value is paused and you can wait.",
+   "costTurnaround": "Bulk $17 / Economy $20 / Standard $55 / Express $100 / Walkthrough $300; members save 10–20%. Mid-2026 actual: Economy ~65 working days, Bulk ~120 working days (est., congested).",
+   "resaleTradeoff": "CGC slabs generally sell below PSA for vintage and most sports, closer to PSA for modern Pokémon — savings can be eaten by lower resale."
+  },
+  {
+   "service": "TAG",
+   "whenToUse": "Speed and transparency when slots are open — AI-assisted grading with a detailed digital report card; best for personal-collection cards or modern you'll hold.",
+   "costTurnaround": "Express $59 (~45+ biz days, reopening at a lower price), Priority $149 (~5 days), Walkthrough $299 (~2–3 days); Economy ~$12–15 when open (est.). Fastest of the group when open (~15–30 biz days), but Express/Basic/Standard were closed in late May 2026.",
+   "resaleTradeoff": "Smallest secondary-market footprint of the four — resale liquidity and premiums lag PSA significantly."
+  },
+  {
+   "service": "BGS (Beckett)",
+   "whenToUse": "Modern high-end chase cards where a BGS 9.5 Gem / Black Label 10 with sub-grades carries a premium; no-membership convenience and free sub-grades (centering/corners/edges/surface) on every card.",
+   "costTurnaround": "Economy $22 (DV ≤ $499) / Standard $34.95 (~45 days) / Express $79.95 (~15 days) / Priority $124.95 (~5 days). Actual Economy currently ~60–120 calendar days (est., congested).",
+   "resaleTradeoff": "Black Label and 9.5s can rival or beat PSA on select modern; mid-grade BGS generally trails PSA."
+  },
+  {
+   "service": "Group submission via a PSA Authorized Dealer",
+   "whenToUse": "You want PSA slabs at bulk/dealer pricing without the Collectors Club membership, and can tolerate handing your cards to a third party and waiting for a batch to fill.",
+   "costTurnaround": "Often at or below PSA's own retail single-card rate, sometimes meaningfully less (magnitude varies by shop, est.); longer effective timeline since dealers wait to fill batches, plus the same open-tier constraints during the pause.",
+   "resaleTradeoff": "No resale tradeoff — you end up with full-premium PSA slabs; the tradeoff is custody risk and the dealer's DV/insurance terms governing instead of yours."
+  }
+ ],
+ "links": {
+  "psaSubmit": "https://www.psacard.com/submit",
+  "psaPricing": "https://www.psacard.com/services/tradingcardgrading",
+  "psaStandards": "https://www.psacard.com/gradingstandards",
+  "psaTracking": "https://www.psacard.com/orderstatus",
+  "cgc": "https://www.cgccards.com/submit/services-fees/cgc-grading/",
+  "tag": "https://taggrading.com/submit",
+  "bgs": "https://www.beckett.com/grading/submit"
+ },
+ "sources": [
+  "PSA — Grading Standards (official): https://www.psacard.com/gradingstandards",
+  "PSA — Trading Card Review (official): https://www.psacard.com/services/tradingcardgrading/review",
+  "PSA — Trading Card Crossover (official): https://www.psacard.com/services/tradingcardgrading/crossover",
+  "PSA Support — Minimum Grade (official): https://support.psacard.com/s/article/Minimum-Grade",
+  "PSA — Journey of a PSA Card (official): https://www.psacard.com/articles/articleview/10241/psa-update-journey-card",
+  "PSA — Service Level Update May 2026 (official): https://www.psacard.com/articles/articleview/15210/service-level-update-may-2026",
+  "PSA — Ship Guide (official): https://www.psacard.com/info/shipguide",
+  "PSA — submission updates (official): https://www.psacard.com/info/submission-updates",
+  "PSA — Group Submissions (official): https://www.psacard.com/dealers/groupsubmissions",
+  "PSA Support — How much does it cost: https://support.psacard.com/s/article/how-much-does-it-cost",
+  "PSA — How-To-Submit PDF: https://resources.psacard.com/PSA-How-To-Submit.pdf",
+  "Cardhound Vintage — Behind the Scenes at PSA: https://cardhoundvintage.com/behind-the-scenes-at-psa-the-card-grading-process/",
+  "ORB Sports Cards — How PSA Grading Works: https://orbsportscards.com/how-psa-grading-works/",
+  "Card Chasers MTL — PSA Grading Process 2025 Step-by-Step: https://www.cardchasersmtl.com/en-us/blogs/blog/psa-grading-process-2025-step-by-step-guide",
+  "Coffee & Fun — How PSA Grades Pokemon Cards: https://www.coffeeandfun.com/blog/how-psa-grades-pokemon-cards-research-guide/",
+  "Phantom Display — PSA Grading Standards 2026 Insider Guide: https://phantomdisplay.com/blogs/blog/psa-grading-standards-2026-insider-guide-to-card-evaluation",
+  "CardGrader.ai — PSA 10 Requirements: https://cardgrader.ai/blog/psa-10-requirements",
+  "Ball Card Genius — PSA Crossover Cost & Grading Info: https://ballcardgenius.com/blog/psa-crossover-cost-grading-information/",
+  "Ball Card Genius — PSA Grading Stages Explained: https://ballcardgenius.com/blog/psa-grading-stages-explained/",
+  "cllct — PSA brings back minimum-grade submissions: https://www.cllct.com/sports-collectibles/sports-cards/psa-brings-back-minimum-grade-submissions",
+  "SI — PSA Reverses Course on Minimum Grades: https://www.si.com/collectibles/news/psa-reverses-course-on-minimum-grades",
+  "SI — Where card grading companies stand after PSA/TAG pauses: https://www.si.com/collectibles/where-card-grading-companies-stand-after-psa-tag-pauses",
+  "Elite Fourum — PSA Review Service thread: https://www.elitefourum.com/t/psa-review-service/21008",
+  "Collectors Universe forum — Does PSA re-grade from their own slabs: https://forums.collectors.com/discussion/1115704/does-psa-re-grade-cards-from-their-own-slabs-they-screwed-me-on-this-one",
+  "ICv2 — PSA temporarily shuts down Value grading tiers: https://icv2.com/articles/news/view/62495/psa-will-temporarily-shuts-down-value-grading-tiers",
+  "Athlon Sports — PSA Value tier pause 2026: https://athlonsports.com/collectibles/collectibles-psa-value-tier-pause-2026",
+  "Cardlines — PSA pauses Value submissions amid record demand: https://cardlines.com/psa-pauses-value-submissions-amid-record-demand-what-the-may-2026-service-level-update-means-for-collectors/",
+  "Yahoo Sports — PSA pausing submissions, backlog near 10M: https://sports.yahoo.com/collectibles/article/psa-announces-its-pausing-new-card-submissions-after-seeing-20-percent-spike-with-backlog-already-near-10m-190800938.html",
+  "cardgrade.io — PSA Value tiers paused 2026: https://cardgrade.io/blog/psa-value-tiers-paused-2026",
+  "cardgrade.io — Card grading backlog 2026: https://cardgrade.io/blog/card-grading-backlog-2026",
+  "cardgrade.io — BGS grading cost breakdown: https://cardgrade.io/blog/bgs-grading-cost-breakdown",
+  "The Grading Report — PSA grading cost: https://thegradingreport.com/psa-grading-cost/",
+  "All Vintage Cards — PSA grading costs: https://allvintagecards.com/psa-grading-costs/",
+  "TCG Protectors — Semi-rigid card holders for PSA grading: https://tcgprotectors.com/blogs/pokemon-tcg-accessories/how-to-use-semi-rigid-card-holders-psa-grading",
+  "Boxed Vinyl — How to package cards for PSA submission: https://www.boxedvinyl.com/blogs/news/how-to-package-cards-for-psa-submission",
+  "Grokipedia — PSA Grading Service Levels: https://grokipedia.com/page/PSA_Grading_Service_Levels",
+  "Wax Zone — PSA brings back minimum grade submissions: https://waxzonesports.com/blogs/news/psa-brings-back-minimum-grade-submissions-what-it-means-for-the-hobby-in-2025",
+  "Sports Card Dad — PSA grading upcharges: https://sportscarddad.com/psa-grading-upcharges-what-to-know/",
+  "CGC Cards — Services & Fees (official): https://www.cgccards.com/submit/services-fees/cgc-grading/",
+  "CGC — Price updates 2026: https://www.cgccomics.com/news/article/14659/cgc-price-updates-2026/",
+  "TAG — Available grading services (official help): https://help.taggrading.com/en/articles/10692075-what-are-tag-s-available-grading-services",
+  "TAG — New Era update (official): https://taggrading.com/blogs/news/new-era-tag-update",
+  "Beckett — Grading (official): https://www.beckett.com/grading",
+  "CollectorStore — PSA submissions: https://collectorstore.com/pages/psa-submissions",
+  "Bent Cardboard: https://bentcardboard.com/",
+  "Level Up Subs: https://www.levelupsubs.com/",
+  "Goat Armor — How to Photograph Trading Cards: https://goatarmor.com/blogs/resources/how-to-photograph-trading-cards-like-a-pro-a-step-by-step-guide",
+  "ProEdu — Cross Polarization: https://proedu.com/blogs/news/crushing-hotspots-cross-polarization-photo",
+  "Omega Optical — Crossed polarizers / extinction: https://omega-optical.com/blog/understanding-wire-grid-polarizers/",
+  "Advanced Illumination — Polarizing filters in machine vision: https://advancedillumination.com/application-notes/using-polarizing-filters-in-machine-vision/",
+  "CardPreGrading — Surface scratches & raking light: https://www.cardpregrading.com/learn/surface-scratches-psa-grade",
+  "CardPreGrading — PSA centering requirements (formula): https://www.cardpregrading.com/learn/psa-centering-requirements",
+  "Conservation Wiki — Raking light: https://www.conservation-wiki.com/wiki/Raking_light",
+  "Poke Therapy — Pokemon card lighting/angles: https://poketherapy.com/blogs/news/how-to-take-stunning-pokemon-cards-pictures-lighting-angles-editing-tips",
+  "Card Capsule — Best scanners for graded cards (V600 CCD vs CIS): https://cardcapsule.com/blogs/blog/best-scanners-graded-sports-cards",
+  "Bat Flip Sports — How to scan baseball cards (600 DPI): https://batflipsports.com/how-to-scan-baseball-cards/",
+  "Rookie Collector — Best scanner for sports cards: https://www.rookiecollector.com/best-scanner-for-sports-cards/",
+  "Collectors Universe forum — Epson V39 for slabs: https://forums.collectors.com/discussion/1045183/epson-v39-for-scanning-slabs",
+  "CardGrading.app — PSA centering standards: https://cardgrading.app/blog/psa-centering-standards-explained",
+  "CardGrade.io — Centering tool: https://cardgrade.io/tools/centering",
+  "ImageJ — Measure / Set Scale / Straighten: https://imagej.net/ij/docs/guide/146-30.html",
+  "Mr. Minty — Card Centering Tool: https://www.mrminty.com/products/card-centering-tool",
+  "VILTROX L116T CRI95 panel (Amazon): https://www.amazon.com/VILTROX-L116T-Dimmable-Bi-Color-3300K-5600K/dp/B01KZLM3QC",
+  "PATIKIL linear polarizing film sheets (Amazon): https://www.amazon.com/Polarized-Polarizing-Non-Adhesive-Educational-Photography/dp/B08Q767R82",
+  "Esslinger — 150mm 0.01mm digital caliper: https://www.esslinger.com/jewelry-and-watch-digital-caliper-6-150mm-x-01mm-precision-micrometer-gauge/",
+  "HealthyDadHacks — Best jeweler's loupe for raw cards: https://healthydadhacks.com/best-jewelers-loupe-inspecting-raw-cards-grading-review/",
+  "Printables — Graded card display stand (3D STL): https://www.printables.com/model/752081-graded-trading-card-display-stand",
+  "Yeggi — phone holder / card scanner jigs: https://www.yeggi.com/q/phone+holder+tcg+card+scanner/"
+ ]
+}
