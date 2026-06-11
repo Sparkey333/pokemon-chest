@@ -1,7 +1,7 @@
 /* ===================== Pokémon Chest ===================== */
 'use strict';
 
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.0';
 const APP_REPO = 'https://github.com/Sparkey333/pokemon-chest';
 
 /* ---------- tiny helpers ---------- */
@@ -657,6 +657,7 @@ function renderSell() {
 
   $$('#view-sell .tabbar button').forEach(b => b.onclick = () => { State.sellTab = b.dataset.st; renderSell(); });
   $$('#view-sell .sr-card, #view-sell .open-i').forEach(el => el.onclick = () => openModal(State.cards[+el.dataset.i]));
+  $$('#view-sell .lc-open').forEach(b => b.onclick = (e) => { e.stopPropagation(); openListingComposer(State.cards[+b.dataset.i], false); });
   if (State.sellTab === 'pop') wirePopWatch(popList);
 }
 
@@ -733,6 +734,7 @@ function sellRow(r, mode) {
   const c = r.x, L = links(c);
   const pick = (name) => { const f = L.find(l => l.t.startsWith(name)); return f ? f.u : '#'; };
   const compCells = `<div class="sr-links">
+      <button class="minilink lc-open" data-i="${c.i}" style="cursor:pointer;background:linear-gradient(135deg,var(--gold),#e7af2c);color:#1e1603;border-color:transparent;font-weight:700">📤 List</button>
       <a class="minilink" href="${pick('eBay — Sold (raw)')}" target="_blank" rel="noopener">eBay raw</a>
       <a class="minilink" href="${pick('eBay — Sold (graded)')}" target="_blank" rel="noopener">eBay graded</a>
       <a class="minilink" href="${pick(c.lang === 'ja' ? 'TCGplayer (JP)' : 'TCGplayer')}" target="_blank" rel="noopener">TCGplayer</a>
@@ -1197,6 +1199,127 @@ function renderAdmin() {
   });
 }
 
+/* ================= EBAY LISTING COMPOSER ================= */
+function ebayTitle(c) {
+  // eBay max 80 chars — lead with the most-searched terms, no filler
+  const bits = ['Pokémon', c.name];
+  if (c.number) bits.push('#' + c.number);
+  bits.push(c.set);
+  if (c.setYear) bits.push(String(c.setYear));
+  if (c.lang === 'ja') bits.push('Japanese');
+  bits.push(c.graded ? `${c.grader || 'PSA'} ${c.grade || ''}`.trim() : 'NM');
+  bits.push('TCG');
+  let t = bits.join(' ');
+  while (t.length > 80 && bits.length > 3) { bits.splice(bits.length - 2, 1); t = bits.join(' '); }
+  return t.slice(0, 80);
+}
+function ebayDescription(c) {
+  const pre = pregradeAll()[c.pcId];
+  const cond = c.graded
+    ? `Professionally graded ${c.grader || 'PSA'} ${c.grade || ''} — the slab in the photos is the exact item you receive.`
+    : `Raw / ungraded, ${(c.wear || '').toLowerCase() === 'normal wear' ? 'near mint' : (c.wear || 'near mint').toLowerCase()} condition — please judge from the photos of the actual card.${pre ? ` Owner pre-screened under grading-bench lighting; centering and surface support roughly PSA ${pre.est} (opinion, not a guarantee).` : ''}`;
+  return [
+    `${c.name}${c.number ? ' #' + c.number : ''} — ${c.set}${c.setYear ? ' (' + c.setYear + ')' : ''}`,
+    '',
+    `• Set: ${c.set}`,
+    `• Card number: ${c.number || '—'}`,
+    `• Language: ${c.lang === 'ja' ? 'Japanese' : 'English'}`,
+    `• Condition: ${c.graded ? `${c.grader || 'PSA'} ${c.grade || ''}` : (c.wear || 'Near Mint')}`,
+    c.setYear ? `• Year: ${c.setYear}` : null,
+    '',
+    cond,
+    '',
+    'Shipping & care: ships in a fresh penny sleeve inside a semi-rigid holder (Card Saver), in a bubble mailer with tracking — packed the same way cards are prepped for PSA submission.',
+    '',
+    'From a smoke-free collection. Check my other listings — happy to combine shipping.',
+  ].filter(x => x !== null).join('\n');
+}
+function openListingComposer(c, backTo) {
+  const lad = !c.graded && c.game === 'Pokémon' ? gradeLadder(c) : null;
+  const mkt = c.price || 0;
+  const title = ebayTitle(c);
+  const desc = ebayDescription(c);
+  const net = (p) => p * (1 - 0.136);
+  const aiOn = !!(State.live && State.live.ai && State.live.ai.enabled);
+  const html = `<div class="modal-bg" id="modalBg"><div class="modal" style="max-width:760px">
+    <button class="close-x" id="modalClose">×</button>
+    <div class="modal-body" style="padding:26px">
+      <h2 style="font-size:20px;margin-bottom:2px">📤 List on eBay</h2>
+      <p class="muted" style="font-size:12.5px;margin-bottom:14px">${esc(c.name)}${c.number ? ' #' + esc(c.number) : ''} · ${esc(c.set)} — copy what you need, then launch eBay with the title pre-loaded.</p>
+
+      <div class="subhead">Title <span style="text-transform:none;letter-spacing:0">(<span id="lc-count">${title.length}</span>/80)</span></div>
+      <div style="display:flex;gap:8px"><input id="lc-title" class="s-inp" style="margin:0" value="${esc(title)}" maxlength="80">
+        <button class="btn sm" id="lc-copy-title">Copy</button></div>
+
+      <div class="subhead">Price — check the comps, then pick</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button class="btn sm lc-price" data-p="${mkt.toFixed(2)}">Market ${money(mkt)}</button>
+        <button class="btn sm lc-price" data-p="${(mkt * 0.9).toFixed(2)}">Fast sale ${money(mkt * 0.9)}</button>
+        <button class="btn sm lc-price" data-p="${(mkt * 1.1).toFixed(2)}">Patient ${money(mkt * 1.1)}</button>
+        <input id="lc-price" type="number" step="0.01" min="0" value="${mkt.toFixed(2)}" class="s-inp" style="width:110px;margin:0">
+        <span class="reason" id="lc-net">nets ≈ ${money(net(mkt))} after ~13.6%</span>
+      </div>
+      <div class="sr-links" style="margin-top:6px">
+        <a class="minilink" href="${State.intel.urlTemplates.ebayRawSold.replace('{q}', enc(c.q))}" target="_blank" rel="noopener">Top solds (raw)</a>
+        <a class="minilink" href="${gradeSoldLink(c, c.graded ? gradeKeyword(c) : 'PSA 10')}" target="_blank" rel="noopener">Top solds (${c.graded ? esc(gradeKeyword(c)) : 'PSA 10'})</a>
+        <a class="minilink" href="${State.intel.urlTemplates.onetwentypoint.replace('{q}', enc(c.q))}" target="_blank" rel="noopener">130point</a>
+      </div>
+
+      <div class="subhead">Photos</div>
+      <div style="display:flex;gap:14px;align-items:flex-start">
+        ${c.img ? `<img src="${c.img}" style="width:72px;border-radius:6px">` : ''}
+        <div class="reason" style="flex:1">eBay needs photos of <b>your actual card</b> (catalog art won’t cut it for raw cards). Shot list — GradeStage makes these repeatable:
+        <b>1</b> front straight-on · <b>2</b> back straight-on · <b>3</b> all four corners close · <b>4</b> surface under raking light · <b>5</b> any flaw, honestly.
+        ${c.img ? `<br><a href="${c.img}" target="_blank" rel="noopener">Open catalog art ↗</a> (reference only)` : ''}</div>
+      </div>
+
+      <div class="subhead">Description ${aiOn ? '<button class="btn sm gold" id="lc-ai" style="margin-left:8px">✨ AI polish</button>' : ''}</div>
+      <textarea id="lc-desc" class="s-inp" style="min-height:200px;font-size:12.5px;line-height:1.5">${esc(desc)}</textarea>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+        <button class="btn sm" id="lc-copy-desc">Copy description</button>
+        <button class="btn primary" id="lc-launch">📤 Open eBay — title auto-copied</button>
+        ${backTo ? '<button class="btn ghost sm" id="lc-back">← Back to card</button>' : ''}
+      </div>
+      <p class="reason" id="lc-status" style="margin-top:8px">Launching marks this card “For sale” and saves a listing note.</p>
+    </div></div></div>`;
+  $('#modalRoot').innerHTML = html;
+  const T = () => $('#lc-title').value;
+  const P = () => +($('#lc-price').value || 0);
+  $('#lc-title').oninput = () => { $('#lc-count').textContent = T().length; };
+  const setPrice = (v) => { $('#lc-price').value = (+v).toFixed(2); $('#lc-net').textContent = `nets ≈ ${money(net(+v))} after ~13.6%`; };
+  $$('.lc-price').forEach(b => b.onclick = () => setPrice(+b.dataset.p));
+  $('#lc-price').oninput = () => $('#lc-net').textContent = `nets ≈ ${money(net(P()))} after ~13.6%`;
+  const copy = async (txt, msg) => { try { await navigator.clipboard.writeText(txt); toast(msg); } catch { toast('Copy blocked — select & copy manually.'); } };
+  $('#lc-copy-title').onclick = () => copy(T(), 'Title copied.');
+  $('#lc-copy-desc').onclick = () => copy($('#lc-desc').value, 'Description copied.');
+  if ($('#lc-ai')) $('#lc-ai').onclick = async () => {
+    $('#lc-status').textContent = 'Asking the AI for polished copy…';
+    try {
+      const j = await (await fetch('/api/ai', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
+        mode: 'listing', name: c.fullName, set: c.set, number: c.number, year: c.setYear,
+        language: c.lang === 'ja' ? 'Japanese' : 'English', graded: c.graded, grader: c.grader, grade: c.grade,
+        condition: c.graded ? `${c.grader} ${c.grade}` : (c.wear || 'Near Mint'), askingPrice: P(),
+        preGrade: pregradeAll()[c.pcId] ? `owner pre-screen suggests ~PSA ${pregradeAll()[c.pcId].est}` : null }) })).json();
+      if (j.ok && j.text) {
+        const parts = j.text.split(/\n-{3,}\n/);
+        if (parts.length >= 2) { const t = parts[0].trim().slice(0, 80); $('#lc-title').value = t; $('#lc-count').textContent = t.length; $('#lc-desc').value = parts.slice(1).join('\n---\n').trim(); }
+        else $('#lc-desc').value = j.text.trim();
+        $('#lc-status').textContent = `✨ Polished by ${j.model}.`;
+      } else $('#lc-status').textContent = 'AI: ' + (j.error || 'no response');
+    } catch (e) { $('#lc-status').textContent = 'AI error: ' + e.message; }
+  };
+  $('#lc-launch').onclick = async () => {
+    await copy(T(), 'Title copied — paste anywhere eBay asks.');
+    uset(c, { status: 'forsale', note: ((uget(c).note || '') + `\n[${new Date().toISOString().slice(0, 10)}] eBay draft @ ${money(P())} — "${T()}"`).trim() });
+    window.open('https://www.ebay.com/sl/prelist/suggest?q=' + enc(T()), '_blank', 'noopener');
+    $('#lc-status').textContent = '✓ eBay opened in your browser · card marked “For sale” · listing note saved.';
+    refreshAfterUser();
+  };
+  $('#modalClose').onclick = closeModal;
+  $('#modalBg').onclick = e => { if (e.target.id === 'modalBg') closeModal(); };
+  if (backTo) $('#lc-back').onclick = () => openModal(c);
+}
+
 /* ================= MODAL ================= */
 function openModal(c) {
   const u = uget(c), a = gradeAdvice(c), L = links(c), s = sellNet(c);
@@ -1221,6 +1344,7 @@ function openModal(c) {
           ${statBox('P/L', c.pl == null ? '—' : (c.pl >= 0 ? '+' : '') + money(c.pl), plColor)}
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn primary sm" id="mk-list">📤 List on eBay</button>
           <button class="btn ${u.status === 'forsale' ? 'gold' : ''} sm" id="mk-fs">${u.status === 'forsale' ? '✓ For sale' : 'Mark “For sale”'}</button>
           <button class="btn ${u.status === 'sold' ? 'primary' : ''} sm" id="mk-sold">${u.status === 'sold' ? '✓ Sold' : 'Mark “Sold”'}</button>
           ${u.status ? `<button class="btn ghost sm" id="mk-clear">Clear</button>` : ''}
@@ -1260,6 +1384,7 @@ function openModal(c) {
   wireLiveZone(c);
   $('#modalClose').onclick = closeModal;
   $('#modalBg').onclick = e => { if (e.target.id === 'modalBg') closeModal(); };
+  $('#mk-list').onclick = () => openListingComposer(c, true);
   $('#mk-fs').onclick = () => { uset(c, { status: uget(c).status === 'forsale' ? '' : 'forsale' }); openModal(c); refreshAfterUser(); };
   $('#mk-sold').onclick = () => { uset(c, { status: uget(c).status === 'sold' ? '' : 'sold' }); openModal(c); refreshAfterUser(); };
   if ($('#mk-clear')) $('#mk-clear').onclick = () => { uset(c, { status: '' }); openModal(c); refreshAfterUser(); };

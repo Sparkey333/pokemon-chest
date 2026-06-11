@@ -29,7 +29,7 @@ Run:  python3 server.py     (or double-click start.command)
 import os, sys, json, html, subprocess, urllib.request, urllib.error, urllib.parse
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 ROOT = os.path.dirname(os.path.abspath(__file__))
 HOME = os.path.abspath(os.environ.get("POKECHEST_HOME") or ROOT)
 SETTINGS = os.path.join(HOME, "settings.local.json")
@@ -130,16 +130,33 @@ AI_SYSTEM = (
     "sentences, no fluff, never overpromise. End with one clear action."
 )
 
+AI_LISTING_SYSTEM = (
+    "You write high-converting, honest eBay listings for trading cards and collectibles. "
+    "Given item facts (name, set, number, language, condition, price, any pre-grade notes), "
+    "return EXACTLY two parts separated by a line containing only '---':\n"
+    "1) A keyword-optimized eBay title, 80 characters MAX (lead with the most-searched "
+    "terms: franchise, card name, number, set, language, grade/condition; no filler words, "
+    "no emoji, no ALL CAPS spam).\n"
+    "2) A clean listing description: a strong opening line, a short bulleted facts block "
+    "(set, number, year, language, condition as stated), a condition paragraph that is "
+    "honest and only claims what the seller stated, and a closing block about careful "
+    "packaging (penny sleeve + semi-rigid holder, bubble mailer, tracked shipping). "
+    "Plain text only, no HTML. Never invent flaws or grades the seller didn't state; "
+    "never guarantee a future PSA grade."
+)
+
 def ai_recommend(payload, settings):
     provider = settings.get("ai_provider", "anthropic")
     key = settings.get("ai_key")
     model = settings.get("ai_model") or ("claude-fable-5" if provider == "anthropic" else "gpt-4o")
-    user = "Card and context:\n" + json.dumps(payload, ensure_ascii=False, indent=2)
+    mode = payload.pop("mode", None) if isinstance(payload, dict) else None
+    system = AI_LISTING_SYSTEM if mode == "listing" else AI_SYSTEM
+    user = ("Item facts:\n" if mode == "listing" else "Card and context:\n") + json.dumps(payload, ensure_ascii=False, indent=2)
     if provider == "anthropic":
         d = http_json(
             "https://api.anthropic.com/v1/messages", method="POST",
             headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-            body={"model": model, "max_tokens": 700, "system": AI_SYSTEM,
+            body={"model": model, "max_tokens": 900, "system": system,
                   "messages": [{"role": "user", "content": user}]})
         text = "".join(b.get("text", "") for b in d.get("content", []) if b.get("type") == "text")
         return {"ok": True, "provider": provider, "model": model, "text": text.strip()}
@@ -147,8 +164,8 @@ def ai_recommend(payload, settings):
         d = http_json(
             "https://api.openai.com/v1/chat/completions", method="POST",
             headers={"Authorization": f"Bearer {key}", "content-type": "application/json"},
-            body={"model": model, "max_tokens": 700,
-                  "messages": [{"role": "system", "content": AI_SYSTEM},
+            body={"model": model, "max_tokens": 900,
+                  "messages": [{"role": "system", "content": system},
                                {"role": "user", "content": user}]})
         text = d["choices"][0]["message"]["content"]
         return {"ok": True, "provider": provider, "model": model, "text": text.strip()}
