@@ -1,0 +1,248 @@
+{
+ "updated": "2026-06",
+ "disclaimer": "Researched and verified June 2026 (IRS sources where noted). Educational only — not legal or tax advice; confirm specifics with a CPA for your state.",
+ "facebook": {
+  "feeReality": [
+   "Local pickup = 0%. Facebook charges no platform fee and no payment fee on local in-person sales — verified mid-2026 across every source checked, including Value Added Resource's coverage of Meta's fee announcements.",
+   "Shipped checkout = 10% of the total buyer payment (item + shipping + tax collected), $0.80 minimum per order. Meta DOUBLED this from the historical 5%/$0.40 effective April 15, 2024; rates last verified May 2026 against official Meta Business Help pages (sellerfeecalc). Several 2026 SEO articles still claim 5%/$0.40 — they are stale; 10%/$0.80 is current.",
+   "The $0.80 floor means items under $8 shipped effectively pay more than 10%.",
+   "Shipped checkout still exists in the US but is fragmented: Meta-provided prepaid shipping labels were discontinued for new listings on Feb 24, 2025 (buy your own via Pirate Ship/USPS; a quiet partial reinstatement for select sellers was reported ~Sept 2025), and access to enabling shipping varies by account — many accounts never see the option.",
+   "Separately, Meta phased out native checkout for Facebook/Instagram Shops (business storefronts) June–Aug 2025 — a different product than Marketplace P2P checkout, but it signals Meta's retreat from handling payments.",
+   "Practical bottom line: treat FB Marketplace in 2026 as a local-first, cash platform. Route shipped card deals to eBay/TCGplayer, or use PayPal Goods & Services (~3%) in BST groups. For local: cash is standard; Zelle/Venmo/Cash App only if you verify the money landed inside your own app at the meetup; never PayPal Friends & Family."
+  ],
+  "setupSteps": [
+   {
+    "step": "Use an established personal account, not a fresh one",
+    "detail": "Brand-new accounts frequently hit 'Marketplace isn't available to you' or heavy restrictions: roughly 5–10 active listings, posts held for review, and a probation lifting over ~30–90 days (est. — community-reported; Meta publishes no thresholds). New accounts that immediately list high-value items are prime flag/ban candidates. An account with real history is unanimously recommended across seller guides."
+   },
+   {
+    "step": "Build trust signals before listing cards",
+    "detail": "Complete profile with a real photo, verified phone, 2FA enabled. Sell a few cheap low-risk items first, respond fast (within an hour where possible), and mark items sold promptly."
+   },
+   {
+    "step": "Skip the Business Page",
+    "detail": "Marketplace listing is fundamentally a personal-profile feature; native Shops checkout died in 2025. A Page is optional branding only for a card seller — skip it unless building a storefront brand (verified direction, details est.)."
+   },
+   {
+    "step": "Join the major Pokemon BST groups — that's where serious card volume happens",
+    "detail": "Pokemon TCG Buy•Sell•Trade Market (facebook.com/groups/PokemonTCGMarket), Pokémon TCG Sell and Trade (facebook.com/groups/202007151080914), Pokemon Cards Trade, Sell, and Buy (facebook.com/groups/pokemonfb), Pokemon Cards Buy/Sell/Trade supported by Veriswap (facebook.com/groups/169517816782271), PokéMart TCG, plus regional groups. Top groups run 50k–100k+ members (est. — counts not visible logged-out)."
+   },
+   {
+    "step": "Learn group norms before posting",
+    "detail": "Timestamp photos (card + handwritten username/date), price + shipping terms in the post, PWE (~$0.70–1.40, no tracking) vs BMWT (~$4–5, tracked) declared up front, PayPal G&S only, no F&F, no razzes/raffles in most groups, scammer-list checks. Exact rules vary per group."
+   },
+   {
+    "step": "Earn the platform badges",
+    "detail": "Work toward Highly Rated / Very Responsive / Top Shipper badges (verified — Facebook Help describes ratings/badges). Ask buyers for ratings after smooth deals. Default search radius buyers see is ~40 miles."
+   }
+  ],
+  "safetyRules": [
+   "Meet at police safe-exchange zones — hundreds of US departments run camera-monitored 24/7 lots/lobbies (safetradestations.com lists them). Use the lobby for high-value deals, go daytime, bring a friend.",
+   "Cash counted on the spot; counterfeit pen for $100s on high-value deals.",
+   "Verify any P2P payment (Zelle/Venmo/Cash App) inside YOUR own app before handing over cards — never trust a screenshot or email. Fake payment screenshots are a documented top scam.",
+   "There is no 'Zelle business account upgrade' fee — spoofed emails claiming you must be paid extra or refund a difference are a scam (CNBC documented a $500 loss in 2025).",
+   "PayPal Goods & Services only for any shipped or non-cash stranger deal; never Friends & Family — no protection, and 'F&F only' is a walk-away red flag.",
+   "Never use a buyer-provided shipping label (reroute / claimed non-delivery scam). Payments from stolen Venmo/PayPal accounts get clawed back — another reason for cash on local deals.",
+   "Verify graded-slab cert numbers on PSA/CGC/Beckett before the meetup; watch for the meetup switcheroo (card/slab swapped or inspected-and-palmed) — real pattern, prevalence est. (community-reported).",
+   "Keep all conversation in Messenger — moving to email/text is a phishing vector. Don't hold items without a deposit."
+  ],
+  "whatSellsBest": [
+   "Trading cards are allowed — a dedicated 'Trading Cards' Marketplace category exists (verified). Constraints: no counterfeits, and razzes/raffles/mystery-pack mechanics risk the gambling prohibition (enforcement est.).",
+   "FB's sweet spot (verified consensus): bulk lots, commons, sealed product, and high-value local cash deals.",
+   "eBay remains better for graded slabs and individual chase singles — largest buyer pool and sold comps; TCGplayer for commodity singles.",
+   "Net math: eBay all-in ≈ 13.5–16% effective (13.25% FVF + $0.30–0.40/order + shipping risk); FB local = 0%; FB shipped = 10%/$0.80. FB local asking prices typically run ~10–30% under eBay sold comps (est. — community consensus), so FB local net ≈ eBay net on most items, with FB winning on bulk/lots and time-to-cash.",
+   "High-value listings (~$500+) on young accounts may be held for review (est. — community-reported)."
+  ],
+  "urls": {
+   "createListing": "https://www.facebook.com/marketplace/create/item",
+   "search": "https://www.facebook.com/marketplace/search?query=pokemon+cards",
+   "prefillNote": "Title/description prefill via URL DOES NOT EXIST — confirmed absence; no documented deep-link params in Meta docs or third-party tooling (listing tools like Vendoo/Crosslist use browser-extension DOM automation, not URL prefill). Plan on copy-paste or extension automation. The create URL is login-gated (shows Marketplace landing page logged-out, not a 404); /marketplace/create is the type chooser. Useful search params: daysSinceListed=1, deliveryMethod=local_pickup (verified via scraper docs); sortBy=creation_time_descend, minPrice/maxPrice also work (est. — undocumented but widely observed). Region-scoped pattern: facebook.com/marketplace/<city>/search/?query=..."
+  }
+ },
+ "llc": {
+  "ten99kNow": [
+   "Federal 1099-K threshold for 2025 and 2026 is back to $20,000 AND more than 200 transactions — the One Big Beautiful Bill Act (signed July 4, 2025) retroactively repealed the ARPA $600 phase-in. IRS confirmed via FAQs and Fact Sheet FS-2025-08 (Oct 23, 2025). The scheduled $5,000/$2,500/$600 steps are dead. (Verified, primary IRS sources.)",
+   "Several STATES keep their own lower thresholds and marketplaces must report to them regardless: MA/VT/VA/MD at $600 (any transaction count); IL at over $1,000 + 4+ transactions; others (NJ, DC) have used lower thresholds — confirm your state for the filing year.",
+   "The trap: receiving (or not receiving) a 1099-K changes nothing about what you owe. All income is reportable whether or not the form is issued — the higher threshold is less automatic paperwork, not a tax cut."
+  ],
+  "hobbyVsBusiness": [
+   "There are THREE possible tax characters for a card/collectibles seller, taxed very differently: (A) selling your own personal collection, (B) hobby, (C) business/dealer.",
+   "(A) Personal collection: gains are capital gains — cards/memorabilia are 'collectibles' under IRC §408(m), so long-term gains (>1 yr) are taxed at your ordinary rate CAPPED at 28% (a cap, not a flat rate — below-28% brackets pay their lower rate); short-term gains are ordinary. Losses on personal-use property are NOT deductible (investment-documented items may get capital-loss treatment — fact-specific).",
+   "(B) Hobby is the worst of both worlds: report 100% of gross income (Schedule 1, line 8j) with ZERO expense deductions for 2018–2025 (TCJA suspended the old hobby-expense deduction) — taxed on gross with no cost-of-cards offset.",
+   "(C) Business: net profit on Schedule C at your ordinary rate PLUS ~15.3% self-employment tax — but you deduct COGS, grading/authentication fees (PSA/BGS/CGC), shipping & supplies, platform/payment fees, mileage, home office, software, show tables.",
+   "The hobby/business line is IRC §183's nine-factor test (businesslike books, profit motive, time/effort, expertise...), with a safe-harbor presumption of 'for profit' if you show a profit in 3 of the last 5 years.",
+   "Key insight: for an active reseller, Schedule C business treatment usually BEATS hobby treatment even with SE tax — the SE tax is the price of being allowed to deduct COGS and expenses.",
+   "COGS timing: you generally deduct a card's cost in the year it SELLS, not the year you buy it — a $2,000 box bought in December is not a December write-off if unsold."
+  ],
+  "llcEconomics": [
+   "A single-member LLC is a 'disregarded entity': ZERO federal income-tax difference vs. a sole proprietorship — same Schedule C, same rates, same ~15.3% SE tax. An LLC by itself saves you no federal tax.",
+   "What it buys is a liability shield (house/savings vs. business lawsuits/debts) — and only if you maintain separation (separate bank account, no commingling), or a court can pierce the veil.",
+   "Costs (verified 2026 ranges): one-time state filing ~$35–$500 (US average ~$132; Montana $35, Kentucky $40, many states $50); annual report $0–$300; registered agent $0 if yourself, $50–$300/yr for a service.",
+   "California flag: $800 minimum annual franchise tax every year, due even at a loss, plus a gross-receipts fee once CA income tops $250k. For a small CA reseller, $800/yr can exceed the entire liability benefit.",
+   "S-corp election is the only move that actually cuts SE tax (salary + distributions split) — rule of thumb is it starts paying off around $50k–$80k+ of consistent net profit (est. — practitioner consensus), because it adds ~$1.5k–$3k/yr in payroll/bookkeeping/tax-prep and requires a defensible reasonable salary.",
+   "Insurance caveat: a personal umbrella policy typically EXCLUDES business/commercial activity — it is not a substitute. A genuine business wants commercial liability (a Business Owners Policy) and possibly inventory/shipping coverage."
+  ],
+  "decisionTiers": [
+   {
+    "tier": "Tier 1 — Casual: under ~$5k/yr revenue, or just liquidating your own collection",
+    "advice": "No LLC — its cost outweighs any benefit here. Likely hobby or personal capital-asset treatment: report gains (collectibles LTCG capped at 28%), losses on personal items non-deductible, hobby expenses non-deductible. Keep a simple cost-basis record so you only pay tax on actual gains. No EIN or permit needed; marketplaces handle sales tax."
+   },
+   {
+    "tier": "Tier 2 — Side business: ~$5k–$30k/yr, buying to flip regularly",
+    "advice": "File Schedule C as a sole proprietor: income tax + ~15.3% SE tax on net, but you now deduct COGS, grading, shipping, fees, mileage, home office — usually better than hobby status. Get the free EIN + separate bank account + resale certificate; keep per-item COGS books. LLC = optional: worth it mainly in a cheap-filing state, with high-value consignment/inventory, or if you want the separation — weigh hard in California ($800/yr minimum). Consider commercial liability insurance instead of or alongside it."
+   },
+   {
+    "tier": "Tier 3 — Serious: $30k+/yr net and growing",
+    "advice": "Operate as a real business; an LLC now makes sense for liability (shows, high-dollar shipments, helpers) plus clean banking/credit identity. Carry commercial liability + inventory insurance; pay quarterly estimated taxes; consider a CPA. Watch the $600 state 1099-K triggers (MA/VA/MD/VT) if you operate there."
+   },
+   {
+    "tier": "Tier 4 — Scaling: ~$50k–$80k+ consistent NET profit",
+    "advice": "Run the S-corp election math (LLC taxed as S-corp) to cut SE tax via the salary/distribution split — only with a defensible reasonable salary and a bookkeeper/CPA, since it adds ~$1.5k–$3k/yr in compliance (threshold est. — practitioner consensus). Below ~$50k net it usually costs more than it saves."
+   }
+  ],
+  "setupChecklist": [
+   {
+    "step": "Get a free EIN directly from IRS.gov",
+    "detail": "Free; avoid third-party sites that charge. Useful even as a sole proprietor so you don't hand out your SSN on resale certificates."
+   },
+   {
+    "step": "Open a separate business bank account",
+    "detail": "The single most important habit — it's what makes you 'businesslike' under §183 AND what preserves an LLC's veil if you ever form one."
+   },
+   {
+    "step": "Get a resale certificate / state sales-tax permit",
+    "detail": "Issued by your state (distinct from the EIN). Lets you buy inventory tax-free for resale; required if you ever collect tax yourself."
+   },
+   {
+    "step": "Keep per-item (or per-lot) cost-basis books",
+    "detail": "Purchase price, date, grading fee, sale price, fees, shipping — makes COGS defensible and is your §183 'businesslike records' evidence. A spreadsheet or tool (MyResellerGenie, Hurdlr) is enough at small scale. Remember: COGS is deducted in the year the item sells, not when bought."
+   },
+   {
+    "step": "Know who handles sales tax where",
+    "detail": "Marketplace-facilitator laws mean eBay/Amazon/Etsy/Mercari/Whatnot collect and remit sales tax FOR you in all sales-tax states. FB shipped orders through Meta checkout: Meta is responsible. FB LOCAL cash/Venmo/Zelle sales: Facebook collects nothing — a true reseller flipping inventory locally is the one technically on the hook for applicable sales tax."
+   },
+   {
+    "step": "Insure the business properly",
+    "detail": "A personal umbrella policy typically excludes business activity — for a genuine reselling operation use commercial liability (Business Owners Policy) and possibly inventory/shipping coverage."
+   }
+  ],
+  "verdict": "Skip the LLC for now — at this scale it buys nothing and costs real money. A single-member LLC is a federally disregarded entity: identical Schedule C, identical ~15.3% SE tax, zero federal tax savings. Its only product is a liability shield costing ~$35–$500 to form (US average ~$132) plus $0–$300/yr in annual report fees and up to $300/yr for a registered agent — and a flat $800/yr minimum franchise tax in California even at a loss. Liquidating a ~$14k collection plus flipping used games and guitars is unlikely to clear the ~$30k/yr-net tier where the shield starts earning its keep, and the 1099-K reversion to $20k + 200 transactions (IRS-verified for 2025/2026) means no automatic paperwork at this volume anyway — though every dollar of real profit is still taxable, and MA/VT/VA/MD trigger reporting at $600. The actual money move at this tier is electing business (Schedule C) treatment so COGS, grading, shipping, platform fees, and mileage are deductible instead of being taxed on gross as a hobby — the SE tax is the price of those deductions. The one line that changes the LLC calculus is the 3D-print rigs: that's a NEW manufactured product designed and shipped to strangers, the kind of real liability exposure the research flags as the legitimate LLC trigger — flipping used cards and games is not. If the rig line gets real traction (roughly $10k+/yr revenue or meaningful assembled-unit volume — threshold est.), form the LLC around that brand in a cheap-filing state and pair it with a commercial BOP, since a personal umbrella excludes business activity. Hold any S-corp election until ~$50k–$80k consistent net profit (est.) — below that, the $1.5k–$3k/yr in compliance eats the SE-tax savings. Until then: free EIN + separate bank account + resale certificate + per-item COGS books + commercial liability insurance delivers ~90% of the LLC's practical benefit at a fraction of the cost. Not legal or tax advice — confirm state specifics before acting."
+ },
+ "multiLine": {
+  "venueMatrix": [
+   {
+    "line": "pokemon-cards",
+    "bestVenues": "eBay (graded slabs, premium/chase singles) · FB Marketplace local (bulk, lots, sealed, high-value cash) · TCGplayer (commodity singles)",
+    "fees": "eBay 13.25–13.6% FVF + $0.40/order (12.7% with Basic Store, $21.95/mo annual); FB local 0%; FB shipped 10%/$0.80 min; eBay runs recurring 50%-off FVF promos on $1,000+ card singles",
+    "note": "FB local asks run ~10–30% under eBay sold comps (est.), so FB-local net ≈ eBay net on most items — FB wins on bulk/lots and time-to-cash, eBay wins on buyer pool, comps, and Authenticity Guarantee. Verify 13.25 vs 13.6% per-category in Seller Hub (sources conflict)."
+   },
+   {
+    "line": "video-games",
+    "bestVenues": "eBay (shippable games) · FB Marketplace local (consoles, lots, local cash)",
+    "fees": "eBay ~13.25–13.6% + $0.40/order (12.7% with Basic Store); FB local 0%; FB shipped 10%/$0.80 min",
+    "note": "FB shipped checkout at 10% is no longer cheap — use FB for local/lot sales only and route shippable games to eBay. FVF conflict (13.25 vs 13.6%): verify in Seller Hub before pricing."
+   },
+   {
+    "line": "guitars-gear",
+    "bestVenues": "eBay Guitars & Basses (lowest fee for shippable) · Reverb (gear-buyer intent) · FB local (amps, cabs, heavy gear — no fee, no shipping risk)",
+    "fees": "eBay Guitars & Basses 6.35% FVF (5.85% with Basic Store+) + $0.40/order (est. — sources conflict, one claimed 12% capped $350; check the live fee table); Reverb 5% (cap $500) + 3.19% + $0.49 processing ≈ 8.2% all-in (Preferred: 2.99% + $0.49); FB local 0%",
+    "note": "On a $1,000 guitar: eBay ≈ $64, Reverb ≈ $82, FB local $0. Reverb is independent again — Etsy's sale to Creator Partners LLC + Servco Pacific (Fender's majority owner) closed June 2, 2025; no fee hikes announced under new ownership as of June 2026."
+   },
+   {
+    "line": "3d-prints-new",
+    "bestVenues": "Etsy (primary launch venue) · eBay (secondary channel) · Shopify deferred until owned traffic justifies it",
+    "fees": "Etsy: $0.20 listing + 6.5% transaction + 3% + $0.25 processing + one-time $15 shop setup ≈ 10–12.5% all-in typical (Offsite Ads 15% opt-out under $10k / 12% mandatory over, capped $100/order); eBay ~13.6%, no originality rule; Shopify Starter $5/mo + 5% transaction ≈ 8%+/sale, Basic $39/mo ($29 annual) + 2.9% + $0.30",
+    "note": "Etsy's Creativity Standards (updated June 10, 2025) require 3D-printed items be the seller's ORIGINAL design — third-party/licensed STL prints are out. Brandon designs his own rigs, so he's squarely allowed and the rule purges licensed-STL competitors from search. Sell the three-tier ladder: STL → kit + hardware pack → assembled rig."
+   },
+   {
+    "line": "stl-digital",
+    "bestVenues": "MakerWorld Exclusive (points + BOM commissions) or Gumroad (direct sales) + an Etsy digital listing · Printables Store secondary",
+    "fees": "Gumroad 10% + $0.50/transaction direct (30% on Discover sales), no monthly fee; MakerWorld Exclusive $0.066/Exclusive Point as of May 2026 (cash out at $100+, exclusivity required) + NEW 3–15% cash commission when buyers order BOM parts/kits from your model page (effective Mar 24, 2026); Printables Store 20% fee + Stripe (net ~60–75%, $5 min price); Etsy digital = same fees as physical, .stl supported, 5 files x 20MB",
+    "note": "Keep the flagship rig STL paid/exclusive; post a free teaser or accessory model for funnel traffic — giving the flagship away undercuts paid kit sales. The MakerWorld BOM commission is directly relevant to a rig with screws/inserts hardware. Etsy digital files also fall under the original-design rule."
+   }
+  ],
+  "accountStrategy": [
+   "ONE established eBay account for all used lines (cards, games, non-guitar gear) — feedback history is the asset and used-goods buyers don't care about catalog coherence. eBay explicitly allows multiple accounts (policy id=4232, 'separate accounts for different product lines'), but feedback doesn't transfer, new accounts start at zero with low selling limits, and a suspension on one can restrict the others. Only split if the 3D-print line gets big enough to want its own storefront branding.",
+   "Add an eBay Basic Store ($21.95/mo annual): pays for itself vs 13.6% non-store rates at roughly >$2.5k/yr in discounted categories; 1,000 free fixed-price listings/mo. (Starter at $4.95/mo has NO FVF discount.)",
+   "Facebook: keep using the personal profile for local sales — business Pages cannot use the simple 'create listing' flow (Commerce Manager/Shop catalog only). A business Page per brand is only worth it for the 3D-print brand as a marketing surface (posts, groups, ads), not as a Marketplace selling vehicle.",
+   "Etsy: ONE shop, 3D-print products only, named for the product brand. Multiple shops are allowed but each needs its own account/email, public disclosure of your other shops, no duplicate listings, and $15 setup each. Used games/cards don't belong on Etsy at all (handmade / 20-yr-vintage / craft-supply rules), and a mixed shop converts worse in Etsy's relevance-driven search."
+  ],
+  "printBrand": [
+   "Yes — a distinct brand/shop for the rig line is worth it; it's the standard playbook for successful functional-print sellers, and niche focus (card imaging) outperforms generalist print shops.",
+   "Three-tier laddering: STL-only (~$12–25, ~95% margin, infinite stock) → printed kit + hardware pack (mid price, buyer assembles, cheap to ship) → fully assembled/calibrated rig (premium, 2–3x kit). Top sellers run all three simultaneously.",
+   "License tiers on the STL: personal / small-commercial / unlimited-commercial at rising prices.",
+   "Bundle a card-photography setup guide PDF (lighting, white balance, PSA/eBay photo standards) with every tier — near-zero cost, big differentiation, and it cross-sells the actual card listings as proof of results.",
+   "Design an ecosystem/series: accessories (phone mounts, light diffusers, slab holders, toploader jigs) that lock buyers into the system.",
+   "MakerWorld's BOM commissions (3–15%, Mar 2026) enable a hybrid play: paid/exclusive flagship STL + kit listing there, while Etsy carries the assembled/kit physical tiers.",
+   "Name caution: a 'DarkHearts'-style brand fits (matching Etsy/Gumroad/MakerWorld profiles, same logo on inserts), but check the name reads as photography-gear-friendly to strangers — the shop name is the search-result trust signal."
+  ],
+  "crossPromo": [
+   "Core rule everywhere: platforms only police diverting an in-progress sale off-platform — not post-purchase or external marketing.",
+   "eBay: the 'offers to buy or sell outside eBay' policy (id=4272) bans offsite links/contact info in LISTINGS and eBay MESSAGES. Physical package inserts are allowed. Safe play: a card in every shipped Pokemon/game order — 'I also make the rig this card was photographed with' + brand URL/QR + social handles. Never put the URL in listings or messages.",
+   "Etsy: fee-avoidance policy bans completing Etsy-originated sales off-platform and offsite links in listings/Messages; inserts are fine and customary. Bonus: Etsy Share & Save — share your own tracked shop link (socials, email, business cards, inserts) and Etsy refunds the equivalent of 4% of attributed orders; Etsy actively rewards the insert/social funnel toward Etsy.",
+   "Reverb: same pattern — keep listings clean, inserts fine (est. — policy page not directly fetched; consistent with marketplace norms).",
+   "Legal flow that works everywhere: every shipment (cards, games, gear) carries the 3D-print brand insert; every STL/guide download contains links to all storefronts; social accounts (the YouTube 'Ansom' channels are an obvious engine) link to everything."
+  ]
+ },
+ "sources": [
+  "https://www.valueaddedresource.net/facebook-marketplace-doubling-selling-fees/",
+  "https://www.valueaddedresource.net/facebook-marketplace-ends-pre-paid-shipping/",
+  "https://www.valueaddedresource.net/meta-phases-out-native-checkout-facebook-instagram-shops/",
+  "https://sellerfeecalc.com/calculators/facebook",
+  "https://litcommerce.com/blog/facebook-marketplace-fees/",
+  "https://www.facebook.com/help/872811933652508",
+  "https://www.facebook.com/help/915385548593204",
+  "https://www.cnbc.com/2025/05/13/how-i-lost-money-getting-scammed-on-facebook-marketplace-zelle.html",
+  "https://lifelock.norton.com/learn/fraud/facebook-marketplace-scams",
+  "https://www.safetradestations.com/where-to-trade.html",
+  "https://www.misprint.com/posts/tcgplayer-vs-ebay-vs-facebook-marketplace",
+  "https://www.pokemonpricetracker.com/blog/posts/selling-pokemon-cards-in-2026-best-platforms-pricing",
+  "https://ballcardgenius.com/blog/what-is-bmwt-in-cards/",
+  "https://pixelscan.net/blog/marketplace-isnt-available-to-you-fix/",
+  "https://www.facebook.com/marketplace/category/trading-cards/",
+  "https://www.irs.gov/newsroom/irs-issues-faqs-on-form-1099-k-threshold-under-the-one-big-beautiful-bill-dollar-limit-reverts-to-20000",
+  "https://www.irs.gov/pub/taxpros/fs-2025-08.pdf",
+  "https://www.irs.gov/pub/irs-news/fs-08-23.pdf",
+  "https://www.irs.gov/pub/irs-pdf/p5558.pdf",
+  "https://www.avalara.com/blog/en/north-america/2025/07/one-big-beautiful-bill-act-1099-reporting-threshold.html",
+  "https://blog.taxact.com/new-form-1099-k-reporting-thresholds/",
+  "https://www.paypal.com/us/cshelp/article/current-form-1099-k-reporting-thresholds-2025-update-help1131",
+  "https://www.journalofaccountancy.com/issues/2013/oct/20138370/",
+  "https://www.mizecpas.com/tax/tax-consequences-of-investing-in-collectibles/",
+  "https://www.ftb.ca.gov/file/business/types/limited-liability-company/index.html",
+  "https://www.ftb.ca.gov/forms/misc/3556.html",
+  "https://www.llcuniversity.com/llc-filing-fees-by-state/",
+  "https://www.chamberofcommerce.org/llc-costs-by-state/",
+  "https://www.sdocpa.com/s-corporation-tax-guide/",
+  "https://www.streamlinedsalestax.org/for-businesses/marketplace-sellers",
+  "https://handsoffsalestax.com/facebook-marketplace-sales-tax/",
+  "https://notyourdadscpa.com/can-i-deduct-inventory-when-i-purchase-it/",
+  "https://www.myresellergenie.com/blog/tax-write-offs-for-resellers",
+  "https://www.thezebra.com/homeowners-insurance/policies/umbrella-llc-landlords/",
+  "https://www.insureon.com/small-business-insurance/business-owners-policy",
+  "https://reverb.com/news/reverb-servco-creator-partners",
+  "https://www.billboard.com/pro/reverb-sold-etsy-servco-creator-partners/",
+  "https://help.reverb.com/hc/en-us/articles/40917652290843-What-fees-will-I-pay-for-selling-on-Reverb",
+  "https://www.ebay.com/help/selling/fees-credits-invoices/selling-fees?id=4822",
+  "https://export.ebay.com/en/growth/ebay-store/subscriptions-and-fees/",
+  "https://www.ebay.com/help/policies/identity-policies/multiple-accounts-policy?id=4232",
+  "https://www.ebay.com/help/policies/payment-policies/offers-buy-sell-outside-ebay-policy?id=4272",
+  "https://www.sportscollectorsdaily.com/ebay-temporarily-cutting-final-value-fees-higher-value-trading-cards/",
+  "https://www.etsy.com/legal/fees",
+  "https://www.etsy.com/legal/creativity/",
+  "https://www.valueaddedresource.net/etsy-creativity-standards-update-june-2025/",
+  "https://www.tctmagazine.com/from-templates-to-originality-etsy-new-3d-printing-policy/",
+  "https://help.etsy.com/hc/en-us/articles/360000338367-How-Etsy-s-Offsite-Ads-Work",
+  "https://help.etsy.com/hc/en-us/articles/360017604474-How-to-Open-a-Second-Shop-on-Etsy",
+  "https://www.etsy.com/legal/policy/off-platform-transactions/1254654515806",
+  "https://www.etsy.com/seller-handbook/article/1187231088945",
+  "https://gumroad.com/pricing",
+  "https://makerworld.com/en/exclusive-model-policy",
+  "https://wiki.bambulab.com/en/makerworld/tutorials/creator-commission-incentives",
+  "https://blog.prusa3d.com/printables-store_87810/",
+  "https://help.prusa3d.com/article/for-creators_497205",
+  "https://www.shopify.com/pricing",
+  "https://www.shopify.com/starter",
+  "https://www.kiloapps.co/feewise/guides/selling-trading-cards-fees/"
+ ]
+}

@@ -1,7 +1,7 @@
 /* ===================== Pokémon Chest ===================== */
 'use strict';
 
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 const APP_REPO = 'https://github.com/Sparkey333/pokemon-chest';
 
 /* ---------- tiny helpers ---------- */
@@ -52,13 +52,14 @@ init();
 async function init() {
   try {
     const grab = (u) => fetch(u + '?_=' + Date.now()).then(r => r.ok ? r.json() : null).catch(() => null);
-    const [col, intel, gintel, merch, lab, submit] = await Promise.all([
+    const [col, intel, gintel, merch, lab, submit, sellerbiz] = await Promise.all([
       fetch('data/collection.json?_=' + Date.now()).then(r => r.json()),
       fetch('data/selling-intel.json?_=' + Date.now()).then(r => r.json()),
       grab('data/grade-intel.json'),   // grade ratios / pop intel (research-verified)
       grab('data/merch-guide.json'),   // merch categories & sealed rules
       grab('data/grade-lab.json'),     // PSA process replica + rig specs (research-verified)
       grab('data/submit-guide.json'),  // submission walkthrough + turnaround status
+      grab('data/seller-biz.json'),    // FB Marketplace setup + LLC/business playbook
     ]);
     State.cards = col.cards;
     State.meta = col.meta;
@@ -67,6 +68,7 @@ async function init() {
     State.merch = merch;
     State.lab = lab;
     State.submit = submit;
+    State.sellerbiz = sellerbiz;
     recordSnapshot(col.meta.totalValue);
     State.live = await loadLiveConfig();
     updateLiveBtn();
@@ -171,6 +173,7 @@ function links(c) {
       ? { t: 'TCGplayer (JP)', s: 'Japanese market price', u: t.tcgplayerJp.replace('{q}', q) }
       : { t: 'TCGplayer', s: 'US market price', u: t.tcgplayerEn.replace('{q}', q) },
     { t: 'Mercari — Sold', s: 'Cheap-fee resale comps', u: t.mercariSold.replace('{q}', q) },
+    { t: 'FB Marketplace', s: 'Local asking prices · 0% fees', u: 'https://www.facebook.com/marketplace/search?query=' + q },
   ];
   return out.filter(x => x.u);
 }
@@ -806,6 +809,70 @@ function renderGuide() {
       <div class="panel"><h3>Sources</h3>
         <div class="src-list">${I.sources.map(s => `<div><a href="${esc(s)}" target="_blank" rel="noopener">${esc(s.replace(/^https?:\/\/(www\.)?/, '').split('/')[0])}</a></div>`).join('')}</div>
       </div>
+    </div>
+    ${sellerPlaybookHTML()}`;
+}
+
+/* ---- Seller Playbook (FB Marketplace, business structure, multi-line strategy) ---- */
+function sellerPlaybookHTML() {
+  const B = State.sellerbiz;
+  if (!B) return `<div class="panel" style="margin-top:22px"><h3>📒 Seller Playbook</h3>
+    <p class="muted" style="font-size:13px">Facebook Marketplace setup, LLC decision framework, and multi-line venue strategy load with the next data update. The FB venue already works in the 📤 listing composer.</p></div>`;
+  const fb = B.facebook, llc = B.llc, ml = B.multiLine;
+  return `
+    <div class="section-head" style="margin-top:30px"><h2>📒 Seller Playbook</h2>
+      <span class="sub">${esc(B.disclaimer || 'Researched June 2026. Educational, not legal or tax advice — confirm specifics with a professional.')}</span></div>
+
+    <div class="cols two">
+      <div class="panel"><h3>Facebook Marketplace — the 0%-fee venue</h3>
+        <div class="subhead">Fee reality</div>
+        <ul class="bullets">${fb.feeReality.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+        <div class="subhead">Account setup for a card seller</div>
+        <ol class="bullets" style="padding-left:20px">${fb.setupSteps.map(s => `<li><b>${esc(s.step)}.</b> ${esc(s.detail)}</li>`).join('')}</ol>
+        <div class="subhead">What sells best there</div>
+        <ul class="bullets">${fb.whatSellsBest.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+      </div>
+      <div class="panel"><h3>Stay un-scammed</h3>
+        <ul class="bullets">${fb.safetyRules.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+        <p class="reason" style="margin-top:8px">${esc(fb.urls.prefillNote)}</p>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:16px"><h3>LLC or not? The business question</h3>
+      <div class="rec-box maybe" style="margin:8px 0 14px"><div class="rh">The verdict for your situation</div>
+        <div class="rb">${esc(llc.verdict)}</div></div>
+      <div class="cols two">
+        <div>
+          <div class="subhead">Taxes right now (1099-K & hobby vs business)</div>
+          <ul class="bullets">${llc.ten99kNow.concat(llc.hobbyVsBusiness).map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+        </div>
+        <div>
+          <div class="subhead">What an LLC actually buys you</div>
+          <ul class="bullets">${llc.llcEconomics.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+        </div>
+      </div>
+      <div class="subhead">By revenue tier</div>
+      <table class="guide-table"><thead><tr><th>Where you are</th><th>What to do</th></tr></thead><tbody>
+        ${llc.decisionTiers.map(t => `<tr><td style="white-space:nowrap"><b>${esc(t.tier)}</b></td><td class="reason">${esc(t.advice)}</td></tr>`).join('')}
+      </tbody></table>
+      <div class="subhead">Setup checklist (either way)</div>
+      <ol class="bullets" style="padding-left:20px">${llc.setupChecklist.map(s => `<li><b>${esc(s.step)}.</b> ${esc(s.detail)}</li>`).join('')}</ol>
+    </div>
+
+    <div class="cols two" style="margin-top:16px">
+      <div class="panel"><h3>Cards · games · guitars · 3D prints — where each sells</h3>
+        <table class="guide-table"><thead><tr><th>Line</th><th>Best venues</th><th>Fees</th></tr></thead><tbody>
+          ${ml.venueMatrix.map(v => `<tr><td><b>${esc(v.line)}</b><br><span class="reason">${esc(v.note)}</span></td><td>${esc(v.bestVenues)}</td><td class="reason">${esc(v.fees)}</td></tr>`).join('')}
+        </tbody></table>
+      </div>
+      <div class="panel"><h3>Accounts & branding</h3>
+        <div class="subhead">Account strategy</div>
+        <ul class="bullets">${ml.accountStrategy.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+        <div class="subhead">The 3D-print line (GradeStage etc.)</div>
+        <ul class="bullets">${ml.printBrand.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+        <div class="subhead">Cross-promotion that’s allowed</div>
+        <ul class="bullets">${ml.crossPromo.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+      </div>
     </div>`;
 }
 
@@ -1234,18 +1301,32 @@ function ebayDescription(c) {
     'From a smoke-free collection. Check my other listings — happy to combine shipping.',
   ].filter(x => x !== null).join('\n');
 }
-function openListingComposer(c, backTo) {
-  const lad = !c.graded && c.game === 'Pokémon' ? gradeLadder(c) : null;
+const VENUES = {
+  ebay: { name: 'eBay', fee: 0.136, feeLabel: 'after ~13.6% fees',
+    launch: (t) => 'https://www.ebay.com/sl/prelist/suggest?q=' + enc(t), launchLabel: '📤 Open eBay — title auto-copied' },
+  fb: { name: 'Facebook Marketplace', fee: 0, feeLabel: 'local cash — you keep 100% (shipped = 10% fee)',
+    launch: () => 'https://www.facebook.com/marketplace/create/item', launchLabel: '📤 Open FB Marketplace — copy goes with you' },
+};
+function openListingComposer(c, backTo, venueKey) {
+  const venue = VENUES[venueKey] ? venueKey : (VENUES[State.lastVenue] ? State.lastVenue : 'ebay');
+  State.lastVenue = venue;
+  const V = VENUES[venue];
   const mkt = c.price || 0;
   const title = ebayTitle(c);
-  const desc = ebayDescription(c);
-  const net = (p) => p * (1 - 0.136);
+  const desc = ebayDescription(c) + (venue === 'fb'
+    ? '\n\nLocal pickup preferred — cash or tap-to-pay at a public safe-exchange spot. Can ship at buyer’s cost, tracked & insured.'
+    : '');
+  const net = (p) => p * (1 - V.fee);
   const aiOn = !!(State.live && State.live.ai && State.live.ai.enabled);
   const html = `<div class="modal-bg" id="modalBg"><div class="modal" style="max-width:760px">
     <button class="close-x" id="modalClose">×</button>
     <div class="modal-body" style="padding:26px">
-      <h2 style="font-size:20px;margin-bottom:2px">📤 List on eBay</h2>
-      <p class="muted" style="font-size:12.5px;margin-bottom:14px">${esc(c.name)}${c.number ? ' #' + esc(c.number) : ''} · ${esc(c.set)} — copy what you need, then launch eBay with the title pre-loaded.</p>
+      <h2 style="font-size:20px;margin-bottom:6px">📤 List for sale</h2>
+      <div class="seg" style="display:inline-flex;margin-bottom:8px">
+        <button id="lc-v-ebay" class="${venue === 'ebay' ? 'active' : ''}">eBay</button>
+        <button id="lc-v-fb" class="${venue === 'fb' ? 'active' : ''}">Facebook · 0% local</button>
+      </div>
+      <p class="muted" style="font-size:12.5px;margin-bottom:14px">${esc(c.name)}${c.number ? ' #' + esc(c.number) : ''} · ${esc(c.set)} — copy what you need, then launch ${esc(V.name)} with the title ready to paste.${venue === 'fb' ? ' <b style="color:var(--green)">Local sales keep 100%</b> — safe-meetup rules in the Guide tab’s Seller Playbook.' : ''}</p>
 
       <div class="subhead">Title <span style="text-transform:none;letter-spacing:0">(<span id="lc-count">${title.length}</span>/80)</span></div>
       <div style="display:flex;gap:8px"><input id="lc-title" class="s-inp" style="margin:0" value="${esc(title)}" maxlength="80">
@@ -1257,18 +1338,19 @@ function openListingComposer(c, backTo) {
         <button class="btn sm lc-price" data-p="${(mkt * 0.9).toFixed(2)}">Fast sale ${money(mkt * 0.9)}</button>
         <button class="btn sm lc-price" data-p="${(mkt * 1.1).toFixed(2)}">Patient ${money(mkt * 1.1)}</button>
         <input id="lc-price" type="number" step="0.01" min="0" value="${mkt.toFixed(2)}" class="s-inp" style="width:110px;margin:0">
-        <span class="reason" id="lc-net">nets ≈ ${money(net(mkt))} after ~13.6%</span>
+        <span class="reason" id="lc-net">nets ≈ ${money(net(mkt))} ${esc(V.feeLabel)}</span>
       </div>
       <div class="sr-links" style="margin-top:6px">
         <a class="minilink" href="${State.intel.urlTemplates.ebayRawSold.replace('{q}', enc(c.q))}" target="_blank" rel="noopener">Top solds (raw)</a>
         <a class="minilink" href="${gradeSoldLink(c, c.graded ? gradeKeyword(c) : 'PSA 10')}" target="_blank" rel="noopener">Top solds (${c.graded ? esc(gradeKeyword(c)) : 'PSA 10'})</a>
         <a class="minilink" href="${State.intel.urlTemplates.onetwentypoint.replace('{q}', enc(c.q))}" target="_blank" rel="noopener">130point</a>
+        <a class="minilink" href="https://www.facebook.com/marketplace/search?query=${enc(c.q)}" target="_blank" rel="noopener">FB asking prices</a>
       </div>
 
       <div class="subhead">Photos</div>
       <div style="display:flex;gap:14px;align-items:flex-start">
         ${c.img ? `<img src="${c.img}" style="width:72px;border-radius:6px">` : ''}
-        <div class="reason" style="flex:1">eBay needs photos of <b>your actual card</b> (catalog art won’t cut it for raw cards). Shot list — GradeStage makes these repeatable:
+        <div class="reason" style="flex:1">${esc(V.name)} buyers need photos of <b>your actual card</b> (catalog art won’t cut it for raw cards). Shot list — GradeStage makes these repeatable:
         <b>1</b> front straight-on · <b>2</b> back straight-on · <b>3</b> all four corners close · <b>4</b> surface under raking light · <b>5</b> any flaw, honestly.
         ${c.img ? `<br><a href="${c.img}" target="_blank" rel="noopener">Open catalog art ↗</a> (reference only)` : ''}</div>
       </div>
@@ -1277,7 +1359,7 @@ function openListingComposer(c, backTo) {
       <textarea id="lc-desc" class="s-inp" style="min-height:200px;font-size:12.5px;line-height:1.5">${esc(desc)}</textarea>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
         <button class="btn sm" id="lc-copy-desc">Copy description</button>
-        <button class="btn primary" id="lc-launch">📤 Open eBay — title auto-copied</button>
+        <button class="btn primary" id="lc-launch">${esc(V.launchLabel)}</button>
         ${backTo ? '<button class="btn ghost sm" id="lc-back">← Back to card</button>' : ''}
       </div>
       <p class="reason" id="lc-status" style="margin-top:8px">Launching marks this card “For sale” and saves a listing note.</p>
@@ -1286,9 +1368,11 @@ function openListingComposer(c, backTo) {
   const T = () => $('#lc-title').value;
   const P = () => +($('#lc-price').value || 0);
   $('#lc-title').oninput = () => { $('#lc-count').textContent = T().length; };
-  const setPrice = (v) => { $('#lc-price').value = (+v).toFixed(2); $('#lc-net').textContent = `nets ≈ ${money(net(+v))} after ~13.6%`; };
+  const setPrice = (v) => { $('#lc-price').value = (+v).toFixed(2); $('#lc-net').textContent = `nets ≈ ${money(net(+v))} ${V.feeLabel}`; };
   $$('.lc-price').forEach(b => b.onclick = () => setPrice(+b.dataset.p));
-  $('#lc-price').oninput = () => $('#lc-net').textContent = `nets ≈ ${money(net(P()))} after ~13.6%`;
+  $('#lc-price').oninput = () => $('#lc-net').textContent = `nets ≈ ${money(net(P()))} ${V.feeLabel}`;
+  $('#lc-v-ebay').onclick = () => { if (venue !== 'ebay') openListingComposer(c, backTo, 'ebay'); };
+  $('#lc-v-fb').onclick = () => { if (venue !== 'fb') openListingComposer(c, backTo, 'fb'); };
   const copy = async (txt, msg) => { try { await navigator.clipboard.writeText(txt); toast(msg); } catch { toast('Copy blocked — select & copy manually.'); } };
   $('#lc-copy-title').onclick = () => copy(T(), 'Title copied.');
   $('#lc-copy-desc').onclick = () => copy($('#lc-desc').value, 'Description copied.');
@@ -1309,10 +1393,13 @@ function openListingComposer(c, backTo) {
     } catch (e) { $('#lc-status').textContent = 'AI error: ' + e.message; }
   };
   $('#lc-launch').onclick = async () => {
-    await copy(T(), 'Title copied — paste anywhere eBay asks.');
-    uset(c, { status: 'forsale', note: ((uget(c).note || '') + `\n[${new Date().toISOString().slice(0, 10)}] eBay draft @ ${money(P())} — "${T()}"`).trim() });
-    window.open('https://www.ebay.com/sl/prelist/suggest?q=' + enc(T()), '_blank', 'noopener');
-    $('#lc-status').textContent = '✓ eBay opened in your browser · card marked “For sale” · listing note saved.';
+    // FB's create form has no URL prefill — copy title AND description together so
+    // one paste fills the title and the rest drops into the description box.
+    await copy(venue === 'fb' ? `${T()}\n\n${$('#lc-desc').value}` : T(),
+      venue === 'fb' ? 'Title + description copied — paste into the FB form.' : 'Title copied — paste anywhere eBay asks.');
+    uset(c, { status: 'forsale', note: ((uget(c).note || '') + `\n[${new Date().toISOString().slice(0, 10)}] ${V.name} draft @ ${money(P())} — "${T()}"`).trim() });
+    window.open(V.launch(T()), '_blank', 'noopener');
+    $('#lc-status').textContent = `✓ ${V.name} opened in your browser · card marked “For sale” · listing note saved.`;
     refreshAfterUser();
   };
   $('#modalClose').onclick = closeModal;
@@ -1344,7 +1431,7 @@ function openModal(c) {
           ${statBox('P/L', c.pl == null ? '—' : (c.pl >= 0 ? '+' : '') + money(c.pl), plColor)}
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn primary sm" id="mk-list">📤 List on eBay</button>
+          <button class="btn primary sm" id="mk-list">📤 List for sale</button>
           <button class="btn ${u.status === 'forsale' ? 'gold' : ''} sm" id="mk-fs">${u.status === 'forsale' ? '✓ For sale' : 'Mark “For sale”'}</button>
           <button class="btn ${u.status === 'sold' ? 'primary' : ''} sm" id="mk-sold">${u.status === 'sold' ? '✓ Sold' : 'Mark “Sold”'}</button>
           ${u.status ? `<button class="btn ghost sm" id="mk-clear">Clear</button>` : ''}
