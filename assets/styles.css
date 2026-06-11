@@ -286,6 +286,29 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px clamp(14px,3vw,30px) 60px}
 /* ---------- footer ---------- */
 .footer{max-width:var(--maxw);margin:0 auto;padding:18px clamp(14px,3vw,30px) 36px;color:var(--muted2);font-size:12px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;align-items:center;gap:2px}
 
+/* grade ladder (modal) + grade matrix cells */
+.ladder{display:grid;grid-template-columns:repeat(auto-fit,minmax(86px,1fr));gap:8px;margin-bottom:4px}
+.lad-cell{display:flex;flex-direction:column;align-items:center;gap:2px;padding:9px 6px;border-radius:10px;background:var(--panel);border:1px solid var(--border2);transition:.13s}
+.lad-cell:hover{border-color:var(--accent);text-decoration:none;transform:translateY(-1px)}
+.lad-cell .lc-g{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2)}
+.lad-cell .lc-v{font-size:14.5px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--text)}
+.lad-cell.g10 .lc-v{color:var(--gold)} .lad-cell.g9 .lc-v{color:var(--accent)} .lad-cell.g8 .lc-v{color:var(--muted)}
+.lad-cell.svc .lc-v{color:var(--green)}
+.grade-est a{color:var(--text);text-decoration:none;border-bottom:1px dotted var(--border2)}
+.grade-est a:hover{color:var(--accent);border-bottom-color:var(--accent)}
+.grade-est.g10 a{color:var(--gold)} .grade-est.g9 a{color:var(--accent)} .grade-est.g8 a{color:var(--muted)}
+.grade-est.svc a{color:var(--green)}
+
+/* pop watch */
+.pop-inp{width:104px;padding:7px 9px;border-radius:8px;border:1px solid var(--border2);background:var(--panel2);color:var(--text);font-family:inherit;font-size:13px}
+.pop-inp:focus{outline:none;border-color:var(--accent)}
+
+/* merch vault */
+.merch-form{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.merch-form input,.merch-form select{padding:9px 11px;border-radius:9px;border:1px solid var(--border2);background:var(--panel2);color:var(--text);font-family:inherit;font-size:13px}
+.merch-form input:focus,.merch-form select:focus{outline:none;border-color:var(--accent)}
+.merch-sold td{opacity:.62}
+
 /* settings inputs */
 .s-inp{width:100%;margin:4px 0 8px;padding:10px 12px;border-radius:10px;border:1px solid var(--border2);background:var(--panel);color:var(--text);font-family:inherit;font-size:13.5px}
 .s-inp:focus{outline:none;border-color:var(--accent)}

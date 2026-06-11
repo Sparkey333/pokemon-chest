@@ -1,7 +1,7 @@
 /* ===================== Pokémon Chest ===================== */
 'use strict';
 
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.0';
 const APP_REPO = 'https://github.com/Sparkey333/pokemon-chest';
 
 /* ---------- tiny helpers ---------- */
@@ -15,6 +15,8 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<':
 const LS_SNAP = 'pokechest.snapshots.v1';
 const LS_USER = 'pokechest.userdata.v1';
 const LS_ACTIONS = 'pokechest.actions.v1';
+const LS_POP = 'pokechest.pop.v1';
+const LS_MERCH = 'pokechest.merch.v1';
 
 // One-time migration from the PokéVault era — keeps existing snapshots & notes.
 (function migrateLegacyKeys() {
@@ -49,13 +51,18 @@ function uset(c, patch) { State.user[c.pcId] = Object.assign({}, uget(c), patch)
 init();
 async function init() {
   try {
-    const [col, intel] = await Promise.all([
+    const grab = (u) => fetch(u + '?_=' + Date.now()).then(r => r.ok ? r.json() : null).catch(() => null);
+    const [col, intel, gintel, merch] = await Promise.all([
       fetch('data/collection.json?_=' + Date.now()).then(r => r.json()),
       fetch('data/selling-intel.json?_=' + Date.now()).then(r => r.json()),
+      grab('data/grade-intel.json'),   // grade ratios / pop intel (research-verified)
+      grab('data/merch-guide.json'),   // merch categories & sealed rules
     ]);
     State.cards = col.cards;
     State.meta = col.meta;
     State.intel = intel;
+    State.gintel = gintel;
+    State.merch = merch;
     recordSnapshot(col.meta.totalValue);
     State.live = await loadLiveConfig();
     updateLiveBtn();
@@ -68,6 +75,7 @@ async function init() {
     renderCollection(true);
     renderSell();
     renderGuide();
+    renderMerch();
   } catch (e) {
     $('#main').innerHTML = `<div class="panel" style="margin-top:30px"><h3>Couldn’t load your collection</h3>
       <p class="muted">Open this page through the <b>start.command</b> launcher (a local server), not by double-clicking index.html — browsers block data files on <code>file://</code>.</p>
@@ -160,6 +168,63 @@ function links(c) {
   return out.filter(x => x.u);
 }
 
+/* ---------- grade ladder (PSA 10/9/8 + other services, research-verified ratios) ---------- */
+// Fallbacks only matter until data/grade-intel.json ships; that file (built from
+// verified research) overrides everything here at runtime.
+const GRADE_FALLBACK = {
+  gradeRatios: {
+    vintage: { psa9OfPsa10: 0.45, psa8OfPsa10: 0.22, psa10OfRaw: 6 },
+    mid:     { psa9OfPsa10: 0.45, psa8OfPsa10: 0.20, psa10OfRaw: 3 },
+    modern:  { psa9OfPsa10: 0.40, psa8OfPsa10: 0.15, psa10OfRaw: 2 },
+    japaneseNote: 'Japanese cards gem-grade more often; ratios hold roughly the same. (est.)',
+  },
+  serviceDeltas: [
+    { service: 'CGC', vsPsaPct: 75, note: 'CGC usually sells at a discount to PSA at equal grade. (est.)' },
+    { service: 'TAG', vsPsaPct: 70, note: 'Newer service; thinner market than PSA. (est.)' },
+  ],
+};
+function gradeIntel() { return State.gintel || GRADE_FALLBACK; }
+function eraKey(c) { return c.era === 'vintage' ? 'vintage' : c.era === 'retro' ? 'mid' : 'modern'; }
+function gradeLadder(c) {
+  const gi = gradeIntel();
+  let r = gi.gradeRatios[eraKey(c)] || gi.gradeRatios.modern;
+  // Japanese modern cards have a compressed grade curve (higher gem rates →
+  // raw already prices in the 10): use the dedicated ratio set when present.
+  if (c.lang === 'ja' && eraKey(c) === 'modern' && gi.gradeRatios.modernJa) r = gi.gradeRatios.modernJa;
+  const raw = c.price || 0;
+  const psa10 = raw * r.psa10OfRaw;
+  const services = {};
+  for (const s of gi.serviceDeltas || []) services[s.service] = { v: psa10 * (s.vsPsaPct / 100), note: s.note };
+  return {
+    raw,
+    psa10, psa9: psa10 * r.psa9OfPsa10, psa8: psa10 * r.psa8OfPsa10,
+    services,
+    ratios: r,
+  };
+}
+function gradeSoldLink(c, keyword) {
+  const t = State.intel.urlTemplates;
+  return t.ebayGradedSold.replace('{q}', enc(c.q)).replace('{grade}', enc(keyword));
+}
+/* per-card pop-watch records (manual entry; BYOK auto-fill later) */
+function popGet(c) { return loadJSON(LS_POP, {})[c.pcId] || null; }
+function popSet(c, pop) {
+  const all = loadJSON(LS_POP, {});
+  if (pop == null || pop === '') delete all[c.pcId];
+  else all[c.pcId] = { pop: +pop, date: new Date().toISOString().slice(0, 10) };
+  localStorage.setItem(LS_POP, JSON.stringify(all));
+}
+function popTier(pop) {
+  const tiers = (State.gintel && State.gintel.popIntel && State.gintel.popIntel.tiers) || [
+    { label: 'Low pop', maxPop: 100, advice: 'Scarce in 10 — grading premium strongest. (est.)' },
+    { label: 'Normal', maxPop: 1000, advice: 'Typical population — standard math applies. (est.)' },
+    { label: 'Elevated', maxPop: 5000, advice: 'Plenty of 10s exist — premium compressing. (est.)' },
+    { label: 'High pop', maxPop: Infinity, advice: 'Market flooded with 10s — grading premium weak; lean sell-raw. (est.)' },
+  ];
+  for (const t of tiers) if (pop <= t.maxPop) return t;
+  return tiers[tiers.length - 1];
+}
+
 /* ---------- recommendation engine (uses verified thresholds) ---------- */
 function gradeAdvice(c) {
   const T = State.intel.thresholds;
@@ -168,30 +233,43 @@ function gradeAdvice(c) {
       body: `This slab is done. Sell graded on eBay (most liquid for slabs). A ${c.grader || 'PSA'} ${c.grade || ''} typically commands a premium over raw; check the graded comps below.` };
   }
   const p = c.price || 0;
-  let threshold, mult, eraLabel;
-  if (c.era === 'vintage') { threshold = T.gradeVintageRaw; mult = 6; eraLabel = 'vintage'; }
-  else if (c.era === 'retro') { threshold = 50; mult = 3; eraLabel = 'older'; }
-  else if (c.era === 'modern') { threshold = c.lang === 'ja' ? 55 : T.gradeModernEnglishRaw; mult = c.lang === 'ja' ? 2.2 : 2; eraLabel = 'modern'; }
-  else { threshold = 60; mult = 2.5; eraLabel = ''; }
+  let threshold, eraLabel;
+  if (c.era === 'vintage') { threshold = T.gradeVintageRaw; eraLabel = 'vintage'; }
+  else if (c.era === 'retro') { threshold = 50; eraLabel = 'older'; }
+  else if (c.era === 'modern') { threshold = c.lang === 'ja' ? 55 : T.gradeModernEnglishRaw; eraLabel = 'modern'; }
+  else { threshold = 60; eraLabel = ''; }
 
-  const estPsa10 = p * mult;
+  const lad = gradeLadder(c);
+  const estPsa10 = lad.psa10;
   const allIn = T.allInGradingCost;
-  const net = estPsa10 - p - allIn; // extra value vs leaving it raw, minus grading cost
+  const fee = 0.136; // eBay, where slabs sell
+  // What lands in your pocket per outcome, vs simply selling raw today:
+  const net10 = lad.psa10 * (1 - fee) - allIn;
+  const net9 = lad.psa9 * (1 - fee) - allIn;
+  const net8 = lad.psa8 * (1 - fee) - allIn;
+  const nineSafe = net9 > p;          // even a 9 beats selling raw
+  const eightSafe = net8 > p;         // even an 8 beats selling raw (rare outside vintage)
+  const net = estPsa10 - p - allIn;
   const jpNote = c.lang === 'ja' ? ' Japanese cards also gem-grade more often, improving your odds of a 10.' : '';
+  const downside = eightSafe
+    ? `Downside is covered: even a PSA 8 (≈${money(lad.psa8)}) nets more than raw.`
+    : nineSafe
+      ? `A PSA 9 (≈${money(lad.psa9)}) still nets ≈${money(net9)} — beats selling raw, so an imperfect card is OK. A PSA 8 (≈${money(lad.psa8)}) would not.`
+      : `<b>10-or-bust:</b> a PSA 9 (≈${money(lad.psa9)}) nets only ≈${money(net9)} after fees+grading — below the ${money(p)} raw. Only grade if it looks gem.`;
 
   if (p < T.gradeFloorRaw) {
-    return { verdict: 'no', title: 'Not worth grading', estPsa10,
+    return { verdict: 'no', title: 'Not worth grading', estPsa10, lad, nineSafe, eightSafe,
       body: `At <b>${money(p)}</b> raw it’s below the ~${money(T.gradeFloorRaw, 0)} floor where grading (~${money(allIn, 0)} all-in at CGC Bulk/TAG) can pay off. Keep raw or sell as-is.` };
   }
   if (p >= threshold && net > p * 0.5) {
-    return { verdict: 'strong', title: 'Strong grading candidate', estPsa10,
-      body: `${cap(eraLabel)} ${c.lang === 'ja' ? 'Japanese' : 'English'} card at <b>${money(p)}</b> raw. A clean PSA 10 ≈ <b>${money(estPsa10)}</b> (~${mult}× ${eraLabel} multiple), so roughly <b>${money(net)}</b> upside after ~${money(allIn, 0)} grading — <i>only if it grades a 10</i>. Verify centering & corners first.${jpNote}` };
+    return { verdict: 'strong', title: nineSafe ? 'Strong grading candidate — 9 still wins' : 'Strong candidate — needs the 10', estPsa10, lad, nineSafe, eightSafe,
+      body: `${cap(eraLabel)} ${c.lang === 'ja' ? 'Japanese' : 'English'} card at <b>${money(p)}</b> raw. PSA 10 ≈ <b>${money(estPsa10)}</b> / PSA 9 ≈ ${money(lad.psa9)} / PSA 8 ≈ ${money(lad.psa8)}. ${downside}${jpNote}` };
   }
   if (p >= threshold * 0.7) {
-    return { verdict: 'maybe', title: 'Borderline — grade only if near-mint', estPsa10,
-      body: `At <b>${money(p)}</b> raw it’s near the ${eraLabel} grading threshold (~${money(threshold, 0)}). Worth it only with pack-fresh corners & 60/40+ centering; a 9 instead of a 10 often won’t beat raw + fees.${jpNote}` };
+    return { verdict: 'maybe', title: 'Borderline — grade only if near-mint', estPsa10, lad, nineSafe, eightSafe,
+      body: `At <b>${money(p)}</b> raw it’s near the ${eraLabel} grading threshold (~${money(threshold, 0)}). ${downside}${jpNote}` };
   }
-  return { verdict: 'no', title: 'Probably leave it raw', estPsa10,
+  return { verdict: 'no', title: 'Probably leave it raw', estPsa10, lad, nineSafe, eightSafe,
     body: `At <b>${money(p)}</b> raw the PSA-10 upside (~${money(estPsa10)}) is thin against ~${money(allIn, 0)} grading + selling fees for a ${eraLabel} card. Sell raw unless it’s flawless.` };
 }
 
@@ -548,32 +626,101 @@ function renderSell() {
   const top = [...c].sort((a, b) => b.value - a.value).slice(0, 40);
   const forSale = c.filter(x => (uget(x).status || '') === 'forsale').sort((a, b) => b.value - a.value);
 
+  const popList = popWatchList();
   const tabs = [
     ['top', `Top sellers (${top.length})`],
     ['grade', `Grading candidates (${gradeCands.length})`],
+    ['pop', `Pop watch (${popList.length})`],
     ['fs', `My for-sale list (${forSale.length})`],
   ];
   let body = '';
   if (State.sellTab === 'top') body = sellTable(top.map(x => ({ x })), 'top');
   else if (State.sellTab === 'grade') body = sellTable(gradeCands, 'grade');
+  else if (State.sellTab === 'pop') body = popWatchHTML(popList);
   else body = forSale.length ? sellTable(forSale.map(x => ({ x })), 'fs')
     : `<div class="empty">No cards flagged yet. Open any card and hit <b>Mark “For sale”</b> to build your selling worklist here.</div>`;
 
+  const gradeNote = State.sellTab === 'grade'
+    ? `<p class="muted" style="font-size:12px;margin:0 2px 10px">Per-grade values are <b>estimates</b> from research-verified era ratios — every cell links to that grade’s real eBay sold comps, so click through before deciding. ${esc((gradeIntel().gradeRatios || {}).japaneseNote || '')}</p>` : '';
   $('#view-sell').innerHTML = `
     <div class="section-head"><h2>Sell Hub</h2>
       <span class="sub">Live sold comps + grading math. Fees baked into “net est.” (eBay ~13.6% / low-fee venues ~11%).</span></div>
     <div class="tabbar">${tabs.map(([v, l]) => `<button class="${State.sellTab === v ? 'active' : ''}" data-st="${v}">${l}</button>`).join('')}</div>
-    ${body}`;
+    ${gradeNote}${body}`;
 
   $$('#view-sell .tabbar button').forEach(b => b.onclick = () => { State.sellTab = b.dataset.st; renderSell(); });
   $$('#view-sell .sr-card, #view-sell .open-i').forEach(el => el.onclick = () => openModal(State.cards[+el.dataset.i]));
+  if (State.sellTab === 'pop') wirePopWatch(popList);
 }
 
+/* ---- Pop Watch: your top cards vs PSA population ---- */
+function popWatchList() {
+  // Top 75 raw Pokémon cards by value — the ones where the grade/pop question is live.
+  return State.cards
+    .filter(c => c.game === 'Pokémon' && !c.graded && (c.price || 0) >= 5)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 75);
+}
+function popWatchHTML(list) {
+  const PI = (State.gintel && State.gintel.popIntel) || null;
+  const PU = (State.gintel && State.gintel.popUrlTemplates) || {
+    psaPopSearch: 'https://www.psacard.com/pop?q={q}',
+    gemrate: 'https://gemrate.com/search?q={q}',
+    psaApiNote: '',
+  };
+  const callout = `
+    <div class="callout" style="margin-bottom:14px">
+      <b>Does a high PSA-10 population kill the premium? </b>
+      ${PI ? esc(PI.claimVerdict) : 'Generally yes — when thousands of PSA 10s exist, the 10 premium compresses toward raw. Verified guidance loads with the next data update.'}
+      ${PI ? `<br><span class="muted" style="font-size:12.5px">${esc(PI.heuristic)}</span>` : ''}
+      <br><span class="muted" style="font-size:12px">Check a card’s pop via the links, type the PSA 10 count in — your entry is saved and the verdict adapts. ${esc(PU.psaApiNote || '')}</span>
+    </div>`;
+  const rows = list.map(c => {
+    const rec = popGet(c);
+    const lad = gradeLadder(c);
+    let badge = '<span class="reason">enter pop →</span>';
+    if (rec) {
+      const t = popTier(rec.pop);
+      const col = /high/i.test(t.label) ? 'var(--red)' : /elev/i.test(t.label) ? 'var(--gold)' : 'var(--green)';
+      badge = `<span class="reason" style="color:${col};font-weight:700">${esc(t.label)}</span><br><span class="reason" title="${esc(t.advice)}">${esc(t.advice.length > 60 ? t.advice.slice(0, 58) + '…' : t.advice)}</span>`;
+    }
+    return `<tr class="sell-row"><td>${sellCardCell(c)}</td>
+      <td class="sr-val" style="color:var(--text)">${money(c.price)}</td>
+      <td class="sr-val"><a href="${gradeSoldLink(c, 'PSA 10')}" target="_blank" rel="noopener" title="eBay sold — PSA 10">${money(lad.psa10)}</a></td>
+      <td><input class="pop-inp" data-i="${c.i}" type="number" min="0" placeholder="PSA 10 pop" value="${rec ? rec.pop : ''}"></td>
+      <td>${badge}</td>
+      <td><div class="sr-links">
+        <a class="minilink" href="${PU.psaPopSearch.replace('{q}', enc(c.name + ' ' + (c.number || '')))}" target="_blank" rel="noopener">PSA pop</a>
+        <a class="minilink" href="${PU.gemrate.replace('{q}', enc(c.name))}" target="_blank" rel="noopener">GemRate</a>
+        <a class="minilink" href="${gradeSoldLink(c, 'PSA 10')}" target="_blank" rel="noopener">Sold 10s</a>
+      </div></td></tr>`;
+  }).join('');
+  return callout + `<table class="sell-table"><thead><tr>
+    <th>Card</th><th>Raw value</th><th>Est. PSA 10</th><th>PSA 10 pop (you enter)</th><th>Pop verdict</th><th>Look it up</th>
+  </tr></thead><tbody>${rows}</tbody></table>`;
+}
+function wirePopWatch(list) {
+  $$('#view-sell .pop-inp').forEach(inp => {
+    inp.onchange = () => { popSet(State.cards[+inp.dataset.i], inp.value); renderSell(); };
+  });
+}
+
+function sellCardCell(c) {
+  return `<div class="sr-card" data-i="${c.i}">
+      ${c.img ? `<img loading="lazy" src="${c.img}" onerror="this.outerHTML=phThumb(${c.i})">` : phThumb(c.i)}
+      <div><div class="sr-name">${esc(c.name)} ${c.graded ? `<span class="grade-chip" style="font-size:9px">${esc(c.grader || '')} ${c.grade || ''}</span>` : ''}</div>
+        <div class="sr-set">${esc(c.set)} · ${c.lang === 'ja' ? 'JP' : 'EN'}${c.number ? ' · #' + esc(c.number) : ''}</div></div>
+    </div>`;
+}
 function sellTable(rows, mode) {
+  const svcNames = (gradeIntel().serviceDeltas || []).slice(0, 2).map(s => s.service);
   const head = mode === 'grade'
-    ? `<th>Card</th><th>Raw value</th><th>Est. PSA 10</th><th>Verdict</th><th>Comps</th>`
+    ? `<th>Card</th><th>Raw</th><th>PSA 10</th><th>PSA 9</th><th>PSA 8</th>${svcNames.map(n => `<th>${esc(n)} 10</th>`).join('')}<th>Verdict</th><th>Comps</th>`
     : `<th>Card</th><th>Value</th><th>Net est.</th><th>P/L</th><th>Comps</th>`;
   return `<table class="sell-table"><thead><tr>${head}</tr></thead><tbody>${rows.map(r => sellRow(r, mode)).join('')}</tbody></table>`;
+}
+function gradeCell(c, label, value, cls) {
+  return `<td class="sr-val grade-est ${cls || ''}"><a href="${gradeSoldLink(c, label)}" target="_blank" rel="noopener" title="eBay sold — ${esc(label)} (estimate; click for real comps)">${money(value)}</a></td>`;
 }
 function sellRow(r, mode) {
   const c = r.x, L = links(c);
@@ -584,17 +731,24 @@ function sellRow(r, mode) {
       <a class="minilink" href="${pick(c.lang === 'ja' ? 'TCGplayer (JP)' : 'TCGplayer')}" target="_blank" rel="noopener">TCGplayer</a>
       <a class="minilink" href="${c.pcUrl || '#'}" target="_blank" rel="noopener">PriceCharting</a>
     </div>`;
-  const cardCell = `<div class="sr-card" data-i="${c.i}">
-      ${c.img ? `<img loading="lazy" src="${c.img}" onerror="this.outerHTML=phThumb(${c.i})">` : phThumb(c.i)}
-      <div><div class="sr-name">${esc(c.name)} ${c.graded ? `<span class="grade-chip" style="font-size:9px">${esc(c.grader || '')} ${c.grade || ''}</span>` : ''}</div>
-        <div class="sr-set">${esc(c.set)} · ${c.lang === 'ja' ? 'JP' : 'EN'}${c.number ? ' · #' + esc(c.number) : ''}</div></div>
-    </div>`;
+  const cardCell = sellCardCell(c);
   if (mode === 'grade') {
-    const a = r.a, vClass = a.verdict === 'strong' ? 'var(--green)' : 'var(--gold)';
+    const a = r.a, lad = a.lad || gradeLadder(c);
+    const vClass = a.verdict === 'strong' ? 'var(--green)' : 'var(--gold)';
+    const vLabel = a.verdict === 'strong' ? '★ Strong' : 'Maybe';
+    const nine = a.nineSafe
+      ? `<span class="reason" style="color:var(--green)">9 still beats raw</span>`
+      : `<span class="reason" style="color:var(--red)">10-or-bust</span>`;
+    const svcs = (gradeIntel().serviceDeltas || []).slice(0, 2)
+      .map(s => gradeCell(c, s.service + ' 10', lad.services[s.service] ? lad.services[s.service].v : 0, 'svc'))
+      .join('');
     return `<tr class="sell-row"><td>${cardCell}</td>
       <td class="sr-val" style="color:var(--text)">${money(c.price)}</td>
-      <td class="sr-val">${money(a.estPsa10)}</td>
-      <td><span class="reason" style="color:${vClass};font-weight:700">${a.verdict === 'strong' ? '★ Strong' : 'Maybe'}</span><br><span class="reason">+${money(a.estPsa10 - c.price - State.intel.thresholds.allInGradingCost)} upside</span></td>
+      ${gradeCell(c, 'PSA 10', lad.psa10, 'g10')}
+      ${gradeCell(c, 'PSA 9', lad.psa9, 'g9')}
+      ${gradeCell(c, 'PSA 8', lad.psa8, 'g8')}
+      ${svcs}
+      <td><span class="reason" style="color:${vClass};font-weight:700">${vLabel}</span><br>${nine}</td>
       <td>${compCells}</td></tr>`;
   }
   const s = sellNet(c), pl = c.pl;
@@ -646,6 +800,92 @@ function renderGuide() {
     </div>`;
 }
 
+/* ================= MERCH VAULT ================= */
+const MERCH_CONDS = ['Factory sealed', 'CIB / with box', 'Built — all pieces + box', 'Built — no box', 'Loose', 'Display-cased'];
+function merchItems() { return loadJSON(LS_MERCH, []); }
+function merchSave(items) { localStorage.setItem(LS_MERCH, JSON.stringify(items)); }
+function merchSoldLink(q) { return State.intel.urlTemplates.ebayRawSold.replace('{q}', enc('pokemon ' + q)); }
+function merchActiveLink(q) {
+  const t = State.intel.urlTemplates.ebayActive || State.intel.urlTemplates.ebayRawSold;
+  return t.replace('{q}', enc('pokemon ' + q)).replace('&LH_Sold=1&LH_Complete=1', '');
+}
+
+function renderMerch() {
+  const M = State.merch;
+  const items = merchItems();
+  const totEst = sum(items.filter(i => !i.soldFor).map(i => +i.est || 0));
+  const totPaid = sum(items.map(i => +i.paid || 0));
+  const realized = sum(items.filter(i => i.soldFor).map(i => (+i.soldFor || 0) - (+i.paid || 0)));
+
+  const tracker = `
+    <div class="panel" style="margin-bottom:16px">
+      <h3>My merch tracker <span class="hint">— sealed boxes, games, plush, anything; saved locally</span></h3>
+      <div class="merch-form">
+        <input id="mi-name" type="text" placeholder="Item — e.g. Lucario V / Tyranitar V Costco box (14 packs)" style="flex:2 1 260px">
+        <select id="mi-cat">${(M ? M.merchCategories : [{ key: 'sealed', name: 'Sealed TCG' }]).map(cat => `<option value="${esc(cat.key)}">${esc(cat.name)}</option>`).join('')}<option value="other">Other</option></select>
+        <select id="mi-cond">${MERCH_CONDS.map(x => `<option>${esc(x)}</option>`).join('')}</select>
+        <input id="mi-paid" type="number" min="0" step="0.01" placeholder="Paid $" style="width:90px">
+        <input id="mi-est" type="number" min="0" step="0.01" placeholder="Est. $" style="width:90px">
+        <button class="btn primary sm" id="mi-add">+ Add</button>
+      </div>
+      ${items.length ? `<table class="sell-table" style="margin-top:10px"><thead><tr><th>Item</th><th>Condition</th><th>Paid</th><th>Est. / Sold</th><th>P/L</th><th>Comps</th><th></th></tr></thead><tbody>
+        ${items.map((it, idx) => {
+          const pl = it.soldFor ? (+it.soldFor || 0) - (+it.paid || 0) : (+it.est || 0) - (+it.paid || 0);
+          return `<tr class="sell-row${it.soldFor ? ' merch-sold' : ''}"><td><div class="sr-name">${esc(it.name)}</div><div class="sr-set">${esc(it.cat)}${it.note ? ' · ' + esc(it.note) : ''}</div></td>
+          <td class="reason">${esc(it.cond || '—')}</td>
+          <td class="sr-val" style="color:var(--text)">${money(+it.paid || 0)}</td>
+          <td class="sr-val">${it.soldFor ? `<span style="color:var(--green)">SOLD ${money(+it.soldFor)}</span>` : money(+it.est || 0)}</td>
+          <td><span class="reason" style="color:${pl >= 0 ? 'var(--green)' : 'var(--red)'}">${pl >= 0 ? '+' : ''}${money(pl)}</span></td>
+          <td><div class="sr-links"><a class="minilink" href="${merchSoldLink(it.name + ' ' + (it.cond === 'Factory sealed' ? 'sealed' : ''))}" target="_blank" rel="noopener">eBay sold</a><a class="minilink" href="${merchActiveLink(it.name)}" target="_blank" rel="noopener">Active</a></div></td>
+          <td><div class="sr-links">${it.soldFor ? '' : `<button class="btn sm" data-msold="${idx}">Sold…</button>`}<button class="btn ghost sm" data-mdel="${idx}">✕</button></div></td></tr>`;
+        }).join('')}
+      </tbody></table>
+      <div class="reason" style="margin-top:8px">Holding est. <b style="color:var(--gold)">${money0(totEst)}</b> · paid ${money0(totPaid)} · realized profit <b style="color:${realized >= 0 ? 'var(--green)' : 'var(--red)'}">${money0(realized)}</b></div>`
+      : `<p class="muted" style="font-size:13px;margin:10px 2px 2px">Nothing tracked yet. Add your sealed boxes, games, plush — like that Costco Lucario V / Tyranitar V box you flipped. Each item gets live eBay comp links.</p>`}
+    </div>`;
+
+  const rules = M && M.sealedRules && M.sealedRules.length ? `
+    <div class="callout" style="margin-bottom:16px"><b>Sealed &amp; merch ground rules.</b>
+      <ul class="bullets" style="margin-top:6px">${M.sealedRules.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+    </div>` : '';
+
+  const cats = M && M.merchCategories ? `
+    <div class="guide-grid">${M.merchCategories.map(cat => `
+      <div class="panel"><h3>${esc(cat.name)}</h3>
+        <p class="muted" style="font-size:12.5px;margin:0 0 8px">${esc(cat.blurb)}</p>
+        <table class="guide-table"><thead><tr><th>Item</th><th>Value</th></tr></thead><tbody>
+          ${cat.examples.map(ex => `<tr><td><a href="${merchSoldLink(ex.item)}" target="_blank" rel="noopener">${esc(ex.item)}</a><br><span class="reason">${esc(ex.note)}</span></td><td style="white-space:nowrap"><b>${esc(ex.valueRange)}</b></td></tr>`).join('')}
+        </tbody></table>
+        <div class="subhead" style="margin-top:10px">Condition rules</div>
+        <ul class="bullets">${cat.conditionRules.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+      </div>`).join('')}
+    </div>` : `<div class="panel"><h3>Market guide loading…</h3><p class="muted" style="font-size:13px">The curated merch value guide (sealed product, games, LEGO, Funko, plush) ships with the next data update — your tracker above works now.</p></div>`;
+
+  $('#view-merch').innerHTML = `
+    <div class="section-head"><h2>Merch Vault</h2>
+      <span class="sub">Beyond singles — sealed product, video games, LEGO, Funko, plush. Item values link to real eBay solds.</span></div>
+    ${tracker}${rules}${cats}`;
+
+  // wiring
+  $('#mi-add').onclick = () => {
+    const name = $('#mi-name').value.trim();
+    if (!name) { toast('Give the item a name first.'); return; }
+    const items2 = merchItems();
+    items2.unshift({ id: Date.now(), name, cat: $('#mi-cat').value, cond: $('#mi-cond').value, paid: $('#mi-paid').value, est: $('#mi-est').value });
+    merchSave(items2); renderMerch(); toast('Added to your merch tracker.');
+  };
+  $$('#view-merch [data-mdel]').forEach(b => b.onclick = () => {
+    const items2 = merchItems(); items2.splice(+b.dataset.mdel, 1); merchSave(items2); renderMerch();
+  });
+  $$('#view-merch [data-msold]').forEach(b => b.onclick = () => {
+    const v = prompt('Sold for how much? ($)');
+    if (v == null || v === '' || isNaN(+v)) return;
+    const items2 = merchItems(); items2[+b.dataset.msold].soldFor = +v;
+    items2[+b.dataset.msold].soldDate = new Date().toISOString().slice(0, 10);
+    merchSave(items2); renderMerch(); toast('Nice flip — recorded.');
+  });
+}
+
 /* ================= MODAL ================= */
 function openModal(c) {
   const u = uget(c), a = gradeAdvice(c), L = links(c), s = sellNet(c);
@@ -681,6 +921,15 @@ function openModal(c) {
         <div class="rh">${a.verdict === 'strong' ? '★' : a.verdict === 'maybe' ? '◐' : '○'} ${esc(a.title)}</div>
         <div class="rb">${a.body}</div>
       </div>
+      ${!c.graded && c.game === 'Pokémon' && a.lad ? `
+      <div class="subhead">Grade ladder <span style="text-transform:none;letter-spacing:0">— estimates; each links to that grade’s real eBay solds</span></div>
+      <div class="ladder">
+        <a class="lad-cell" href="${links(c)[1] ? links(c)[1].u : '#'}" target="_blank" rel="noopener"><span class="lc-g">Raw</span><span class="lc-v">${money(c.price)}</span></a>
+        <a class="lad-cell g10" href="${gradeSoldLink(c, 'PSA 10')}" target="_blank" rel="noopener"><span class="lc-g">PSA 10</span><span class="lc-v">${money(a.lad.psa10)}</span></a>
+        <a class="lad-cell g9" href="${gradeSoldLink(c, 'PSA 9')}" target="_blank" rel="noopener"><span class="lc-g">PSA 9</span><span class="lc-v">${money(a.lad.psa9)}</span></a>
+        <a class="lad-cell g8" href="${gradeSoldLink(c, 'PSA 8')}" target="_blank" rel="noopener"><span class="lc-g">PSA 8</span><span class="lc-v">${money(a.lad.psa8)}</span></a>
+        ${(gradeIntel().serviceDeltas || []).slice(0, 2).map(sd => `<a class="lad-cell svc" href="${gradeSoldLink(c, sd.service + ' 10')}" target="_blank" rel="noopener" title="${esc(sd.note)}"><span class="lc-g">${esc(sd.service)} 10</span><span class="lc-v">${money(a.lad.services[sd.service] ? a.lad.services[sd.service].v : 0)}</span></a>`).join('')}
+      </div>` : ''}
 
       <div class="subhead">Check live prices &amp; sold comps</div>
       <div class="linkgrid">

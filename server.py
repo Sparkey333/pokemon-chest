@@ -29,7 +29,7 @@ Run:  python3 server.py     (or double-click start.command)
 import os, sys, json, html, subprocess, urllib.request, urllib.error, urllib.parse
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 ROOT = os.path.dirname(os.path.abspath(__file__))
 HOME = os.path.abspath(os.environ.get("POKECHEST_HOME") or ROOT)
 SETTINGS = os.path.join(HOME, "settings.local.json")

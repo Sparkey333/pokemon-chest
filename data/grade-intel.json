@@ -1,0 +1,154 @@
+{
+ "updated": "2026-06",
+ "disclaimer": "Estimation ratios compiled and cross-verified from public sold-data sources (June 2026). Every estimate links to live comps in-app — comps beat ratios.",
+ "gradeRatios": {
+  "vintage": {
+   "psa9OfPsa10": 0.18,
+   "psa8OfPsa10": 0.1,
+   "psa10OfRaw": 8
+  },
+  "mid": {
+   "psa9OfPsa10": 0.3,
+   "psa8OfPsa10": 0.18,
+   "psa10OfRaw": 5
+  },
+  "modern": {
+   "psa9OfPsa10": 0.45,
+   "psa8OfPsa10": 0.3,
+   "psa10OfRaw": 3.5
+  },
+  "japaneseNote": "Japanese modern cards have a compressed grade curve: PSA 9 ≈ 0.65 of PSA 10 (vs 0.45 English) and PSA 10 ≈ 1.6x raw (vs 2-5x English), because JPN gem rates run 60-70% vs 40-50% for English. JPN vintage behaves like English WOTC with steep ratios (est.). Separately, modern JPN cards carry a 15-40% absolute price premium over English equivalents — a price-level effect, not a grade-ratio effect. Caveats: the mid-era (2004-2019) band is interpolated, and all psa10OfRaw multipliers except modern English (verified 2-5x) are derived (est.). Modern PSA 8 sells at-or-below raw NM (0.8-1.0x raw) — flag negative grading EV. Chase/low-pop cards sit at the LOW end of every PSA 9/8 ratio range.",
+  "modernJa": {
+   "psa9OfPsa10": 0.65,
+   "psa8OfPsa10": 0.4,
+   "psa10OfRaw": 1.6,
+   "_note": "Derived from verified JPN gem-rate research (est.): compressed grade curve, JPN modern PSA10 ~1.6x raw."
+  }
+ },
+ "serviceDeltas": [
+  {
+   "service": "CGC",
+   "vsPsaPct": 80,
+   "note": "Typical equal-grade blend: CGC 10 Gem Mint ≈ 85% of PSA 10 on modern (gap narrowing to 90-95% on hot 2026 modern), ≈ 73% on vintage; CGC 9 ≈ 80% of PSA 9 (est.). CGC Pristine 10 is a SEPARATE tier above Gem Mint and the only CGC grade that reliably beats PSA 10 (~120%, range 100-200%) — never conflate Pristine with a plain CGC 10. Legacy pre-2023 CGC 9.5 ≈ today's CGC 10 and roughly matches PSA 9 money."
+  },
+  {
+   "service": "TAG",
+   "vsPsaPct": 62,
+   "note": "TAG 10 ≈ 67% of PSA 10 on modern, ≈ 57% on vintage — PSA commands a 35-60% premium over TAG and the gap widens on vintage/high-value cards (verified comps: 151 Charizard ex $185-220 PSA vs $115-135 TAG; Base Charizard $4,500-6,000+ vs $2,500-3,500). Lower TAG grades ≈ 60-70% of same-grade PSA (est., extrapolated)."
+  },
+  {
+   "service": "BGS",
+   "vsPsaPct": 85,
+   "note": "BGS 9.5 ≈ 85% of a PSA 10 (the market's standard comparison; strong subgrades approach parity); PSA 10s resell 10-20% over equivalent BGS 9.5s. BGS 10 Pristine (non-black) ≈ 110% of PSA 10 (est., range 90-150%); BGS Black Label 10 ≈ 250% of PSA 10 (est.) — verified at 3-5x a regular BGS 10."
+  }
+ ],
+ "popIntel": {
+  "claimVerdict": "TRUE as a tendency, with a major caveat: a high PSA-10 population reliably COMPRESSES the grade premium (PSA 10 over raw/PSA 9) — but population is a modifier, not a deterministic price function. Pop-report inflation is self-reinforcing (price rises pull more raw copies into grading, raising pop and pushing the 10 back down), yet iconic/character-anchored cards can appreciate even at extreme pop: Van Gogh Pikachu has 40,000+ PSA 10s and still traded at ~$1,100-2,000 in 2025. High pop should trigger a warning, never an automatic 'grading not worth it.' Gem rate (<10% = hard to grade, >35% = easy) is more predictive than raw pop for grading ROI.",
+  "evidence": [
+   "Umbreon VMAX Alt Art (Evolving Skies): ~3,000+ PSA 10s at a ~35% gem rate; PSA 10 prices declined ~30-40% as population expanded (est., PokemonPriceTracker figures)",
+   "McDonald's Pikachu JP M-P promo (2025): 273,159 graded / 239,939 PSA 10s — the saturation extreme (verified GemRate/Misprint counts)",
+   "Van Gogh Grey Felt Hat Pikachu (2023): ~105,000 graded / 40,000-46,800 PSA 10s, yet PSA 10s still sold ~$1,100-2,000 in 2025 — price and pop climbed together (the iconic override)",
+   "Charizard ex SIR 151 (2023): 90,861 graded / 26,443 PSA 10s; Eevee Prismatic Evolutions ETB promo (2025): 71,331 graded / 28,814 PSA 10s (verified counts)",
+   "Base Set Shadowless Charizard: ~486 PSA 10s, ~7.1% gem rate, only 3-4%/yr pop growth — values stable at ~$15k-25k",
+   "EX-era Gold Stars: typically <200 PSA 10s at 8-12% gem rates — appreciated 30-50%",
+   "Vintage pop is near-final (grade-able supply exhausted); modern (2020+) pop is still inflating fast, so discount today's modern pop and warn earlier (est.)"
+  ],
+  "tiers": [
+   {
+    "label": "Low pop — scarcity premium intact",
+    "maxPop": 100,
+    "advice": "PSA 10 premium runs 100-1000%+ over PSA 9 (est.); grading a clean raw copy is strongly favored."
+   },
+   {
+    "label": "Normal",
+    "maxPop": 1000,
+    "advice": "Premium ~50-200% over PSA 9 (est.); grading EV usually positive when the raw card clears grading cost (~$15-25/card all-in)."
+   },
+   {
+    "label": "Elevated — premium compressing",
+    "maxPop": 5000,
+    "advice": "Premium compressing to ~20-50% over PSA 9 (est.); show AMBER warning and defer to live PSA 10 vs PSA 9/raw comps before grading."
+   },
+   {
+    "label": "High — commodity-grade",
+    "maxPop": 15000,
+    "advice": "Premium thins below ~20% (est.); grading rarely worth it on modern unless the card is an iconic/chase or gem rate is under 10%."
+   },
+   {
+    "label": "Saturated",
+    "maxPop": 9999999,
+    "advice": "Grade premium mostly arbitraged away; skip grading unless iconic-override applies (Van Gogh Pikachu held $1k+ at 40k pop) — demand can outrun even extreme supply (est.)."
+   }
+  ],
+  "heuristic": "Compute premium = PSA10_value - raw_value - grading_cost(~$20). RED ('likely not worth grading'): raw < ~$30 AND PSA10 pop > 5,000 AND era = modern (2020+) AND gem rate unknown or > 25%. AMBER ('premium compressing, check comps'): pop 1,000-5,000, OR modern with gem rate > 30%, OR raw value < grading cost regardless of pop. GREEN ('scarcity supports grading'): pop < 1,000 OR gem rate < 10% OR vintage with stable pop. Two overrides: (1) iconic/chase cards (Charizard, Pikachu, named promos, alt-art SIR/SAR) downgrade RED to AMBER; (2) live PSA10-vs-raw/PSA9 comps always beat the pop tier — pop is the prior, comps are the evidence. Gem rate = PSA10 pop / total graded; it beats raw pop as a predictor (est. thresholds, community consensus)."
+ },
+ "popUrlTemplates": {
+  "psaPopSearch": "https://www.psacard.com/pop/search?q={q}",
+  "gemrate": "https://www.gemrate.com/player?grader=psa&category=&player={q}",
+  "psaApiNote": "PSA's free public API (api.psacard.com, OAuth2 password grant with a free PSA account, 100 calls/day) exposes ONLY cert verification — GET /publicapi/cert/GetByCertNumber/{certNumber} — there is NO population endpoint; the psacard.com/pop report is not mirrored in the API. For programmatic pop, use PokemonPriceTracker's API (GET /api/psa/population/{cardId}, BYOK bearer key, ~100 credits/day free; their published pricing is inconsistent across pages — verify on signup) or PokeData.io Pro (paid). Both psacard.com/pop and gemrate.com 403 plain server fetches — deep-link the user out or use a headless browser. The ?q= deep-link on PSA pop search is best-effort/undocumented (est.); the reliable fallback is opening https://www.psacard.com/pop/search directly."
+ },
+ "sources": [
+  "https://pokescope.app/blog/psa-10-vs-psa-9-pokemon-cards-price-guide/",
+  "https://www.misprint.com/posts/psa-10-vs-psa-9-price-difference",
+  "https://www.misprint.com/posts/psa-vs-tag-is-tag-worth-it",
+  "https://www.misprint.com/posts/most-graded-pokemon-cards",
+  "https://www.misprint.com/posts/evolving-skies-booster-box-price-2026",
+  "https://www.pokemonpricetracker.com/blog/posts/pokemon-card-slabs-psa-vs-cgc-vs-bgs-2026-guide",
+  "https://www.pokemonpricetracker.com/blog/posts/raw-vs-graded-pokemon-cards-roi-analysis-2026",
+  "https://www.pokemonpricetracker.com/blog/posts/pokemon-card-population-report-guide-rarity-analysis-2026",
+  "https://www.pokemonpricetracker.com/psa-pokemon-card-api",
+  "https://thepullrate.com/guides/is-psa-grading-worth-it",
+  "https://pkmhobby.com/blogs/cards/graded-pokemon-card-values",
+  "https://www.cllct.com/sports-collectibles/sports-cards/what-grade-is-better-than-a-gem-mint-10-the-pristine-10-reigns-supreme",
+  "https://pokeinsider.com/2025/11/15/cgc-vs-psa-what-smart-collectors-need-to-know-before-grading-modern-pokemon-cards/",
+  "https://ogcards.com/blogs/pokemon-cards/psa-vs-bgs-vs-cgc-pokemon-grading-guide",
+  "https://phantomdisplay.com/blogs/blog/bgs-vs-psa",
+  "https://samuraiswordtokyo.com/blogs/news/best-japanese-pokemon-cards-psa-grading-2026",
+  "https://cardcodex.com/pokemon/sun-moon/hidden-fates-shiny-vault/charizard-gx-sv49-94-rare-shiny-gx/",
+  "https://www.gemrate.com/",
+  "https://www.gemrate.com/universal-search",
+  "https://cardcollective.ai/2025/03/30/why-psa-9s-are-becoming-more-popular-than-psa-10s-in-2025/",
+  "https://www.psacard.com/publicapi/documentation",
+  "https://api.psacard.com/publicapi/swagger/ui/index",
+  "https://www.psacard.com/pop",
+  "https://github.com/brad-newman/fetch-psa-api",
+  "https://github.com/ChrisMuir/psa-scrape/tree/master/pop_report",
+  "https://gocollect.com/blog/the-van-gogh-pikachu-card-has-doubled-in-value-in-just-4-months",
+  "https://www.pricecharting.com/game/pokemon-promo/pikachu-with-grey-felt-hat-85",
+  "https://www.hokocollectables.com/blogs/news/how-to-read-psa-pop-report",
+  "https://zeropop.app/blog/population-reports-explained",
+  "https://www.pokedata.io/pro",
+  "https://www.pricecharting.com/game/pokemon-promo/heavy-hitters-premium-collection-lucario-v-&-tyranitar-v",
+  "https://www.pricecharting.com/game/pokemon-base-set/booster-box",
+  "https://www.pricecharting.com/game/pokemon-base-set/booster-box-1st-edition",
+  "https://www.pricecharting.com/game/pokemon-promo/factory-sealed-paldea-adventure-chest",
+  "https://www.pricecharting.com/game/gameboy/pokemon-red",
+  "https://comics.ha.com/heritage-auctions-press-releases-and-news/sealed-pokemon-base-set-booster-box-sells-for-record-408-000-at-heritage-auctions.s?releaseId=4076",
+  "https://icv2.com/articles/news/view/47948/pokemon-tcg-1st-edition-base-set-sealed-box-prices-retreat-ha",
+  "https://www.pokemon.com/us/pokemon-tcg/product-gallery/heavy-hitters-premium-collection",
+  "https://www.costco.ca/pok%C3%A9mon-heavy-hitters-premium-collection-%E2%80%93-english-edition.product.4000231235.html",
+  "https://www.tcgplayer.com/product/648365/pokemon-miscellaneous-cards-and-products-prismatic-evolutions-lucario-ex-and-tyranitar-ex-premium-collection-sams-club",
+  "https://news.justcollecting.com/pokemon-game-goes-for-over-80000/",
+  "https://www.thebrickfan.com/lego-pokemon-2026-sets-officially-announced/",
+  "https://jaysbrickblog.com/news/first-lego-pokemon-sets-officially-revealed-for-27-february-2026-launch/",
+  "https://jaysbrickblog.com/news/lego-pokemon-smart-play-sets-officially-unveiled-for-august-2026-release/",
+  "https://www.brickeconomy.com/set/40892-1/lego-pokemon-kanto-region-badge-collection",
+  "https://theearlofbricks.com/blog-lego-resale-value-opened-vs-unopened/",
+  "https://funkypriceguide.com/checklist/funko-pop-pokemon/",
+  "https://gamerant.com/pokemon-rarest-funko-pops/",
+  "https://www.boxedvinyl.com/blogs/news/top-20-most-valuable-funko-pops-in-2025-with-prices",
+  "https://popandfigures.com/collector-tips/display-your-funko-pop-out-box-vs-in-box/",
+  "https://collectinsure.com/2025/09/09/the-most-expensive-pokemon-merch-a-guide-to-valuable-collectibles/",
+  "https://japan-figure.com/blogs/news/rare-pokemon-plush",
+  "https://www.thegamer.com/rare-most-valuable-pokemon-plushes/",
+  "https://bulbapedia.bulbagarden.net/wiki/Build-A-Bear_Workshop_collection",
+  "https://www.pricecharting.com/game/pokemon-promo/eevee-build-a-bear-63",
+  "https://pkmncollectors.livejournal.com/17108821.html",
+  "https://bulbapedia.bulbagarden.net/wiki/Pok%C3%A9mon_Zukan_figures",
+  "https://picclick.com/Pok%C3%A9mon-zukan-1-40-%E2%80%94-Lugia-Ho-Oh-284045464315.html",
+  "https://screenrant.com/pokemon-gold-cards-burger-king-collectors-bad-investment/",
+  "https://bulbapedia.bulbagarden.net/wiki/1999_Burger_King_promotional_Pok%C3%A9mon_toys",
+  "https://www.tcgplayer.com/content/article/A-Complete-Guide-to-McDonald-s-Happy-Meal-Pok%C3%A9mon-Cards/e631efe0-fc8f-4eac-88bc-8d56c553fc81/",
+  "https://pkmncollectors.fandom.com/wiki/Mega_Construx"
+ ]
+}

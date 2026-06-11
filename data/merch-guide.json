@@ -1,0 +1,314 @@
+{
+ "updated": "2026-06",
+ "disclaimer": "Value ranges from verified sales/indexes (June 2026); markets move — always check the linked live comps.",
+ "merchCategories": [
+  {
+   "key": "sealed",
+   "name": "Sealed TCG Product",
+   "blurb": "Booster boxes, ETBs, and warehouse-club premium collections. Vintage WOTC appreciates on pure scarcity; modern sealed dips 1-2 years post-release then climbs once out of print; warehouse exclusives outperform on small never-restocked print runs.",
+   "conditionRules": [
+    "Factory sealed, never opened, original shrink intact is everything — resealed product is near-worthless and rampant at vintage prices",
+    "Dented corners / crushed shrink take 10-20% off; buyers check pack weight (unweighed)",
+    "Opened box = sum of pack/single value, typically 30-50% less",
+    "Five-figure boxes effectively require auction-house LOA; authenticated listings command big premiums ($57,000 vs $36,000 for the same Base Unlimited box)",
+    "eBay's authenticity guarantee does NOT cover sealed boxes — sell vintage $10K+ via Heritage/Goldin/PWCC; modern sealed clears best on TCGplayer (the price-setter), then eBay"
+   ],
+   "examples": [
+    {
+     "item": "Base Set Unlimited booster box (1999)",
+     "valueRange": "$36,000-$57,000",
+     "note": "PriceCharting index ~$41,050; 2026 Heritage sales $36,251-$41,250; sell only via auction house with LOA"
+    },
+    {
+     "item": "Heavy Hitters Premium Collection: Lucario V & Tyranitar V (Costco/Sam's)",
+     "valueRange": "$245-$290",
+     "note": "PriceCharting $263 / TCGplayer $244.79; climbed all of 2026 from $165-210 in late 2025; sell on TCGplayer/eBay; see sealedRules verdict"
+    },
+    {
+     "item": "Hidden Fates Elite Trainer Box (2019)",
+     "valueRange": "$450-$550",
+     "note": "~$500, 10x retail, ~3 sales/day — the modern ETB blue chip; TCGplayer/eBay"
+    },
+    {
+     "item": "Evolving Skies booster box (2021)",
+     "valueRange": "$260-$310",
+     "note": "Dipped to $90-110 in 2022, peaked $350-370 in 2024, corrected since; TCGplayer; ignore the '$2,600 box' claim (that was a 6-box case)"
+    },
+    {
+     "item": "Scarlet & Violet 151 Booster Bundle (2023)",
+     "valueRange": "$160-$200",
+     "note": "~$179 vs $26.99 retail (~6.6x); sealed only; TCGplayer"
+    },
+    {
+     "item": "Paldea Adventure Chest (Costco)",
+     "valueRange": "$88-$99",
+     "note": "~$92 vs $50 retail (often clearanced to $30) — 2-3x in two years; warehouse exclusives are never restocked"
+    }
+   ]
+  },
+  {
+   "key": "games",
+   "name": "Pokemon Video Games",
+   "blurb": "Gen 1-5 handheld games on a four-rung value ladder: loose cart, CIB, raw sealed, graded sealed (WATA/VGA). Grading premium is biggest on Gen 1-3. eBay is the market below ~$2K; Heritage Auctions holds the graded-sealed records.",
+   "conditionRules": [
+    "Ladder: CIB ≈ 1.5-5x loose; sealed ≈ 3-50x loose; graded sealed ≈ 2x raw sealed",
+    "CIB requires box + manual + inserts; the box alone carries most of the premium (Red box-only $195, manual $22)",
+    "HGSS: the Pokewalker IS the value — big-box with Pokewalker roughly doubles standard CIB; 'no Pokewalker' listings sell at standard-cart money",
+    "Battery-replaced carts acceptable but must be disclosed; fake GBA carts are epidemic — authentication photos matter",
+    "Graded sealed $2K+ goes to Heritage Auctions; everything else clears on eBay (PriceCharting indexes it)"
+   ],
+   "examples": [
+    {
+     "item": "Pokemon Red (GB)",
+     "valueRange": "$67-$8,292",
+     "note": "$67 loose / $344 CIB / $3,856 sealed / $8,292 graded sealed; WATA 9.8 A++ record $84,000 (Heritage 2021)"
+    },
+    {
+     "item": "Pokemon Emerald (GBA)",
+     "valueRange": "$246-$7,426",
+     "note": "$246 loose (loose-cart king) / $687 CIB / $7,426 graded sealed; fake-cart hotspot — authenticate"
+    },
+    {
+     "item": "Pokemon Crystal (GBC)",
+     "valueRange": "$178-$4,400",
+     "note": "$178 loose / $854 CIB / $4,400 graded sealed; battery-replaced OK if disclosed"
+    },
+    {
+     "item": "HeartGold big box w/ Pokewalker (DS)",
+     "valueRange": "$250-$1,165",
+     "note": "$520 CIB vs $246 standard CIB — the Pokewalker doubles it; specialty buyers (J2Games, Raretro) for big-box"
+    },
+    {
+     "item": "SoulSilver big box w/ Pokewalker (DS)",
+     "valueRange": "$210-$1,356",
+     "note": "$420 CIB / $950 raw sealed; same Pokewalker rule as HeartGold"
+    }
+   ]
+  },
+  {
+   "key": "lego",
+   "name": "LEGO & Construction Sets",
+   "blurb": "Official LEGO Pokemon launched 27 Feb 2026 (wave 2 on 1 Aug 2026); main sets are in-print so resale is at/below retail — the GWP is the only aftermarket play today. The retired MEGA Construx Pokemon line is the slow-burn value pool.",
+   "conditionRules": [
+    "Sealed (MISB) premium: 30-80% over used-complete of the same set",
+    "Built-complete WITH box + instructions ≈ 50-65% of sealed on big display sets, 70-80% on smaller licensed sets",
+    "No box/instructions = additional 15-25% haircut; large display sets lose most collector appeal without the box",
+    "In-print sets sell at/below retail; first-wave licensed sets historically appreciate 2-4+ years after retirement (est.)"
+   ],
+   "examples": [
+    {
+     "item": "LEGO 40892 Kanto Region Badge Collection (GWP)",
+     "valueRange": "$140-$165",
+     "note": "~$152 sealed on BrickEconomy; gift-with-purchase only 27 Feb-8 Mar 2026, already retired — the wave-1 flip; eBay/BrickLink"
+    },
+    {
+     "item": "LEGO 72153 Venusaur/Charizard/Blastoise (6,838 pcs)",
+     "valueRange": "$650 retail",
+     "note": "In print at $649.99 — hold sealed for post-retirement appreciation (est.); no flip today"
+    },
+    {
+     "item": "MEGA Motion Charizard HMW05 (1,664 pcs)",
+     "valueRange": "$70-$90",
+     "note": "Sealed eBay listings ~$70, near retail — not yet a flip (listing-based, est.); line reportedly out of production"
+    },
+    {
+     "item": "MEGA Every Eevee Evolution GFV85 (retired)",
+     "valueRange": "$80-$150",
+     "note": "Sealed typical range (listing-based, est.); Poke Ball Series 3, 5, 7 are the recognized hard-to-find MEGA items"
+    }
+   ]
+  },
+  {
+   "key": "funko",
+   "name": "Funko Pop",
+   "blurb": "Value concentrates in con-sticker exclusives and production-shorted variants; common in-print Pokemon Pops are $6-15 and not worth tracking individually. eBay is the venue; box condition is half the price.",
+   "conditionRules": [
+    "Loose ≈ 50% of mint-in-box on commons (out-of-box loses up to 70%); rare/older exclusives retain 60-75% loose",
+    "Official con sticker (SDCC/ECCC/NYCC) ≈ 2-3x the shared Spring/Wondrous/retailer sticker of the same sculpt (est.)",
+    "The box is the de facto certificate of authenticity; crushed corners or sun fade knock 20-40% off mint pricing (est.)",
+    "Skip tracking anything in-print under ~$15"
+   ],
+   "examples": [
+    {
+     "item": "#843 Charizard Metallic (Wondrous Convention 2022)",
+     "valueRange": "$410-$1,000",
+     "note": "Guide $410, reported sales $650-1,000; production-shorted, ~200-300 authenticated; mint-in-box with sticker only; eBay"
+    },
+    {
+     "item": "#627 Vaporeon Diamond (ECCC 2021)",
+     "valueRange": "$100-$120",
+     "note": "~$110 now after peaking ~$500 in 2021 — con-exclusive prices mean-revert"
+    },
+    {
+     "item": "#581 Mewtwo Flocked",
+     "valueRange": "$40-$140",
+     "note": "SDCC 2020 sticker ~$140 vs shared/common sticker ~$40 — the sticker rule in action"
+    },
+    {
+     "item": "#01 Pikachu 18-inch",
+     "valueRange": "$80-$100",
+     "note": "~$90 guide; size, not sticker, drives this one"
+    },
+    {
+     "item": "A Day with Pikachu complete set of 12 (2019)",
+     "valueRange": "$150-$300",
+     "note": "Complete boxed set (listing-based, est.); individuals only $10-30"
+    }
+   ]
+  },
+  {
+   "key": "plush",
+   "name": "Plush & Figures",
+   "blurb": "Pokemon Center lottery/raffle items are the grails; the repeatable hierarchy is lottery/raffle > jumbo limited-preorder > standard PC exclusive. Includes TOMY Monster Collection figures, zukan gachapon, and Build-A-Bear bundles.",
+   "conditionRules": [
+    "New-with-hang-tag rules: hang tag + tush tag ≈ 1.5-2x tush-tag-only (est.); tush tag removed = near-unverifiable, sells at junk prices",
+    "TOMY figures: commons $1-10 (buy/sell in lots); never pay >$20 for any TOMY in poor condition",
+    "Zukan: mint-in-package (capsule + paper insert) carries a clear premium over assembled; missing pegs or bases kills rare-set value",
+    "Build-A-Bear: the full bundle (plush + clothing + sound chip + sealed promo card) is the unit of value; the promo card alone holds value"
+   ],
+   "examples": [
+    {
+     "item": "2001 Pokemon Center Giant Entei / Suicune / Raikou",
+     "valueRange": "$4,000-$5,000",
+     "note": "~$5,000 mint each; PC NY/Tokyo launch items; specialist collector sales, not eBay BIN"
+    },
+    {
+     "item": "Banpresto Giant Eevee ('I Love Eevee' raffle, 20 made)",
+     "valueRange": "$2,000-$5,000",
+     "note": "Raffle-only — the top of the lottery > preorder > exclusive hierarchy"
+    },
+    {
+     "item": "Giant Furret (2019, $350 retail)",
+     "valueRange": "$1,500-$2,500",
+     "note": "Resells up to $2,500; modern jumbo PC plush hold or exceed retail once sold out"
+    },
+    {
+     "item": "Build-A-Bear Mimikyu full bundle NWT",
+     "valueRange": "$80-$180",
+     "note": "Retired BAB bundles typically $80-180 (est.); Mimikyu listed $169.99; bundled BAB Eevee 63/98 promo card ~$33 sealed on its own"
+    },
+    {
+     "item": "Lugia & Ho-Oh 1/40 zukan",
+     "valueRange": "$500-$700",
+     "note": "Listed at $700 (listing-based, est.); RSE-era sets and mail-in exclusive zukan are the rarest of the series"
+    },
+    {
+     "item": "Tagged 1998 Hasbro/Play-by-Play Pikachu",
+     "valueRange": "$50-$150",
+     "note": "Typical tagged examples; the ~$2,000 'chonky Pikachu' claim is a best-case grail, not a comp (est.); untagged commons $20-60"
+    }
+   ]
+  },
+  {
+   "key": "oddities",
+   "name": "Promos, Displays & Oddities",
+   "blurb": "Fast-food promos, vintage store displays, and designer collabs. Hoarded mass promos (BK gold cards, McDonald's packs) are volume items, not grails; displays and high-fashion collabs are thin but real markets.",
+   "conditionRules": [
+    "BK 23k gold cards: sealed in Poke Ball with COA ~$18 avg; opened ~$10 (about a 45% haircut)",
+    "Heavily hoarded fast-food promos stay cheap — the 2026 McDonald's 30th-anniversary promo will be high-print / low long-term value",
+    "Store displays/banners: thin market, price by size and condition, expect slow sales (est.)"
+   ],
+   "examples": [
+    {
+     "item": "Burger King 1999 23k gold-plated Charizard",
+     "valueRange": "$18-$30",
+     "note": "Sealed Poke Ball + COA; the best of the six; ~$10 unsealed; mass-produced volume item, never a grail"
+    },
+    {
+     "item": "Burger King 1999-2000 toy promo complete set (57-59 toys)",
+     "valueRange": "$300-$350",
+     "note": "~$325 on eBay verified; individual toys only $3-15 (est.)"
+    },
+    {
+     "item": "McDonald's 2015 Pikachu promo card",
+     "valueRange": "$10-$30",
+     "note": "Most valuable US McD card; note there was NO US 90s McDonald's Pokemon promo — first US Happy Meal was 2011; 90s US fast-food Pokemon = Burger King"
+    },
+    {
+     "item": "Toys R Us 48x48 Pikachu cardboard display sign",
+     "valueRange": "$100-$500",
+     "note": "Vintage store displays trade on eBay; thin market, size/condition driven (listing-based, est.)"
+    },
+    {
+     "item": "Tiffany & Co. x Arsham 18k gold diamond Pikachu pendant",
+     "valueRange": "$31,000+",
+     "note": "Verified $31,000 retail; limited drop resells at/above retail (est.); silver character pendants ~$1,393"
+    }
+   ]
+  }
+ ],
+ "sealedRules": [
+  "VERDICT — Costco/Sam's 'Heavy Hitters Premium Collection: Lucario V & Tyranitar V' (Sam's Club Sept 2022, Costco run Fall 2023-2024): KEEP IT SEALED — it is a verified winner. From ~$50-60 warehouse retail (est.) to $245-290 sealed today (PriceCharting index $263, TCGplayer market $244.79), roughly 4-5x in ~3 years, and it climbed all of 2026 ($165-210 in Nov-Dec 2025 to $289.97 in May 2026). Do NOT confuse it with the 2025 Sam's Club 'Prismatic Evolutions Lucario ex & Tyranitar ex Premium Collection' when pricing.",
+  "Rule #1: factory sealed, never opened, original shrink intact. Resealed product is near-worthless and rampant at vintage price points.",
+  "Beware fake 1st Edition: 2026 eBay 'Base Set 1st Edition box' sales at $4,900-$12,650 are almost certainly resealed/fake — an authentic 1st Ed box is six figures ($120K-$400K+; Heritage record $408,000) and never sells for a tenth of an Unlimited box.",
+  "Modern sealed boxes typically go sideways or DOWN for 1-2 years post-release (Evolving Skies dipped 35% below MSRP in 2022), then climb once out of print: historically 100-300% total over 3-5 years, ~20-60%/yr early settling to ~10-25%/yr (est.); 2020-21 bubble rates are not repeatable.",
+  "Warehouse-club exclusives (Costco/Sam's) outperform because print runs are smaller and they are never restocked.",
+  "Condition haircuts: dented corners or crushed shrink take 10-20% off; buyers check pack weight; opened box = sum of pack/single value, typically 30-50% less.",
+  "High-value boxes increasingly need provenance: auction-house LOA / authenticated listings command large premiums ($57,000 vs $36,000 for the same Base Unlimited box); never ship a five-figure box without an LOA.",
+  "Venues: TCGplayer is the price-setter for modern sealed, eBay second, Whatnot/Facebook fastest cash at ~10-20% under market, LCS buylist ~70-80% of market (est.); vintage WOTC $10K+ goes to Heritage/Goldin/PWCC. eBay's authenticity guarantee covers graded cards $250+ but does NOT cover sealed boxes."
+ ],
+ "sources": [
+  "https://pokescope.app/blog/psa-10-vs-psa-9-pokemon-cards-price-guide/",
+  "https://www.misprint.com/posts/psa-10-vs-psa-9-price-difference",
+  "https://www.misprint.com/posts/psa-vs-tag-is-tag-worth-it",
+  "https://www.misprint.com/posts/most-graded-pokemon-cards",
+  "https://www.misprint.com/posts/evolving-skies-booster-box-price-2026",
+  "https://www.pokemonpricetracker.com/blog/posts/pokemon-card-slabs-psa-vs-cgc-vs-bgs-2026-guide",
+  "https://www.pokemonpricetracker.com/blog/posts/raw-vs-graded-pokemon-cards-roi-analysis-2026",
+  "https://www.pokemonpricetracker.com/blog/posts/pokemon-card-population-report-guide-rarity-analysis-2026",
+  "https://www.pokemonpricetracker.com/psa-pokemon-card-api",
+  "https://thepullrate.com/guides/is-psa-grading-worth-it",
+  "https://pkmhobby.com/blogs/cards/graded-pokemon-card-values",
+  "https://www.cllct.com/sports-collectibles/sports-cards/what-grade-is-better-than-a-gem-mint-10-the-pristine-10-reigns-supreme",
+  "https://pokeinsider.com/2025/11/15/cgc-vs-psa-what-smart-collectors-need-to-know-before-grading-modern-pokemon-cards/",
+  "https://ogcards.com/blogs/pokemon-cards/psa-vs-bgs-vs-cgc-pokemon-grading-guide",
+  "https://phantomdisplay.com/blogs/blog/bgs-vs-psa",
+  "https://samuraiswordtokyo.com/blogs/news/best-japanese-pokemon-cards-psa-grading-2026",
+  "https://cardcodex.com/pokemon/sun-moon/hidden-fates-shiny-vault/charizard-gx-sv49-94-rare-shiny-gx/",
+  "https://www.gemrate.com/",
+  "https://www.gemrate.com/universal-search",
+  "https://cardcollective.ai/2025/03/30/why-psa-9s-are-becoming-more-popular-than-psa-10s-in-2025/",
+  "https://www.psacard.com/publicapi/documentation",
+  "https://api.psacard.com/publicapi/swagger/ui/index",
+  "https://www.psacard.com/pop",
+  "https://github.com/brad-newman/fetch-psa-api",
+  "https://github.com/ChrisMuir/psa-scrape/tree/master/pop_report",
+  "https://gocollect.com/blog/the-van-gogh-pikachu-card-has-doubled-in-value-in-just-4-months",
+  "https://www.pricecharting.com/game/pokemon-promo/pikachu-with-grey-felt-hat-85",
+  "https://www.hokocollectables.com/blogs/news/how-to-read-psa-pop-report",
+  "https://zeropop.app/blog/population-reports-explained",
+  "https://www.pokedata.io/pro",
+  "https://www.pricecharting.com/game/pokemon-promo/heavy-hitters-premium-collection-lucario-v-&-tyranitar-v",
+  "https://www.pricecharting.com/game/pokemon-base-set/booster-box",
+  "https://www.pricecharting.com/game/pokemon-base-set/booster-box-1st-edition",
+  "https://www.pricecharting.com/game/pokemon-promo/factory-sealed-paldea-adventure-chest",
+  "https://www.pricecharting.com/game/gameboy/pokemon-red",
+  "https://comics.ha.com/heritage-auctions-press-releases-and-news/sealed-pokemon-base-set-booster-box-sells-for-record-408-000-at-heritage-auctions.s?releaseId=4076",
+  "https://icv2.com/articles/news/view/47948/pokemon-tcg-1st-edition-base-set-sealed-box-prices-retreat-ha",
+  "https://www.pokemon.com/us/pokemon-tcg/product-gallery/heavy-hitters-premium-collection",
+  "https://www.costco.ca/pok%C3%A9mon-heavy-hitters-premium-collection-%E2%80%93-english-edition.product.4000231235.html",
+  "https://www.tcgplayer.com/product/648365/pokemon-miscellaneous-cards-and-products-prismatic-evolutions-lucario-ex-and-tyranitar-ex-premium-collection-sams-club",
+  "https://news.justcollecting.com/pokemon-game-goes-for-over-80000/",
+  "https://www.thebrickfan.com/lego-pokemon-2026-sets-officially-announced/",
+  "https://jaysbrickblog.com/news/first-lego-pokemon-sets-officially-revealed-for-27-february-2026-launch/",
+  "https://jaysbrickblog.com/news/lego-pokemon-smart-play-sets-officially-unveiled-for-august-2026-release/",
+  "https://www.brickeconomy.com/set/40892-1/lego-pokemon-kanto-region-badge-collection",
+  "https://theearlofbricks.com/blog-lego-resale-value-opened-vs-unopened/",
+  "https://funkypriceguide.com/checklist/funko-pop-pokemon/",
+  "https://gamerant.com/pokemon-rarest-funko-pops/",
+  "https://www.boxedvinyl.com/blogs/news/top-20-most-valuable-funko-pops-in-2025-with-prices",
+  "https://popandfigures.com/collector-tips/display-your-funko-pop-out-box-vs-in-box/",
+  "https://collectinsure.com/2025/09/09/the-most-expensive-pokemon-merch-a-guide-to-valuable-collectibles/",
+  "https://japan-figure.com/blogs/news/rare-pokemon-plush",
+  "https://www.thegamer.com/rare-most-valuable-pokemon-plushes/",
+  "https://bulbapedia.bulbagarden.net/wiki/Build-A-Bear_Workshop_collection",
+  "https://www.pricecharting.com/game/pokemon-promo/eevee-build-a-bear-63",
+  "https://pkmncollectors.livejournal.com/17108821.html",
+  "https://bulbapedia.bulbagarden.net/wiki/Pok%C3%A9mon_Zukan_figures",
+  "https://picclick.com/Pok%C3%A9mon-zukan-1-40-%E2%80%94-Lugia-Ho-Oh-284045464315.html",
+  "https://screenrant.com/pokemon-gold-cards-burger-king-collectors-bad-investment/",
+  "https://bulbapedia.bulbagarden.net/wiki/1999_Burger_King_promotional_Pok%C3%A9mon_toys",
+  "https://www.tcgplayer.com/content/article/A-Complete-Guide-to-McDonald-s-Happy-Meal-Pok%C3%A9mon-Cards/e631efe0-fc8f-4eac-88bc-8d56c553fc81/",
+  "https://pkmncollectors.fandom.com/wiki/Mega_Construx"
+ ]
+}
