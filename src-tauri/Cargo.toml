@@ -1,0 +1,17 @@
+[package]
+name = "pokemon-chest"
+version = "1.0.0"
+description = "Pokémon Chest — your card collection, live comps, and sell & grade intelligence."
+authors = ["DarkHearts"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1

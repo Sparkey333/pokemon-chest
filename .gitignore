@@ -1,0 +1,17 @@
+# Secrets — your BYOK API keys live here. NEVER commit this.
+settings.local.json
+
+# Cached TCGdex set data (re-fetched on demand)
+scripts/cache/
+
+# Node / Tauri build artifacts
+node_modules/
+src-tauri/target/
+src-tauri/gen/
+
+# Built installers (kept locally in the project folder, not in git)
+*.dmg
+*.app
+
+# OS cruft
+.DS_Store

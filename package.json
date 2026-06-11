@@ -1,0 +1,14 @@
+{
+  "name": "pokemon-chest",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Pokémon Chest — your card collection, live comps, and sell & grade intelligence. © 2026 DarkHearts",
+  "scripts": {
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

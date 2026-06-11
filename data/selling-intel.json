@@ -1,0 +1,83 @@
+{
+  "updated": "2026-06",
+  "disclaimer": "Educational guidance compiled from public hobby sources (June 2026). Prices, fees, and grading tiers change often — always confirm current numbers and check live sold comps before selling or grading.",
+  "thresholds": {
+    "gradeFloorRaw": 30,
+    "gradeModernEnglishRaw": 75,
+    "gradeVintageRaw": 40,
+    "allInGradingCost": 35,
+    "psa9OfPsa10": 0.4,
+    "sellNowValue": 40
+  },
+  "gradeMultiples": {
+    "vintage": "Vintage WOTC (1999–2003): PSA 10 ≈ 5–10× raw NM (10×+ for elite chase cards); PSA 10 ≈ 5–7× a PSA 9. Gem-mint survivors are genuinely scarce, so the 10 carries the value.",
+    "modern": "Modern Scarlet & Violet (2023–2025): PSA 10 ≈ 1.5–3× raw NM; PSA 10 ≈ 1.3–2.5× a PSA 9. Big PSA-10 populations mean 10s aren't scarce.",
+    "note": "Universal one-grade cliff: a PSA 9 usually sells for only 30–50% of the matching PSA 10. Cards >$100 raw see roughly +120–300% at PSA 10; cards under ~$10 raw rarely gain enough to cover grading. Japanese modern cards gem ~2–3× more often than English (~15–20% vs ~8–12%), but clean English PSA 10s often command higher prices."
+  },
+  "gradeCandidateSignals": [
+    "Modern English: raw value ≳ $75–80 (or $50+ if a clean PSA 10 looks likely)",
+    "Vintage: raw value ≳ $40 with a real shot at grading 9+ — the 10 multiple does the heavy lifting",
+    "Universal floor: worth at least ~$30 raw NM before grading is mathematically sensible",
+    "Target an expected graded value ≥ ~3× your total grading cost for reliable ROI",
+    "Four sharp corners, no whitening",
+    "Centering 60/40 or better front AND back (off-centering is the #1 PSA-10 killer)",
+    "No print lines, scratches, or surface scuffs; clean glossy surface",
+    "Marquee modern alt-arts / Special Illustration Rares (Charizard, Umbreon/Moonbreon, Pikachu) are the strongest modern bets",
+    "Clean vintage holos of iconic Pokémon (Base Charizard/Blastoise/Venusaur) are the highest-ROI targets overall",
+    "Japanese raw cards are better grading bets on condition odds (tighter centering, finer holo, ~2–3× higher gem rate)"
+  ],
+  "doNotGrade": [
+    "Anything under ~$30 raw with no realistic appreciation — fees and shipping eat the gain",
+    "Bulk modern holos / ex cards under ~$10 raw — a stack of PSA 9s on $5 cards loses money",
+    "Commons, uncommons, and non-alt-art modern rares — high population, tiny premium",
+    "Visibly flawed cards (edge wear, bends, scratches, print lines, heavy off-centering) — these grade ≤7 and often sell at or under raw",
+    "Modern cards likely to grade 9 not 10 — a modern PSA 9 is only 0.4–0.7× the 10 and frequently won't beat raw + fees"
+  ],
+  "gradingTiers": [
+    {"grader": "CGC", "tier": "Bulk (25-card min)", "maxValue": "$500", "cost": "$17", "turnaround": "~120 days"},
+    {"grader": "TAG", "tier": "Basic (10-card min)", "maxValue": "$300", "cost": "$22", "turnaround": "45+ days"},
+    {"grader": "Beckett", "tier": "Base / Bulk", "maxValue": "—", "cost": "$15–$25", "turnaround": "75–120 days"},
+    {"grader": "CGC", "tier": "Economy", "maxValue": "$1,000", "cost": "$20", "turnaround": "~65 days"},
+    {"grader": "PSA", "tier": "Regular (cheapest active PSA, Jun 2026 — Value tiers paused)", "maxValue": "$1,499", "cost": "$79.99", "turnaround": "~20 days"},
+    {"grader": "CGC", "tier": "Standard", "maxValue": "$3,000", "cost": "$55", "turnaround": "~10 days"},
+    {"grader": "PSA", "tier": "Express", "maxValue": "$2,499", "cost": "$149", "turnaround": "~15 days"}
+  ],
+  "breakEven": "As of June 2026, budget roughly $30–$40 all-in per card at the cheapest realistic tier (low grading fee + a share of shipping/insurance). The graded value should exceed raw by at least ~$35 just to break even, and ideally be ≥ ~3× your total cost to justify the time and risk. PSA's sub-$30 Value tiers are paused — cheapest legit routes now are CGC Bulk (~$17), Beckett Base (~$15–25), or TAG Basic ($22); PSA's floor is Regular at $79.99 (only worth it for cards expected to clear ~$240+ graded).",
+  "marketplaces": [
+    {"name": "eBay (US)", "fee": "~13.6% (13.25% FVF + $0.30; drops toward 2.35% above $7,500)", "bestFor": "High-value cards, graded slabs, vintage holos, and Japanese cards. Largest, most liquid global audience (~58% of Pokémon volume). Best for max price, not speed. Authenticity Guarantee on singles ≥$250."},
+    {"name": "TCGplayer", "fee": "~13.25–15% total", "bestFor": "Raw English singles, modern/playable cards, and bulk lots. The dedicated TCG marketplace where players buy by exact set/condition. Weak for graded slabs and Japanese cards."},
+    {"name": "Mercari (US)", "fee": "~10% flat (no separate processing fee since 2025)", "bestFor": "Raw English mid-value singles and small lots, sold fast with the cheapest US fees. Casual buyer base; not ideal for premium slabs."},
+    {"name": "Whatnot", "fee": "~11.2% (0% commission on TCG portion above $1,500)", "bestFor": "Speed — moving lower/mid inventory fast via live auctions; bulk breaks. Live urgency can spike prices with a big audience."},
+    {"name": "Cardmarket (EU)", "fee": "~5–6% private, capped €100/article", "bestFor": "The European audience and the cheapest venue for high-value cards thanks to the €100 cap. Strong for English and Japanese singles within Europe."},
+    {"name": "COMC", "fee": "~5% sale + intake fee + 10% cash-out", "bestFor": "Hands-off consignment of bulk/low-value English singles. Cheap only if you recycle credit into buying; cash-out is pricey."}
+  ],
+  "bestVenues": {
+    "rawEnglish": ["TCGplayer — dedicated player audience, fair pricing, best for volume", "Mercari — cheapest at ~10% flat, fast for mid-value singles", "Whatnot / COMC — for bulk you want gone"],
+    "gradedEnglish": ["eBay — most liquid market for slabs, standard for max price", "Whatnot — strong for mid-value slabs with live viewership", "Auction houses (Fanatics/PWCC) for top-tier vintage"],
+    "japanese": ["eBay — by far the largest global buyer base searching Japanese sets", "Cardmarket — cheapest fees if you can serve EU buyers", "Mercari Japan / Yahoo! Auctions Japan via Buyee for Japan-native demand"]
+  },
+  "urlTemplates": {
+    "ebayRawSold": "https://www.ebay.com/sch/i.html?_nkw={q}&_sacat=183454&LH_Sold=1&LH_Complete=1&_ipg=240",
+    "ebayGradedSold": "https://www.ebay.com/sch/i.html?_nkw={q}%20{grade}&_sacat=183454&LH_Sold=1&LH_Complete=1&_ipg=240",
+    "ebayActive": "https://www.ebay.com/sch/i.html?_nkw={q}&_sacat=183454",
+    "tcgplayerEn": "https://www.tcgplayer.com/search/pokemon/product?productLineName=pokemon&q={q}",
+    "tcgplayerJp": "https://www.tcgplayer.com/search/pokemon-japan/product?productLineName=pokemon-japan&q={q}",
+    "mercariSold": "https://www.mercari.com/search/?keyword={q}&status=sold_out",
+    "onetwentypoint": "https://130point.com/sales/?query={q}"
+  },
+  "sources": [
+    "https://www.psacard.com/info/submission-updates",
+    "https://www.cgccards.com/submit/services-fees/cgc-grading/",
+    "https://taggrading.com/pages/pricing",
+    "https://www.pokemonpricetracker.com/blog/posts/selling-pokemon-cards-in-2026-best-platforms-pricing",
+    "https://www.pokemonpricetracker.com/blog/posts/japanese-vs-english-pokemon-cards-value-guide-2026",
+    "https://pokescope.app/blog/psa-10-vs-psa-9-pokemon-cards-price-guide/",
+    "https://www.ebay.com/help/selling/fees-credits-invoices/selling-fees?id=4822",
+    "https://help.tcgplayer.com/hc/en-us/articles/201357836-TCGplayer-Fees",
+    "https://www.mercari.com/us/help_center/article/169/",
+    "https://www.cardmarket.com/en/Policies/Fees",
+    "https://help.whatnot.com/hc/en-us/articles/4847069165965-Whatnot-seller-fees",
+    "https://www.ebay.com/b/CCG-Individual-Cards/183454",
+    "https://130point.com/sales/"
+  ]
+}
