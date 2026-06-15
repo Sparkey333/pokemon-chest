@@ -1,0 +1,244 @@
+{
+ "updated": "2026-06",
+ "disclaimer": "Researched & verified June 2026. Educational only — not legal or financial advice; gambling/lottery law is state-specific and changing fast in this category. Confirm with a lawyer/CPA before launching products.",
+ "llcConcept": {
+  "nameIdeas": [
+   "Guaranteed Pull Co.",
+   "Honest Holo (repack + nostalgia line)",
+   "Nine Sets Nostalgia",
+   "Floor & Ceiling Cards",
+   "Repack Reliquary"
+  ],
+  "pitch": "A transparency-first Pokemon products LLC built on one rule: everyone wins. Sell guaranteed-value repacks and curated nostalgia/themed boxes where every buyer receives disclosed-value product (no chance-to-lose outcome), plus a 3D-printed display and accessory line that needs no cards as inventory. The moat is honest, traceable pull rates and published floor/ceiling values in a category currently under active legal fire (Whatnot RICO/lottery arbitration, March 2026). Compete on trust, not odds.",
+  "productLines": [
+   {
+    "name": "Guaranteed-value repacks (everyone-wins)",
+    "what": "Aftermarket repacks with a published floor value and guaranteed hit tier (e.g. every pack guarantees at least one holo/EX-or-better), clearly labeled as repacks (never implied factory-sealed). Tiers: ~$5 entry (15-25 cards, 1 guaranteed foil), ~$10 mid (1 guaranteed holo + nostalgia mix), ~$25 premium (WOTC/vintage, guaranteed 1st-ed/holo). (est.)",
+    "economics": "Industry rule of thumb ~2.5x cost markup approx 60% gross margin; sourced example ~$9 cost to ~$23 price approx $14 profit/pack. Bulk inputs: commons $0.008-0.01/card, holos $0.03-0.05, ultra rares $0.25-1.50. Set floor BELOW price so margin survives but high enough buyers feel fair value. (est.)",
+    "legalNote": "Legal as a PRODUCT because guaranteed stated value + guaranteed hit means everyone receives disclosed-value goods, removing the prize-by-chance element; must publish floor/ceiling and disclose contents per eBay Chance-Listings policy (updated Oct 28 2025)."
+   },
+   {
+    "name": "Nostalgia / themed curated boxes",
+    "what": "The theme is the product, not a gamble: '90s WOTC nostalgia' boxes (genuine Base/Jungle/Fossil/Team Rocket/Neo, guaranteed holo), 'one card from each of the 9 WOTC sets' samplers, 1999-Starter-Gift-Box-style collector/gift kits, and holiday/birthday boxes with a guaranteed centerpiece card. Strong emotional pull for returning 30-something collectors.",
+    "economics": "Margin is in curation, not random hits, so pull-rate risk is near zero; can command gift-tier pricing. Sourcing from owner's existing 934 EN + 357 JP raw stock (cost basis ~$604) converts low-cost-basis inventory into higher-margin curated SKUs. (est.)",
+    "legalNote": "Cleanly legal: buyer knows roughly what they get and there is no lose outcome; reselling authentic unmodified cards needs no license under the first-sale doctrine."
+   },
+   {
+    "name": "3D-printed display & accessory line",
+    "what": "Branded, card-agnostic physical goods: slab/graded-card display stands, booster-box and ETB display risers, set-themed card frames, deck-box trays, toploader/sleeve organizers, and tournament/collection-tracker holders. Zero card-inventory risk; pure manufactured product. Sold as the LLC's own brand (not Pokemon-branded).",
+    "economics": "High margin once printers are amortized: filament cost per stand is cents-to-low-dollars, retails $8-30+; no spoilage, no pull-rate liability, infinitely re-printable. Best long-term defensible asset because it does not depend on volatile card prices. Upfront: printer(s) + design time. (est.)",
+    "legalNote": "Must NOT use Pokemon/Nintendo trademarks, logos, character art, or imply endorsement (no counterfeit branded 'merch'); sell generic-design accessories under your own brand to stay clear of IP infringement."
+   },
+   {
+    "name": "Curated graded + raw bundles",
+    "what": "Pair one slabbed/graded card with a themed set of raw cards (e.g. a graded Eeveelution SIR plus matching raw evolution-line cards), sold as a verifiable-value bundle with the grade providing the price anchor.",
+    "economics": "Value is verifiable (grade sets a defensible floor), margin sits in the curation premium; lets the LLC monetize grading expertise and the owner's eventual graded holdings. Liquidity is better than raw because the slab carries a comp. (est.)",
+    "legalNote": "Disclosed, fixed-price bundle with stated grade = a product, not a chance; keep supplier/grading provenance to defend authenticity."
+   }
+  ],
+  "legalGuardrails": [
+   "GAMBLING/RAZZ LINE (lead rule): A product is an illegal lottery only if it has ALL THREE of prize + chance + consideration. Guaranteed-stated-value repacks where everyone receives disclosed-value product = LEGAL (no prize-by-chance). Razzes/raffles where one random buyer wins and everyone else loses = ILLEGAL gambling in most states, PayPal/Facebook-banned. NEVER run razzes, spot-sales, wheel-spins, or dice-roll breaks.",
+   "Disclose contents and floor value on every listing: eBay Chance-Listings policy (updated Oct 28 2025) allows grab-bags/mystery boxes only if you give general info on what's included and do not single out high-value items unless they're in every purchase.",
+   "Whatnot is tightening hard: 'Professionally Sealed Surprise Products' policy (effective Nov 3 2025) requires pre-approval, audits, the in-app Surprise Set feature, and a public checklist; physical randomizers are banned. Whatnot also faces RICO + illegal-lottery arbitration (March 2026) targeting randomized breaks. Design conservatively and prefer fixed-price guaranteed repacks. (est.)",
+   "Sell only authentic, unmodified cards (first-sale doctrine exhausts trademark control, no license needed) and do NOT use Pokemon/Nintendo branding in your logos/marketing in a way implying endorsement; never manufacture counterfeit branded merch.",
+   "Never imply a repack is factory-sealed: use distinct aftermarket packaging, clear labeling, no resealing/weighing/marking (those are fraud and the category's reputation-killers); authenticate any 'hit' card to avoid including counterfeits.",
+   "Get a state sales-tax license/reseller permit to collect sales tax and buy bulk tax-free for resale via a resale certificate (only resale-intended inventory qualifies); rules vary by state. (est.)",
+   "Treat repack/box sales as ordinary business income (not collectible capital gains) and keep clean per-lot COGS + supplier provenance records to set defensible floor values and defend against tamper/counterfeit claims. (est.)",
+   "This is educational research, NOT legal advice; gambling/lottery law is state-specific and changing fast in this category. Confirm with a lawyer in your state before launching the products line."
+  ],
+  "startupSteps": [
+   {
+    "step": "1. Validate the everyone-wins model on owner's own inventory",
+    "detail": "Build the first guaranteed-value and nostalgia SKUs from the existing 934 EN + 357 JP raw cards (cost basis ~$604) before buying any bulk; this turns low-cost-basis stock into proof-of-concept product at near-zero new spend. (est.)"
+   },
+   {
+    "step": "2. Stand up the home-base storefront",
+    "detail": "Launch on your own Shopify/website first (best control over product descriptions, floor values, and terms), then add eBay (highest traffic, compliant disclosure) and Etsy for vintage repacks. Treat Whatnot as later/optional given the 2026 crackdown and litigation. (est.)"
+   },
+   {
+    "step": "3. Decide entity timing and register",
+    "detail": "Form the LLC once you are (a) marketing branded repacks publicly at volume, (b) holding meaningful inventory, or (c) making value claims to many strangers; the value-claim/tamper exposure argues for the LLC earlier than for plain reselling. Confirm with a local attorney/CPA. (est.)"
+   },
+   {
+    "step": "4. Get tax + reseller compliance in place",
+    "detail": "Obtain the state sales-tax license/reseller permit, set up a resale certificate for tax-free bulk buys, and start per-lot COGS tracking (price/lb, per-card cost, packaging, labor) from day one. (est.)"
+   },
+   {
+    "step": "5. Source bulk and set published floor/ceiling values",
+    "detail": "Vet bulk suppliers (avoid 'oddly specific' pre-picked lots like '4,000 commons + 4,000 foils'; authenticate against counterfeits), then publish a floor and ceiling per product (Mint City example: $100 product, $25-30 floor, $300+ ceiling) and a no-tamper guarantee. (est.)"
+   },
+   {
+    "step": "6. Spin up the 3D-print accessory line",
+    "detail": "Design card-agnostic, non-branded displays/accessories, price for high margin, and launch as the LLC's own brand; this is the inventory-risk-free, card-price-independent backbone of the business. (est.)"
+   }
+  ],
+  "firstMoves": [
+   "This week: photograph and inventory the best raw cards and pull a starter batch into one nostalgia 'one-card-from-each-WOTC-set' sampler and one guaranteed-value repack tier to test the everyone-wins model.",
+   "Draft a compliant listing template now: theme + general contents + guaranteed hit + published floor value + 'aftermarket repack, not factory sealed' disclosure, matching eBay's Oct 2025 Chance-Listings policy.",
+   "Sketch 2-3 non-branded 3D-print accessory designs (slab stand, booster-box riser, deck tray) and print a prototype to validate the highest-margin, lowest-legal-risk line first.",
+   "Write down the standing rule on a card by the workbench: guaranteed value = legal product; chance-to-lose = illegal razz, never run one.",
+   "Book a 30-minute consult with a local attorney/CPA before any public branded sales at volume, to confirm LLC timing and state sales-tax/reseller permit steps. (est.)"
+  ]
+ },
+ "invest": {
+  "thesis": "Mid-2026 is an active correction: modern speculative singles are down 40-60% from peak while vintage WOTC and sealed product are holding or rising. For a ~$14k, mostly-raw collector, weight new money toward sealed boxes/ETBs of Charizard- and Eevee-anchored sets and vintage WOTC, exploit the structural ~30-50% Japanese-vs-English price lag for cheap upside, buy marquee modern (Moonbreon, Charizard SIRs) only on the dip, treat warehouse-club product and bundles as flip inventory only, and ride the 30th-anniversary + LEGO-launch + Mega-era catalysts. Not financial advice; assume ~13% sell fees and modern volatility of +/-40%.",
+  "buys": [
+   {
+    "item": "Evolving Skies booster box (sealed)",
+    "why": "The benchmark modern sealed hold (the 'Moonbreon'/Eevee-line set); a $130-145 retail box in 2021 now trades ~$2,400-2,700 sealed. Proven performer, most liquid format. (est.)",
+    "range": "$2,400-2,700",
+    "horizon": "3-5+ yr hold",
+    "risk": "Medium - high entry price; sealed insulates from PSA-pop risk but is capital-intensive for a small collector."
+   },
+   {
+    "item": "Phantasmal Flames booster box (Nov 2025, sealed)",
+    "why": "Standout current sealed-box buy: near $144 MSRP but reportedly doubled on the Mega Charizard X ex SIR chase (~$450-500). Charizard presence = durable, reprint-resilient demand. (est.)",
+    "range": "$144 MSRP, ~$280+ secondary",
+    "horizon": "2-4 yr hold",
+    "risk": "Medium - current-era set, reprint risk if demand pulls in more print runs."
+   },
+   {
+    "item": "Prismatic Evolutions & Surging Sparks ETBs (sealed)",
+    "why": "Eevee-line (Prismatic) and Pikachu-line/SIR (Surging Sparks) sets; singles corrected hard (Umbreon SIR -48%) which makes sealed the cleaner play. Surging Sparks box tracked toward $250-300 vs ~$140 MSRP by end-2026. ETBs give best percentage appreciation. (est.)",
+    "range": "$50-70 per ETB",
+    "horizon": "3-5 yr hold",
+    "risk": "Medium - popular sets had large print; buy ETBs on dips, not at hype peak."
+   },
+   {
+    "item": "Ascended Heroes ETBs / Premium Poster Collection (Jan 2026, sealed)",
+    "why": "Collection-only distribution with NO booster boxes, so the sealed ETBs/bundles become the scarce format - that scarcity is the thesis. Chase: new Mega Attack Rare + Mega Gengar ex SIR ($800+ in Japan). (est.)",
+    "range": "$50-90 per sealed unit",
+    "horizon": "3-5 yr hold",
+    "risk": "Medium - new rarity tier is unproven; scarcity thesis depends on distribution staying box-free."
+   },
+   {
+    "item": "Vintage WOTC holos - Base/Jungle/Fossil (PSA 7-9 graded + clean raw)",
+    "why": "Vintage (pre-2003) is insulated from modern overprinting and the clear 2026 strength; trackers project +30-50% on 1st-Ed Base/Jungle/Fossil during the 30th-anniversary year. PSA 7-9 and clean raw are the lower-ticket entry into the safest appreciation lane. (est.)",
+    "range": "$80-400 per card (non-Charizard)",
+    "horizon": "3-5+ yr hold",
+    "risk": "Low-medium - authentication/condition risk on raw; grade vintage for liquidity."
+   },
+   {
+    "item": "Moonbreon - Umbreon VMAX Alt Art (Evolving Skies), on the dip",
+    "why": "Crown jewel of modern, now a correction buy not a peak chase: raw fell ~$2,218 to ~$1,400 (-37%); PSA 10 swinging $700-1,500 off its ~$2,300 Oct-2025 peak. Accumulate on weakness. (est.)",
+    "range": "$700-1,500 (PSA 10) / ~$1,400 raw",
+    "horizon": "3-5 yr hold",
+    "risk": "High - high-value single, expect +/-40% volatility; keep under 10-15% of portfolio."
+   },
+   {
+    "item": "Lagging Japanese SARs / alt-arts (esp. starter-Pokemon)",
+    "why": "Japanese cards run ~30-50% cheaper than English at equal grade on better cardstock; starter-Pokemon SAR/alt-arts specifically lag legendary pricing, and Japan-only rarities (MUR/MA/BWR) have no English substitute = structural scarcity. A real, exploitable inefficiency for this collector who already holds 357 JP cards. (est.)",
+    "range": "$30-300 per card",
+    "horizon": "2-4 yr hold",
+    "risk": "Medium - import/grading logistics; pick iconic art, not every print."
+   },
+   {
+    "item": "Flagship LEGO Pokemon sets (sealed, 2026 new license)",
+    "why": "Brand-new line launched Feb 27 2026 (Pokemon Day); first-year-of-a-new-license sets are prime appreciation targets once retired. Focus on big/iconic builds - Charizard ~$650 flagship and large Kanto-starter showpieces - not the cheap August sets. (est.)",
+    "range": "$60-650 per set",
+    "horizon": "2-4 yr hold to retirement",
+    "risk": "Medium - depends on LEGO retiring the set; cheap small sets are weak holds, buy the iconic ones."
+   }
+  ],
+  "avoid": [
+   "Overprinted modern with huge PSA pop - the epicenter of the correction (Obsidian Flames Charizard fell ~$126 to $79, -37%; modern SIRs broadly at 40-60% of peak). High pop = no scarcity = no floor.",
+   "Anything still priced near its peak despite the down-trend.",
+   "Modern cards with no competitive utility AND massive print runs - nothing supporting them.",
+   "Warehouse-club product (Costco/Sam's) as a 'hold' - 2M+ reprint units combined flooding in 2026 kills the scarcity thesis; that is flip inventory only. (est.)",
+   "Buying after a catalyst has passed - don't buy 30th-anniversary commemorative sets at peak resale.",
+   "Grading cheap bulk modern - PSA bulk ~$18.99/card, CGC ~$12 often costs more than it adds; hold cheap modern raw or sealed.",
+   "Ungraded sealed/vintage video games - the WATA-certified Game Boy cart lane (e.g. Yellow WATA 9.4A sold $950k) is deep-pocket and thin-liquidity; at most one trophy piece, never a core allocation for a $14k collector."
+  ],
+  "deployTiers": [
+   {
+    "budget": "$500 (starter / learn the market)",
+    "mix": "$300 sealed hold (2 ETBs of Prismatic Evolutions/Surging Sparks, or 1 Phantasmal Flames box); $150 vintage singles (a couple Base/Jungle/Fossil holos raw or PSA 6-8); $50 flip experiment (a club bundle or hot single to learn liquidity/fees). Horizon: sealed/vintage 3-5 yr, flip 1-3 months. (est.)"
+   },
+   {
+    "budget": "$2,000 (balanced)",
+    "mix": "$900 (45%) sealed - 1 booster box (Phantasmal Flames or Surging Sparks) + 3-4 ETBs across sets (Prismatic Evolutions, Ascended Heroes ETBs since no box); $700 (35%) vintage/graded singles - 1 mid-grade WOTC holo + several raw vintage + 1 lagging Japanese SAR; $250 (12.5%) adjacent - a sealed iconic LEGO Pokemon set; $150 (7.5%) flip inventory - current-set bundles/hot singles. (est.)"
+   },
+   {
+    "budget": "$5,000 (serious, diversified)",
+    "mix": "$2,000 (40%) sealed - 2-3 booster boxes incl. an Evolving Skies box anchor + a spread of ETBs; $1,750 (35%) vintage + marquee graded - PSA 9 Base-era holo(s), a Moonbreon on the dip, lagging Japanese SARs; $750 (15%) adjacent - a flagship LEGO Pokemon set sealed + optionally one WATA-graded mid-tier Game Boy cart trophy; $500 (10%) flip inventory turned 2-4x/yr to fund grading. Horizon: sealed/vintage/LEGO 3-5+ yr, flip rotates in months. (est.)"
+   }
+  ]
+ },
+ "bigIdeas": [
+  {
+   "title": "Consign the best vintage pieces through an established auction house",
+   "detail": "The collection holds strong unrealized gains (~$14k value on ~$604 cost basis). For trophy-tier vintage WOTC holos, consigning via a reputable auction house (e.g. Heritage Auctions) reaches deep-pocket buyers and provides verified comps, rather than fighting ~13% marketplace fees and thin liquidity on raw singles. Pair with the 30th-anniversary tailwind for timing. (est.)",
+   "effort": "Medium - identify the 3-5 highest-value pieces, grade them first, then submit to consignment.",
+   "payoff": "Access to top-of-market prices on trophy cards and clean liquidity events that marketplaces can't match for high-value vintage. (est.)"
+  },
+  {
+   "title": "Bulk-grade the marquee cards when PSA Value tier reopens / is cost-effective",
+   "detail": "Grading is the liquidity for vintage and marquee modern - PSA 10s of Base-era holos sell 2-5x raw. Bulk-grade only the cards where the grade adds more than its cost (~$18.99/card PSA bulk, ~$12 CGC); never grade cheap high-pop modern. Time submissions to the Value/bulk window to protect margin. (est.)",
+   "effort": "Medium - triage which raw cards clear the grade-adds-value bar, batch-submit, wait out turnaround.",
+   "payoff": "Converts raw upside into graded liquidity and unlocks the 2-5x PSA-10 premium on the right vintage/marquee cards. (est.)"
+  },
+  {
+   "title": "Build a complete graded WOTC set as a flagship asset",
+   "detail": "Assemble and grade a full vintage set (e.g. Base Set or the 9-set WOTC run) as a single cohesive collection. Complete graded sets command a premium over the sum of singles and become a marketable, story-driven flagship piece - and a natural anchor for the nostalgia product line. (est.)",
+   "effort": "High - multi-year acquisition, condition-matching, and grading discipline.",
+   "payoff": "A premium, liquid flagship asset plus marketing gravity for the LLC's WOTC nostalgia boxes. (est.)"
+  },
+  {
+   "title": "Brand and scale the 3D-printed accessory line into the durable business core",
+   "detail": "Unlike cards, 3D-printed displays/accessories carry no inventory-spoilage or pull-rate risk and are independent of volatile card prices. Build it into a recognizable own-brand product line (display stands, box risers, deck trays), the steady-margin backbone that funds the more volatile card plays. (est.)",
+   "effort": "Medium-high - design library, printer capacity, brand/storefront build-out.",
+   "payoff": "Recurring, high-margin, card-price-independent revenue and the most defensible long-term asset of the LLC. (est.)"
+  },
+  {
+   "title": "Run the products business as a transparent-pull-rate brand (trust as the moat)",
+   "detail": "In a category under active legal fire (Whatnot RICO/lottery arbitration, March 2026), the durable competitive advantage is honest, traceable pull rates plus published floor/ceiling values and a no-tamper guarantee. Build the app to log and surface real pull data so buyers can verify it - the only moat that survives the crackdown. (est.)",
+   "effort": "Medium - instrument pull-rate tracking and public reporting into the app/storefront.",
+   "payoff": "Repeat-buyer loyalty and brand survival while competitors get squeezed by tightening platform policies and litigation. (est.)"
+  },
+  {
+   "title": "Exploit the Japanese-vs-English arbitrage as a sourcing strategy",
+   "detail": "Japanese cards run ~30-50% cheaper than English at equal grade on better cardstock, with some rarities (MUR/MA/BWR) having no English substitute. The owner already holds 357 Japanese cards - systematically source iconic lagging Japanese SARs/alt-arts (especially underpriced starter-Pokemon) as both investment and curated-bundle inventory. (est.)",
+   "effort": "Medium - build import/grading workflow and identify the iconic lagging prints.",
+   "payoff": "Structural cheap-upside lane plus differentiated inventory for premium curated bundles. (est.)"
+  }
+ ],
+ "sources": [
+  "eBay Chance listings policy (updated Oct 28, 2025): https://www.ebay.com/help/policies/prohibited-restricted-items/chance-listings-policy?id=4311",
+  "Whatnot Card Breaks Policy: https://help.whatnot.com/hc/en-us/articles/34107485220237-Card-Breaks-Policy",
+  "Whatnot Professionally Sealed Surprise Products (Nov 3, 2025): https://help.whatnot.com/hc/en-us/articles/39618879679757-Professionally-Sealed-Surprise-Products",
+  "Whatnot RICO / illegal-lottery litigation (Mar 2026): https://www.benzinga.com/markets/private-markets/26/03/51338094",
+  "Whatnot 'unregulated online casino' lawsuit: https://www.baseballamerica.com/stories/lawsuit-accuses-breaking-platform-whatnot-of-being-unregulated-online-casino-for-sports-cards-report/",
+  "Three elements of an illegal lottery: https://thesocialmedialawfirm.com/blog/sweepstakes-law/the-three-elements-of-an-illegal-lottery-prize-chance-and-consideration/",
+  "Three core elements of gambling: https://www.freeadvice.com/legal/the-three-core-elements-that-make-up-gambling/",
+  "Razzes explained / why banned: https://medium.com/@authenticmemorabiliacompany/razzing-razzes-raffles-what-they-are-and-why-you-should-avoid-them-a025b0974821",
+  "Box breaks & sweepstakes law (Dale Joerling): https://www.cardboardconnection.com/qa-legality-box-breaks-sweepstakes-law-blogs-dale-joerling",
+  "Schwartz v. Upper Deck (chase cards / gambling): https://law.justia.com/cases/federal/district-courts/FSupp/956/1552/1895162/",
+  "Repack economics / bulk sourcing: https://www.gemtcg.com/how-to-source-process-and-sell-pokemon-bulk-for-maximum-profit",
+  "Repack pricing & margin: https://vapetm.com/pages/inventory-and-pricing-pokemon-vending",
+  "Repacks guide (cllct): https://www.cllct.com/sports-collectibles/sports-cards/what-are-repacks-cllct-s-guide-to-hobby-s-hot-trend",
+  "Reseal scam case (Dexerto): https://www.dexerto.com/gaming/dad-caught-teaching-son-to-scam-pokemon-fans-with-resealed-packs-3246738/",
+  "How to spot resealed packs (PokeFolio): https://www.pokefolio.eu/en/blog/how-to-spot-resealed-pokemon-packs/",
+  "Guaranteed-value repack model (Mint City): https://welcometomintcity.com/blogs/news/what-are-pokemon-mystery-packs",
+  "WOTC nostalgia repack listing (Etsy): https://www.etsy.com/listing/1723330341/",
+  "Trademark first-sale doctrine: https://revisionlegal.com/trademark/what-is-the-trademark-first-sale-doctrine/",
+  "First-sale doctrine (Seattle Trademark Lawyer): http://seattletrademarklawyer.com/blog/2012/2/28/",
+  "Reseller permit / trading-card business tax (JustAnswer): https://www.justanswer.com/tax/r2lb0-question-starting-trading-card-business.html",
+  "Trading-card capital gains vs business income (Claimyr): https://claimyr.com/government-services/irs/Tax-Implications-Of-Selling-Trading-Cards-Capital-Gains-vs-Business-Income/2025-04-11",
+  "PokemonPriceTracker - Market Crash 2026: https://www.pokemonpricetracker.com/blog/posts/pokemon-card-market-crash-2026-what-really-happened",
+  "PokeInsider - Sun & Moon surges while modern corrects: https://pokeinsider.com/2025/12/04/pokemon-tcg-market-splits-wide-open-as-sun-moon-era-surges-while-modern-cards-correct/",
+  "Athlon Sports - Best Pokemon TCG Sets to Buy 2026: https://athlonsports.com/collectibles/collectibles-best-pokemon-tcg-sets-to-buy-2026",
+  "Athlon Sports - Mega Evolution / Sealed Plays 2026: https://athlonsports.com/collectibles/pokemon-tcg-investing-2026-mega-evolution",
+  "PokeTrace - 30th Anniversary Collecting & Investment Guide 2026: https://poketrace.com/blog/pokemon-30th-anniversary-collecting-investment-guide-2026",
+  "TCGPlayer - Price Trends 04/28/2026: https://seller.tcgplayer.com/blog/price-trends-pok%C3%A9mon-cards-climbing-in-price-04-28-2026",
+  "Wargamer - Phantasmal Flames booster box surge: https://www.wargamer.com/pokemon-trading-card-game/phantasmal-flames-booster-box-surge",
+  "Beckett - Ascended Heroes (Mega Evolution): https://www.beckett.com/news/upcoming-pokemon-tcg-set-mega-evolution-ascended-heroes-features-more-mega-evolutions/",
+  "SNKRDUNK - Top 10 Most Wanted Japanese Pokemon Cards 2026: https://snkrdunk.com/en/magazine/2026/04/07/the-gengar-grail-list-top-10-most-wanted-japanese-pokemon-cards-2026-edition/",
+  "Samurai Sword - Japanese Alt Art SAR Guide: https://samuraiswordtokyo.com/blogs/news/japanese-pokemon-alt-art-sar-cards-guide",
+  "The Brick Fan - LEGO Pokemon 2026 Sets: https://www.thebrickfan.com/lego-pokemon-2026-sets-officially-announced/",
+  "Jay's Brick Blog - LEGO Pokemon Aug 2026: https://jaysbrickblog.com/news/lego-pokemon-smart-play-sets-officially-unveiled-for-august-2026-release/",
+  "Heritage Auctions - WATA Certified Games: https://www.ha.com/information/certified-video-games.s",
+  "JustCollecting - Pokemon game $80k+: https://news.justcollecting.com/pokemon-game-goes-for-over-80000/",
+  "CardChill - Is the Pokemon TCG Market on the Brink?: https://cardchill.com/article/is-the-pokemon-tcg-market-on-the-brink-of-collapse-an-analysis-of-risks-and-resilience-in-2025",
+  "Resell Calendar - Costco Prismatic Evolutions: https://resellcalendar.com/news/news/costco-pokemon-fight-prismatic-evolutions/"
+ ]
+}

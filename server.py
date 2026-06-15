@@ -29,11 +29,12 @@ Run:  python3 server.py     (or double-click start.command)
 import os, sys, json, html, subprocess, urllib.request, urllib.error, urllib.parse
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "1.4.0"
+VERSION = "1.5.0"
 ROOT = os.path.dirname(os.path.abspath(__file__))
 HOME = os.path.abspath(os.environ.get("POKECHEST_HOME") or ROOT)
 SETTINGS = os.path.join(HOME, "settings.local.json")
 PORT = int(os.environ.get("POKECHEST_PORT") or os.environ.get("POKEVAULT_PORT") or "8787")
+POCKET_NAME = "Pokémon Chest — Pocket.html"
 
 # ---------------------------------------------------------------- settings ---
 def load_settings():
@@ -205,12 +206,31 @@ def refresh_data():
                 report = None
     if not isinstance(report, dict):
         return {"ok": False, "error": "builder finished but produced no REPORT_JSON line"}
+    build_pocket()  # keep the iPhone Pocket Edition in sync with fresh data
     return {"ok": True, "report": {
         "entries": report.get("entries"),
         "cards": report.get("cards"),
         "value": report.get("value"),
         "imagesMatched": report.get("imagesMatched"),
     }}
+
+def build_pocket():
+    """Regenerate the self-contained iPhone Pocket Edition HTML. Best-effort —
+    never raises into a request handler."""
+    script = os.path.join(ROOT, "scripts", "build_pocket.py")
+    if not os.path.isfile(script):
+        return {"ok": False, "error": "pocket builder not found"}
+    env = dict(os.environ); env["POKECHEST_HOME"] = HOME
+    try:
+        proc = subprocess.run([sys.executable, script],
+                              capture_output=True, text=True, env=env, cwd=HOME, timeout=120)
+        if proc.returncode != 0:
+            return {"ok": False, "error": (proc.stderr or proc.stdout or "pocket build failed").strip().splitlines()[-1]}
+        out = os.path.join(HOME, "Pokémon Chest — Pocket.html")
+        kb = os.path.getsize(out) // 1024 if os.path.isfile(out) else 0
+        return {"ok": True, "file": "Pokémon Chest — Pocket.html", "kb": kb}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 # ----------------------------------------------------------------- handler ---
 class Handler(SimpleHTTPRequestHandler):
@@ -238,6 +258,23 @@ class Handler(SimpleHTTPRequestHandler):
             self._json({"enabled": False, "needs": what}, 200)
             return False
         return True
+
+    def _serve_file(self, fpath, ctype):
+        """Serve a file from the writable home if it exists. Returns True if served."""
+        if not os.path.isfile(fpath):
+            return False
+        try:
+            with open(fpath, "rb") as f:
+                body = f.read()
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+            return True
+        except Exception:
+            return False
 
     def _local_ok(self):
         """Reject API calls that don't come from this machine's own app.
@@ -270,19 +307,14 @@ class Handler(SimpleHTTPRequestHandler):
             # Serve the rebuilt copy from the writable home when it exists;
             # otherwise fall through to the bundled static file.
             live = os.path.join(HOME, "data", "collection.json")
-            if os.path.isfile(live):
-                try:
-                    with open(live, "rb") as f:
-                        body = f.read()
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json")
-                    self.send_header("Content-Length", str(len(body)))
-                    self.send_header("Cache-Control", "no-store")
-                    self.end_headers()
-                    self.wfile.write(body)
-                    return
-                except Exception:
-                    pass  # fall back to the bundled static file
+            if self._serve_file(live, "application/json"):
+                return
+        if path == "/" + POCKET_NAME or path == "/" + urllib.parse.quote(POCKET_NAME):
+            # The iPhone Pocket Edition is a generated artifact in the writable
+            # home (the bundle is read-only), so serve it from there.
+            if self._serve_file(os.path.join(HOME, POCKET_NAME), "text/html; charset=utf-8"):
+                return
+            return self._json({"ok": False, "error": "Pocket Edition not generated yet — click Regenerate in the Admin tab."}, 404)
         if path == "/api/price":
             s = load_settings()
             if not self._guard(s.get("pricecharting_token"), "pricecharting_token"):
@@ -310,6 +342,8 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(refresh_data())
             except Exception as e:
                 return self._json({"ok": False, "error": str(e)}, 200)
+        if path == "/api/pocket":
+            return self._json(build_pocket())
         if path == "/api/comps":
             s = load_settings()
             if not self._guard(s.get("comps_key"), "comps_key"):
@@ -334,6 +368,14 @@ class Handler(SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)  # binds here
+    # Ensure the iPhone Pocket Edition exists in the writable home so the Admin
+    # "Open Pocket Edition" link works on first launch of the bundled app.
+    if not os.path.isfile(os.path.join(HOME, POCKET_NAME)):
+        try:
+            import threading
+            threading.Thread(target=build_pocket, daemon=True).start()
+        except Exception:
+            pass
     print("┌──────────────────────────────────────────────┐")
     print(f"│  Pokémon Chest running → http://localhost:{PORT} │")
     print("│  Keep this window open. Close it to stop.    │")

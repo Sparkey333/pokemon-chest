@@ -18,6 +18,10 @@ fi
 echo "Rebuilding data from the newest PriceCharting .xlsx in this folder…"
 "$PY" scripts/build_data.py
 
+echo "Refreshing the iPhone Pocket Edition…"
+"$PY" scripts/build_pocket.py
+
 echo ""
 echo "✅ Done. Reload Pokémon Chest (or just use the in-app ↻ Refresh next time)."
+echo "   📱 'Pokémon Chest — Pocket.html' is updated — AirDrop it to your iPhone."
 read -r -p "Press Enter to close."

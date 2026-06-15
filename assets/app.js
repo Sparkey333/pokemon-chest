@@ -1,7 +1,7 @@
 /* ===================== Pokémon Chest ===================== */
 'use strict';
 
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.5.0';
 const APP_REPO = 'https://github.com/Sparkey333/pokemon-chest';
 
 /* ---------- tiny helpers ---------- */
@@ -52,7 +52,7 @@ init();
 async function init() {
   try {
     const grab = (u) => fetch(u + '?_=' + Date.now()).then(r => r.ok ? r.json() : null).catch(() => null);
-    const [col, intel, gintel, merch, lab, submit, sellerbiz] = await Promise.all([
+    const [col, intel, gintel, merch, lab, submit, sellerbiz, plan] = await Promise.all([
       fetch('data/collection.json?_=' + Date.now()).then(r => r.json()),
       fetch('data/selling-intel.json?_=' + Date.now()).then(r => r.json()),
       grab('data/grade-intel.json'),   // grade ratios / pop intel (research-verified)
@@ -60,6 +60,7 @@ async function init() {
       grab('data/grade-lab.json'),     // PSA process replica + rig specs (research-verified)
       grab('data/submit-guide.json'),  // submission walkthrough + turnaround status
       grab('data/seller-biz.json'),    // FB Marketplace setup + LLC/business playbook
+      grab('data/game-plan.json'),     // LLC concept + invest picks + big ideas (research-verified)
     ]);
     State.cards = col.cards;
     State.meta = col.meta;
@@ -69,6 +70,7 @@ async function init() {
     State.lab = lab;
     State.submit = submit;
     State.sellerbiz = sellerbiz;
+    State.plan = plan;
     recordSnapshot(col.meta.totalValue);
     State.live = await loadLiveConfig();
     updateLiveBtn();
@@ -324,6 +326,8 @@ function renderDashboard() {
       <div class="kpi ${k.cls}"><div class="k-label">${k.l}</div><div class="k-value">${k.v}</div><div class="k-sub">${k.s}</div></div>`).join('')}
     </div>
 
+    ${gamePlanHTML()}
+
     ${actionBoardHTML()}
 
     <div class="cols side" style="margin-top:16px">
@@ -364,8 +368,169 @@ function renderDashboard() {
     ${feedbackCardHTML()}`;
 
   $$('#view-dashboard .mini').forEach(el => el.onclick = () => openModal(State.cards[+el.dataset.i]));
+  wireGamePlan();
   wireActionBoard();
   wireFeedback();
+}
+
+/* ================= GAME PLAN (Now / Build / Invest) ================= */
+// "Now" money-moves are generated live from the collection — no data file needed.
+function buildNowMoves() {
+  const moves = [];
+  const raw = State.cards.filter(c => !c.graded && c.game === 'Pokémon');
+  const allIn = (State.intel.thresholds && State.intel.thresholds.allInGradingCost) || 35;
+
+  // 1. Best grading upside (net at PSA 10 minus raw, only "strong" verdicts)
+  const gradeCands = raw.map(c => ({ c, a: gradeAdvice(c) }))
+    .filter(x => x.a.verdict === 'strong')
+    .map(x => ({ ...x, upside: x.a.lad.psa10 * (1 - 0.136) - allIn - x.c.price }))
+    .sort((p, q) => q.upside - p.upside);
+  if (gradeCands.length) {
+    const g = gradeCands[0];
+    moves.push({ icon: '🔬', tone: 'strong',
+      title: `Grade ${g.c.name}${g.c.number ? ' #' + g.c.number : ''}`,
+      detail: `PSA 10 ≈ ${money(g.a.lad.psa10)} vs ${money(g.c.price)} raw — ~${money(g.upside)} upside${g.a.nineSafe ? ', and a 9 still beats raw' : ' (10-or-bust)'}. ${gradeCands.length} strong candidates total.`,
+      cta: 'Pre-grade it', go: () => { switchView('lab'); State.labTab = 'pregrade'; renderLab(); wirePregrade(); } });
+  }
+
+  // 2. Biggest realized gain available right now (high value, modern leans sell)
+  const sellNow = raw.filter(c => (uget(c).status || '') !== 'sold' && c.value >= 40)
+    .map(c => ({ c, pop: c.era === 'modern' })) // modern = more downside to holding
+    .sort((p, q) => q.c.value - p.c.value);
+  if (sellNow.length) {
+    const s = sellNow[0].c, n = sellNet(s);
+    moves.push({ icon: '💸', tone: 'gold',
+      title: `Cash in ${s.name}${s.number ? ' #' + s.number : ''}`,
+      detail: `Your top mover at ${money(s.value)} — nets ≈ ${money(n.net)} after fees. ${sellNow.filter(x => x.pop).length} modern cards worth ≥$40 (modern can soften as PSA pops climb).`,
+      cta: 'Build listing', go: () => openListingComposer(s, false) });
+  }
+
+  // 3. Best percentage flip (bought cheap, worth a lot)
+  const flips = raw.filter(c => c.cost > 0 && c.value >= 25 && c.plPct != null).sort((a, b) => b.plPct - a.plPct);
+  if (flips.length && flips[0].plPct > 100) {
+    const f = flips[0];
+    const mult = f.cost > 0 ? f.value / f.cost : 0;
+    const gain = f.plPct > 1000 ? `${money(f.pl)} (${mult.toFixed(0)}×)` : `${Math.round(f.plPct)}%`;
+    moves.push({ icon: '📈', tone: 'green',
+      title: `Lock the ${gain} gain on ${f.name}`,
+      detail: `Paid ${money(f.cost)}, worth ${money(f.value)}. Pure profit sitting in a binder — strongest return in your collection.`,
+      cta: 'Build listing', go: () => openListingComposer(f, false) });
+  }
+
+  // 4. Finish what's flagged
+  const flagged = State.cards.filter(c => (uget(c).status || '') === 'forsale');
+  if (flagged.length) {
+    moves.push({ icon: '📤', tone: 'blue',
+      title: `Finish listing ${flagged.length} flagged card${flagged.length > 1 ? 's' : ''}`,
+      detail: `You marked ${money0(sum(flagged.map(c => c.value)))} worth “for sale” — get them posted on eBay or local FB.`,
+      cta: 'Open Sell Hub', go: () => { switchView('sell'); State.sellTab = 'fs'; renderSell(); } });
+  }
+
+  // 5. Pop-check the biggest holdings (does grading still pay?)
+  moves.push({ icon: '🔎', tone: '',
+    title: 'Pop-check your top cards before grading',
+    detail: 'High PSA-10 populations quietly erase the grading premium. Verify pop on your top movers in Pop Watch before you spend on slabs.',
+    cta: 'Open Pop Watch', go: () => { switchView('sell'); State.sellTab = 'pop'; renderSell(); } });
+
+  return moves.slice(0, 5);
+}
+
+function gamePlanHTML() {
+  const P = State.plan;
+  const moves = buildNowMoves();
+  const toneColor = { strong: 'var(--green)', gold: 'var(--gold)', green: 'var(--green)', blue: 'var(--accent)', '': 'var(--muted)' };
+
+  const nowCol = `
+    <div class="gp-col">
+      <div class="gp-h"><span class="gp-badge now">NOW</span> Next best money moves</div>
+      <div class="gp-moves">${moves.map((m, i) => `
+        <div class="gp-move" data-gp="${i}">
+          <div class="gp-move-top"><span class="gp-ic">${m.icon}</span><b style="color:${toneColor[m.tone] || 'var(--text)'}">${esc(m.title)}</b></div>
+          <div class="reason">${m.detail}</div>
+          <button class="btn sm gp-cta" data-gp="${i}">${esc(m.cta)} →</button>
+        </div>`).join('')}</div>
+    </div>`;
+
+  const buildCol = `
+    <div class="gp-col">
+      <div class="gp-h"><span class="gp-badge build">BUILD</span> Turn it into a business</div>
+      ${P && P.llcConcept ? `
+        <div class="reason" style="margin-bottom:8px">${esc(P.llcConcept.pitch)}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">${(P.llcConcept.nameIdeas || []).slice(0, 3).map(n => `<span class="chip gold">${esc(n)}</span>`).join('')}</div>
+        <div class="gp-h2">Product lines</div>
+        <ul class="bullets">${(P.llcConcept.productLines || []).slice(0, 4).map(pl => `<li><b>${esc(pl.name)}</b> — ${esc(pl.what)}</li>`).join('')}</ul>
+        <div class="rec-box maybe" style="margin:8px 0 0;padding:10px 12px"><div class="rb" style="font-size:12.5px"><b>⚖ Stay legal:</b> ${esc((P.llcConcept.legalGuardrails || [''])[0])}</div></div>
+        <button class="btn sm gold" id="gp-build-more" style="margin-top:10px">See full LLC plan →</button>
+      ` : `<div class="reason">Your custom LLC concept — guaranteed-value mystery packs, nostalgia boxes, and 3D-printed display gear — is being researched now and lands with the next data update. The legality-first playbook will live here.</div>`}
+    </div>`;
+
+  const investCol = `
+    <div class="gp-col">
+      <div class="gp-h"><span class="gp-badge invest">INVEST</span> Smart next buys</div>
+      ${P && P.invest ? `
+        <div class="reason" style="margin-bottom:8px">${esc(P.invest.thesis)}</div>
+        <div class="gp-h2">Top picks</div>
+        <ul class="bullets">${(P.invest.buys || []).slice(0, 4).map(b => `<li><b>${esc(b.item)}</b> <span class="reason">${esc(b.range)} · ${esc(b.horizon)}</span><br><span class="reason">${esc(b.why)}</span></li>`).join('')}</ul>
+        <button class="btn sm" id="gp-invest-more" style="margin-top:6px">See all picks & deploy plan →</button>
+      ` : `<div class="reason">A grounded mid-2026 buy list — which sealed product, singles, and adjacent plays (incl. the 2026 LEGO Pokémon line) to deploy capital into — is being researched now and lands with the next data update.</div>`}
+    </div>`;
+
+  return `
+    <div class="panel gp-panel" style="margin-top:16px">
+      <h3 style="font-size:16px">🎯 Your Game Plan <span class="hint">— from today’s moves to the big picture</span></h3>
+      <div class="gp-grid">${nowCol}${buildCol}${investCol}</div>
+    </div>`;
+}
+
+function wireGamePlan() {
+  const moves = buildNowMoves();
+  $$('#view-dashboard .gp-move, #view-dashboard .gp-cta').forEach(el => {
+    el.onclick = (e) => { e.stopPropagation(); const m = moves[+el.dataset.gp]; if (m && m.go) m.go(); };
+  });
+  if ($('#gp-build-more')) $('#gp-build-more').onclick = () => openPlanModal('build');
+  if ($('#gp-invest-more')) $('#gp-invest-more').onclick = () => openPlanModal('invest');
+}
+
+function openPlanModal(which) {
+  const P = State.plan; if (!P) return;
+  let body = '';
+  if (which === 'build' && P.llcConcept) {
+    const L = P.llcConcept;
+    body = `<h2 style="font-size:20px">🏗 The LLC plan</h2>
+      <p class="reason" style="margin:4px 0 12px">${esc(L.pitch)}</p>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${(L.nameIdeas || []).map(n => `<span class="chip gold">${esc(n)}</span>`).join('')}</div>
+      <div class="subhead">Product lines</div>
+      <table class="guide-table"><thead><tr><th>Line</th><th>Economics</th></tr></thead><tbody>
+        ${(L.productLines || []).map(pl => `<tr><td><b>${esc(pl.name)}</b><br><span class="reason">${esc(pl.what)} · ⚖ ${esc(pl.legalNote)}</span></td><td class="reason">${esc(pl.economics)}</td></tr>`).join('')}
+      </tbody></table>
+      <div class="rec-box no" style="margin:14px 0"><div class="rh">⚖ Legal guardrails — read before you sell a single pack</div>
+        <ul class="bullets" style="margin-top:6px">${(L.legalGuardrails || []).map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>
+      <div class="subhead">Startup steps</div>
+      <ol class="bullets" style="padding-left:20px">${(L.startupSteps || []).map(s => `<li><b>${esc(s.step)}.</b> ${esc(s.detail)}</li>`).join('')}</ol>
+      <div class="subhead">First moves this month</div>
+      <ul class="bullets">${(L.firstMoves || []).map(x => `<li>${esc(x)}</li>`).join('')}</ul>`;
+  } else if (which === 'invest' && P.invest) {
+    const I = P.invest;
+    body = `<h2 style="font-size:20px">💎 Where to invest next</h2>
+      <p class="reason" style="margin:4px 0 12px">${esc(I.thesis)}</p>
+      <div class="subhead">The buy list</div>
+      <table class="guide-table"><thead><tr><th>Buy</th><th>Range</th><th>Horizon</th><th>Risk</th></tr></thead><tbody>
+        ${(I.buys || []).map(b => `<tr><td><b>${esc(b.item)}</b><br><span class="reason">${esc(b.why)}</span></td><td style="white-space:nowrap">${esc(b.range)}</td><td class="reason">${esc(b.horizon)}</td><td class="reason">${esc(b.risk)}</td></tr>`).join('')}
+      </tbody></table>
+      <div class="subhead">If you’re deploying…</div>
+      <table class="guide-table"><tbody>${(I.deployTiers || []).map(t => `<tr><td style="white-space:nowrap"><b>${esc(t.budget)}</b></td><td class="reason">${esc(t.mix)}</td></tr>`).join('')}</tbody></table>
+      <div class="rec-box no" style="margin-top:14px"><div class="rh">Avoid / bubble warnings</div><ul class="bullets" style="margin-top:6px">${(I.avoid || []).map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>`;
+  }
+  const big = (P.bigIdeas && P.bigIdeas.length) ? `
+    <div class="subhead">Bigger plays on the table</div>
+    <div class="cols two">${P.bigIdeas.map(b => `<div class="rec-box maybe" style="margin:0 0 10px"><div class="rh">${esc(b.title)}</div><div class="rb">${esc(b.detail)}<br><span class="reason">Effort: ${esc(b.effort)} · Payoff: ${esc(b.payoff)}</span></div></div>`).join('')}</div>` : '';
+  $('#modalRoot').innerHTML = `<div class="modal-bg" id="modalBg"><div class="modal" style="max-width:820px">
+    <button class="close-x" id="modalClose">×</button>
+    <div class="modal-body" style="padding:26px">${body}${big}
+      <p class="reason" style="margin-top:14px">${esc(P.disclaimer || 'Researched June 2026 — educational, not legal or financial advice.')}</p>
+    </div></div></div>`;
+  $('#modalClose').onclick = closeModal;
+  $('#modalBg').onclick = e => { if (e.target.id === 'modalBg') closeModal(); };
 }
 
 /* ---------- action board ---------- */
@@ -1220,9 +1385,25 @@ function renderAdmin() {
   const R = (State.lab && State.lab.rigSpecs) || null;
   const done = loadJSON(LS_RND, {});
   const stls = ['gradestage-base.stl', 'gradestage-ledbar.stl (print 2)', 'gradestage-column.stl (print 4)', 'gradestage-bridge.stl'];
+  const liveOn = !!State.live;
   $('#view-admin').innerHTML = `
     <div class="section-head"><h2>🛠 Admin — DarkHearts R&D</h2>
       <span class="sub">GradeStage: a 3D-printed card imaging rig — from collection scans to PSA-bench-grade capture. Build it, prove it, sell it.</span></div>
+
+    <div class="panel" style="margin-bottom:16px"><h3>📱 Take it with you — iPhone Pocket Edition</h3>
+      <p class="muted" style="font-size:13.5px;line-height:1.6">A single self-contained file — <code>Pokémon Chest — Pocket.html</code> in your project folder — with your whole collection, the Game Plan, and tap-to-open comp links baked in. Works offline; no app store, no account.</p>
+      <ol class="bullets" style="padding-left:20px">
+        <li><b>AirDrop</b> <code>Pokémon Chest — Pocket.html</code> from the project folder to your iPhone (or email it to yourself).</li>
+        <li>Open it in <b>Safari</b> → Share → <b>Add to Home Screen</b>. It gets the chest icon and launches full-screen like an app.</li>
+        <li>It’s a <b>snapshot</b> — tap <b>Regenerate</b> below (or refresh prices) after you update your collection, then re-AirDrop.</li>
+      </ol>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px">
+        <a class="btn sm gold" href="/Pok%C3%A9mon%20Chest%20%E2%80%94%20Pocket.html" target="_blank" rel="noopener">Open Pocket Edition ↗</a>
+        ${liveOn ? '<button class="btn sm" id="ad-pocket">↻ Regenerate from latest data</button>' : '<span class="reason">Launch via start.command to regenerate from inside the app.</span>'}
+        <span class="reason" id="ad-pocket-status"></span>
+      </div>
+    </div>
+
     <div class="cols side">
       <div class="panel"><h3>Product brief</h3>
         <p class="muted" style="font-size:13.5px;line-height:1.6">
@@ -1264,6 +1445,13 @@ function renderAdmin() {
   $$('#view-admin [data-rnd]').forEach(cb => cb.onchange = () => {
     const d = loadJSON(LS_RND, {}); d[cb.dataset.rnd] = cb.checked; localStorage.setItem(LS_RND, JSON.stringify(d));
   });
+  if ($('#ad-pocket')) $('#ad-pocket').onclick = async () => {
+    $('#ad-pocket-status').textContent = 'Regenerating…';
+    try {
+      const j = await (await fetch('/api/pocket', { method: 'POST' })).json();
+      $('#ad-pocket-status').textContent = j.ok ? `✓ Rebuilt (${j.kb} KB) — re-AirDrop it to your iPhone.` : 'Failed: ' + (j.error || 'unknown');
+    } catch (e) { $('#ad-pocket-status').textContent = 'Error: ' + e.message; }
+  };
 }
 
 /* ================= EBAY LISTING COMPOSER ================= */
