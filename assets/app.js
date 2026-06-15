@@ -1,7 +1,7 @@
 /* ===================== Pokémon Chest ===================== */
 'use strict';
 
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.7.0';
 const APP_REPO = 'https://github.com/Sparkey333/pokemon-chest';
 
 /* ---------- tiny helpers ---------- */
@@ -54,7 +54,7 @@ init();
 async function init() {
   try {
     const grab = (u) => fetch(u + '?_=' + Date.now()).then(r => r.ok ? r.json() : null).catch(() => null);
-    const [col, intel, gintel, merch, lab, submit, sellerbiz, plan] = await Promise.all([
+    const [col, intel, gintel, merch, lab, submit, sellerbiz, plan, venues] = await Promise.all([
       fetch('data/collection.json?_=' + Date.now()).then(r => r.json()),
       fetch('data/selling-intel.json?_=' + Date.now()).then(r => r.json()),
       grab('data/grade-intel.json'),   // grade ratios / pop intel (research-verified)
@@ -63,6 +63,7 @@ async function init() {
       grab('data/submit-guide.json'),  // submission walkthrough + turnaround status
       grab('data/seller-biz.json'),    // FB Marketplace setup + LLC/business playbook
       grab('data/game-plan.json'),     // LLC concept + invest picks + big ideas (research-verified)
+      grab('data/local-venues.json'),  // Colorado Springs local venues + automation/photo guidance
     ]);
     State.cards = col.cards;
     State.meta = col.meta;
@@ -73,6 +74,7 @@ async function init() {
     State.submit = submit;
     State.sellerbiz = sellerbiz;
     State.plan = plan;
+    State.venues = venues;
     recordSnapshot(col.meta.totalValue);
     recordCardSnaps();
     State.live = await loadLiveConfig();
@@ -979,10 +981,42 @@ function renderGuide() {
         <div class="src-list">${I.sources.map(s => `<div><a href="${esc(s)}" target="_blank" rel="noopener">${esc(s.replace(/^https?:\/\/(www\.)?/, '').split('/')[0])}</a></div>`).join('')}</div>
       </div>
     </div>
-    ${sellerPlaybookHTML()}`;
+    ${localPlaybookHTML()}${sellerPlaybookHTML()}`;
 }
 
 /* ---- Seller Playbook (FB Marketplace, business structure, multi-line strategy) ---- */
+function localPlaybookHTML() {
+  const V = State.venues; if (!V || !V.local) return '';
+  const L = V.local, A = V.automation || {};
+  return `
+    <div class="section-head" style="margin-top:30px"><h2>📍 Sell local — ${esc(L.area || 'Colorado Springs')}</h2>
+      <span class="sub">Keep 100% with local cash — verified shops, groups, shows &amp; safe spots.</span></div>
+    <div class="cols two">
+      <div class="panel"><h3>Card shops that buy / consign</h3>
+        <table class="guide-table"><tbody>${(L.shops || []).map(s => `<tr><td><b>${esc(s.name)}</b><br><span class="reason">${esc(s.where)}</span></td><td class="reason">${esc(s.note)}</td></tr>`).join('')}</tbody></table>
+        <div class="subhead">Best local route by card value</div>
+        <table class="guide-table"><tbody>${(L.byValueTier || []).map(t => `<tr><td style="white-space:nowrap"><b>${esc(t.tier)}</b></td><td class="reason">${esc(t.advice)}</td></tr>`).join('')}</tbody></table>
+      </div>
+      <div class="panel"><h3>Groups, shows &amp; apps</h3>
+        <div class="subhead">Facebook groups</div><ul class="bullets">${(L.groups || []).map(g => `<li><b>${esc(g.name)}</b> — ${esc(g.note)}</li>`).join('')}</ul>
+        <div class="subhead">Card shows / events</div><ul class="bullets">${(L.shows || []).map(s => `<li><b>${esc(s.name)}</b> <span class="reason">(${esc(s.cadence)})</span> — ${esc(s.note)}</li>`).join('')}</ul>
+        <div class="subhead">Local-pickup apps</div><ul class="bullets">${(L.apps || []).map(a => `<li><b>${esc(a.name)}</b> — ${esc(a.note)}</li>`).join('')}</ul>
+      </div>
+    </div>
+    <div class="cols two" style="margin-top:16px">
+      <div class="panel"><h3>Safe meetups &amp; the 0%-fee reality</h3>
+        <ul class="bullets">${(L.safeSpots || []).concat(L.noFeeReality || []).map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+      </div>
+      <div class="panel"><h3>How far can we automate?</h3>
+        <div class="subhead">Listing photos (stay legit)</div>
+        <ul class="bullets">${(A.photoPolicy || []).concat(A.imageGuidance || []).map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+        <div class="subhead">What the eBay API would unlock (BYOK dev account)</div>
+        <ul class="bullets">${(A.ebayApi || []).map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+        ${(A.crossListTools && A.crossListTools.length) ? `<div class="subhead">Cross-listing tools</div><ul class="bullets">${A.crossListTools.map(t => `<li><b>${esc(t.name)}</b> — ${esc(t.how)} <span class="reason">${esc(t.price)}</span></li>`).join('')}</ul>` : ''}
+      </div>
+    </div>`;
+}
+
 function sellerPlaybookHTML() {
   const B = State.sellerbiz;
   if (!B) return `<div class="panel" style="margin-top:22px"><h3>📒 Seller Playbook</h3>
@@ -1639,8 +1673,21 @@ const VENUES = {
   fb: { name: 'Facebook Marketplace', fee: 0, feeLabel: 'local cash — you keep 100% (shipped = 10% fee)',
     launch: () => 'https://www.facebook.com/marketplace/create/item', launchLabel: '📤 Open FB Marketplace — copy goes with you' },
 };
+function localVenueStripHTML(c) {
+  const q = enc('pokemon ' + (c.name || '') + (c.number ? ' ' + c.number : ''));
+  const area = (State.venues && State.venues.local && State.venues.local.area) || 'Colorado Springs';
+  return `<div class="subhead">Sell local — ${esc(area)} · keep 100%</div>
+    <div class="sr-links">
+      <a class="minilink" href="https://www.facebook.com/marketplace/search?query=${q}" target="_blank" rel="noopener">FB Marketplace</a>
+      <a class="minilink" href="https://offerup.com/search?q=${q}" target="_blank" rel="noopener">OfferUp</a>
+      <a class="minilink" href="https://www.mercari.com/search/?keyword=${q}&shippingPayerId=2" target="_blank" rel="noopener">Mercari (local)</a>
+      <a class="minilink" href="https://cosprings.craigslist.org/search/sss?query=${q}" target="_blank" rel="noopener">Craigslist</a>
+    </div>
+    <p class="reason" style="margin-top:4px">Local cash = <b style="color:var(--green)">you keep 100%</b> (no fees, no shipping). Card shops that buy, COS/Denver Pokémon groups, shows &amp; safe-meetup spots are in the <b>Seller Playbook</b> (Sell &amp; Grade Guide tab).</p>`;
+}
 function openListingComposer(c, backTo, venueKey) {
-  const venue = VENUES[venueKey] ? venueKey : (VENUES[State.lastVenue] ? State.lastVenue : 'ebay');
+  // Facebook (0% local) is the default — keeping 100% beats eBay on most cards.
+  const venue = VENUES[venueKey] ? venueKey : (VENUES[State.lastVenue] ? State.lastVenue : 'fb');
   State.lastVenue = venue;
   const V = VENUES[venue];
   const mkt = c.price || 0;
@@ -1655,10 +1702,10 @@ function openListingComposer(c, backTo, venueKey) {
     <div class="modal-body" style="padding:26px">
       <h2 style="font-size:20px;margin-bottom:6px">📤 List for sale</h2>
       <div class="seg" style="display:inline-flex;margin-bottom:8px">
+        <button id="lc-v-fb" class="${venue === 'fb' ? 'active' : ''}">⭐ Facebook · 0% local</button>
         <button id="lc-v-ebay" class="${venue === 'ebay' ? 'active' : ''}">eBay</button>
-        <button id="lc-v-fb" class="${venue === 'fb' ? 'active' : ''}">Facebook · 0% local</button>
       </div>
-      <p class="muted" style="font-size:12.5px;margin-bottom:14px">${esc(c.name)}${c.number ? ' #' + esc(c.number) : ''} · ${esc(c.set)} — copy what you need, then launch ${esc(V.name)} with the title ready to paste.${venue === 'fb' ? ' <b style="color:var(--green)">Local sales keep 100%</b> — safe-meetup rules in the Guide tab’s Seller Playbook.' : ''}</p>
+      <p class="muted" style="font-size:12.5px;margin-bottom:14px">${esc(c.name)}${c.number ? ' #' + esc(c.number) : ''} · ${esc(c.set)} — copy what you need, then launch ${esc(V.name)} with the title ready to paste.${venue === 'fb' ? ' <b style="color:var(--green)">Local sales keep 100%</b> — shops, groups &amp; safe-meetup spots in the Seller Playbook.' : ''}</p>
 
       <div class="subhead">Title <span style="text-transform:none;letter-spacing:0">(<span id="lc-count">${title.length}</span>/80)</span></div>
       <div style="display:flex;gap:8px"><input id="lc-title" class="s-inp" style="margin:0" value="${esc(title)}" maxlength="80">
@@ -1679,17 +1726,26 @@ function openListingComposer(c, backTo, venueKey) {
         <a class="minilink" href="https://www.facebook.com/marketplace/search?query=${enc(c.q)}" target="_blank" rel="noopener">FB asking prices</a>
       </div>
 
-      <div class="subhead">Photos</div>
+      ${localVenueStripHTML(c)}
+
+      <div class="subhead">Photos <span style="text-transform:none;letter-spacing:0">— reference fast, then shoot the real thing</span></div>
       <div style="display:flex;gap:14px;align-items:flex-start">
         ${c.img ? `<img src="${c.img}" style="width:72px;border-radius:6px">` : ''}
-        <div class="reason" style="flex:1">${esc(V.name)} buyers need photos of <b>your actual card</b> (catalog art won’t cut it for raw cards). Shot list — GradeStage makes these repeatable:
-        <b>1</b> front straight-on · <b>2</b> back straight-on · <b>3</b> all four corners close · <b>4</b> surface under raking light · <b>5</b> any flaw, honestly.
-        ${c.img ? `<br><a href="${c.img}" target="_blank" rel="noopener">Open catalog art ↗</a> (reference only)` : ''}</div>
+        <div class="reason" style="flex:1">Pull a reference instantly, then take <b>your own photos</b> (raw singles legally need a shot of the actual card — using others’ web images breaks policy &amp; copyright). GradeStage shot list: <b>1</b> front · <b>2</b> back · <b>3</b> corners · <b>4</b> surface under raking light · <b>5</b> any flaw.
+        </div>
+      </div>
+      <div class="sr-links" style="margin-top:8px">
+        <a class="minilink" href="https://www.google.com/search?tbm=isch&q=${enc((c.fullName || c.name) + ' ' + c.set + ' pokemon card')}" target="_blank" rel="noopener">🔍 Google Images</a>
+        <a class="minilink" href="${gradeSoldLink(c, c.graded ? gradeKeyword(c) : 'PSA 10')}" target="_blank" rel="noopener">📷 How others shot it (eBay)</a>
+        ${c.img ? `<a class="minilink" href="${c.img}" target="_blank" rel="noopener">Catalog art ↗</a>` : ''}
+        ${c.img && State.live ? `<button class="minilink" id="lc-saveimg" style="cursor:pointer">💾 Save reference image</button>` : ''}
+        <span class="reason" id="lc-imgstatus"></span>
       </div>
 
       <div class="subhead">Description ${aiOn ? '<button class="btn sm gold" id="lc-ai" style="margin-left:8px">✨ AI polish</button>' : ''}</div>
       <textarea id="lc-desc" class="s-inp" style="min-height:200px;font-size:12.5px;line-height:1.5">${esc(desc)}</textarea>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+        <button class="btn sm gold" id="lc-copy-all">📋 Copy everything</button>
         <button class="btn sm" id="lc-copy-desc">Copy description</button>
         <button class="btn primary" id="lc-launch">${esc(V.launchLabel)}</button>
         ${backTo ? '<button class="btn ghost sm" id="lc-back">← Back to card</button>' : ''}
@@ -1708,6 +1764,14 @@ function openListingComposer(c, backTo, venueKey) {
   const copy = async (txt, msg) => { try { await navigator.clipboard.writeText(txt); toast(msg); } catch { toast('Copy blocked — select & copy manually.'); } };
   $('#lc-copy-title').onclick = () => copy(T(), 'Title copied.');
   $('#lc-copy-desc').onclick = () => copy($('#lc-desc').value, 'Description copied.');
+  $('#lc-copy-all').onclick = () => copy(`${T()}\n\nPrice: ${money(P())}\n\n${$('#lc-desc').value}`, 'Title + price + description copied.');
+  if ($('#lc-saveimg')) $('#lc-saveimg').onclick = async () => {
+    $('#lc-imgstatus').textContent = 'Saving…';
+    try {
+      const j = await (await fetch('/api/saveimg', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: c.img, name: (c.fullName || c.name) + (c.number ? ' ' + c.number : '') + ' ' + c.set }) })).json();
+      $('#lc-imgstatus').innerHTML = j.ok ? `✓ saved to <b>listing-photos/</b> (${j.kb} KB) — your reference shot` : '✕ ' + esc(j.error || 'failed');
+    } catch (e) { $('#lc-imgstatus').textContent = 'Error: ' + e.message; }
+  };
   if ($('#lc-ai')) $('#lc-ai').onclick = async () => {
     $('#lc-status').textContent = 'Asking the AI for polished copy…';
     try {
@@ -1861,7 +1925,7 @@ function openSettings() {
         <option value="anthropic">Claude (Anthropic) — recommended</option>
         <option value="openai">OpenAI</option>
       </select>
-      <input id="s-ai-model" class="s-inp" type="text" placeholder="Model (default claude-fable-5 / gpt-4o)" />
+      <input id="s-ai-model" class="s-inp" type="text" placeholder="Model (default claude-sonnet-4-6 / gpt-4o)" />
       <input id="s-ai" class="s-inp" type="password" placeholder="AI API key ${L && L.ai?.enabled ? '(connected — leave blank to keep)' : ''}" />
 
       <div style="display:flex;gap:10px;margin-top:18px">
@@ -1936,7 +2000,8 @@ function wireLiveZone(c) {
     const a = gradeAdvice(c), s = sellNet(c);
     const ctx = { name: c.fullName, set: c.set, number: c.number, language: c.lang, era: c.era, year: c.setYear,
       graded: c.graded, grader: c.grader, grade: c.grade, marketValue: c.price, cost: c.cost, qty: c.qty,
-      ourGradeRead: a.title, estPsa10: a.estPsa10, netAfterFees: s.net };
+      ourGradeRead: a.title, estPsa10: a.estPsa10, netAfterFees: s.net,
+      gradingCostAllIn: (State.intel.thresholds && State.intel.thresholds.allInGradingCost) || 35 };
     try {
       const j = await (await fetch('/api/ai', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(ctx) })).json();
       if (j.enabled === false) return busy('Add a Claude or OpenAI key in ⚙ Live.');

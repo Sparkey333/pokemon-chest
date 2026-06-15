@@ -18,3 +18,6 @@ src-tauri/gen/
 
 # Generated iPhone snapshot (regenerated from data)
 Pok*mon Chest — Pocket.html
+
+# Generated reference/listing images
+listing-photos/

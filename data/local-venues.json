@@ -1,0 +1,222 @@
+{
+ "updated": "2026-06",
+ "disclaimer": "Local venue research verified June 2026. Shop buy-rates and show dates change — call ahead. Educational, not financial advice.",
+ "local": {
+  "area": "Colorado Springs, CO (with Denver metro ~70 mi north as the higher-value / show destination)",
+  "noFeeReality": [
+   "A local pickup + cash handoff = 0% fees on every platform. Fees only appear when you ship. This is the single biggest lever for a Colorado Springs seller.",
+   "Facebook Marketplace and OfferUp are the only two with a true 0% on local pickup + cash. List as 'local pickup only / cash'.",
+   "Mercari 'Local' is NOT fee-free — even after Mercari dropped its separate payment fee (Jan 6, 2026), the 10% sell fee still applies to local. Worse than OfferUp/FB for local. (Verified)",
+   "Craigslist is 0% to list most items, all cash, but no buyer protection — meet in a safe zone.",
+   "Whatnot (~11% all-in: 8% sell + ~2.9% + $0.30) is a ship-based reach/velocity play, not a local-cash play.",
+   "Selling to a shop counter or consigning trades a 20-50% haircut for convenience and reach; local + cash keeps everything but you do the legwork."
+  ],
+  "shops": [
+   {
+    "name": "Unbound Games",
+    "where": "3440 N Carefree Cir #160, Colorado Springs 80917 (NE/Academy corridor; 719-999-5454; Tue-Sun 11a-10p, closed Mon)",
+    "note": "Strongest current Springs LGS for Pokemon singles selection (reputation review-sourced). Best for trading bulk/mid singles into store credit. Buy %s not posted — call. You can hit Unbound + Card Cosmos in one Carefree Circle trip."
+   },
+   {
+    "name": "Card Cosmos LLC",
+    "where": "4749 N Carefree Cir, Colorado Springs 80917 (same NE stretch as Unbound)",
+    "note": "Buys, trades, carries Pokemon singles, bulk, and art singles. Buying/trading confirmed; percentages not posted (est.). Pair with the Unbound visit."
+   },
+   {
+    "name": "Hite's TCG Plus",
+    "where": "4831 Baily Pl, Colorado Springs 80916 (SE Springs; 719-963-0437)",
+    "note": "Sells, buys, and trades Pokemon + MTG and other TCGs; runs a Pokemon community group (the most local-to-COS Pokemon-specific FB group). Good for fast local buyers. Rates not posted."
+   },
+   {
+    "name": "Impact Sports Cards & Collectibles",
+    "where": "416 S 8th St, Colorado Springs 80905 (west side / near downtown; daily 10a-7p; 719-344-9973)",
+    "note": "BEST Springs option for consignment and vintage. Does consignment, buys collections, grading submissions, raw + graded + sealed wax. Specifically buys vintage/WOTC Pokemon (Base, Jungle, Fossil, Rocket, Gym, Neo, e-Reader) through EX/Diamond & Pearl/Black & White eras. Hosts a monthly 'Cards & Calzones Trade Night'."
+   },
+   {
+    "name": "Denver Card Shop",
+    "where": "Denver (denvercardshop.com)",
+    "note": "Sports + Pokemon/TCG, PSA grading, sealed, slabs and singles. Services verified; buy terms not posted. A Denver-trip option for graded/sealed."
+   },
+   {
+    "name": "My Hobby Source (The Hobby Source)",
+    "where": "Denver",
+    "note": "Actively buys singles, sealed boxes, and large collections across sports + Pokemon/Yu-Gi-Oh, and takes trade-ins. Best Denver stop for unloading a whole lot at once."
+   },
+   {
+    "name": "MeH Games",
+    "where": "Denver",
+    "note": "MTG-centric but does Pokemon, and is one of the few shops that POSTS a number: 60% of TCGplayer in store credit / 40% in cash for Pokemon singles. Use this as your benchmark for what a 'normal' shop offer looks like. (Verified)"
+   },
+   {
+    "name": "Replay Sports Cards",
+    "where": "Inside Stanley Marketplace, Aurora (2nd floor)",
+    "note": "Sports + Pokemon singles/slabs/sealed. Location verified. Convenient if you're already in the Aurora/Denver metro."
+   },
+   {
+    "name": "PayMore Denver",
+    "where": "Denver (buyback chain)",
+    "note": "Pays cash for single cards or collections and does trade-in. Convenient but typically lower than a dedicated card shop — treat as a FLOOR price, not your target."
+   }
+  ],
+  "groups": [
+   {
+    "name": "Hite's TCG Plus Pokemon",
+    "note": "facebook.com/groups/1469614203160422 — the Springs shop's own Pokemon group; the most local-to-COS Pokemon-specific group found. Best place to surface a local cash buyer fast."
+   },
+   {
+    "name": "Colorado Springs - Buy|Sell|Trade|Want|Free",
+    "note": "facebook.com/groups/CoSpgs.buy.sell.trade — large general BST (~20k members) where cards do move."
+   },
+   {
+    "name": "Colorado Springs Buy Sell & Swap",
+    "note": "General BST, ~58k members. Cards move here but it's not card-focused."
+   },
+   {
+    "name": "Colorado Collectors Corner",
+    "note": "facebook.com/ColoradoCollectorsCorner — collectors buy/sell/trade; tied to display cases inside American Classics Marketplace."
+   },
+   {
+    "name": "Statewide / national Pokemon BST groups",
+    "note": "'Pokemon TCG Buy-Sell-Trade Market', 'Pokemon TCG Sell and Trade' — useful for reach but NOT local: these mean shipping, not cash meetups. For true local cash, FB Marketplace + the Hite's group out-perform these."
+   }
+  ],
+  "shows": [
+   {
+    "name": "Denver Card Shows",
+    "cadence": "Several times/year at National Western / Livestock Event Center, Denver. Confirmed 2026 dates: Feb 27-Mar 1 and June 26-28, 2026.",
+    "note": "FREE general admission. Sports, Pokemon, MTG, One Piece, sealed wax, graded, singles. Best regular venue to sell to competing dealers under one roof (better offers, immediate cash) or rent a table. The go-to for $100+/vintage/graded."
+   },
+   {
+    "name": "Trading Card Con - Denver 2026 (formerly PokeCon)",
+    "cadence": "April 10-12, 2026, Sheraton Denver Downtown (1550 Court Place). Touring event, roughly annual in Denver.",
+    "note": "Heavily Pokemon (voice actors, creators). Badges $25-$200. Reach/community play more than a pure dealer-sell venue."
+   },
+   {
+    "name": "Impact 'Cards & Calzones' Trade Night",
+    "cadence": "Monthly, in Colorado Springs (at Impact Sports Cards, 416 S 8th St)",
+    "note": "The closest recurring card event IN the Springs. No dedicated recurring COS card SHOW surfaced — for a real show you drive to Denver. (Absence of a COS show is an inference, not a confirmed fact.)"
+   }
+  ],
+  "apps": [
+   {
+    "name": "Facebook Marketplace",
+    "note": "0% on local pickup + cash; ~10% only if you use FB shipping/checkout. Biggest local audience in COS. Pair with the Hite's Pokemon group. This is your primary local channel."
+   },
+   {
+    "name": "OfferUp",
+    "note": "0% — keep 100% on local pickup; 12.9% (min $1.99) only if shipped. Clearest 'free for local cash' model. Solid secondary local channel."
+   },
+   {
+    "name": "Craigslist",
+    "note": "0% to list most items, all cash, no buyer protection. Old-school but works; meet in a safe zone."
+   },
+   {
+    "name": "Mercari",
+    "note": "10% flat sell fee applies even to Mercari Local (as of Jan 6, 2026 the separate payment fee was dropped, but 10% remains). Worse than FB/OfferUp for local — use only if shipping for reach. (Verified)"
+   },
+   {
+    "name": "Whatnot",
+    "note": "~11% all-in, live-auction, ship-based. A velocity/reach play for a big lot, NOT a local-cash play. (Verified)"
+   }
+  ],
+  "safeSpots": [
+   "CSPD Sand Creek Police Substation — designated safe-exchange alcove built specifically for online-transaction meetups, in the lobby across from a 24/7-staffed front desk, with cameras throughout. This is THE named CSPD safe-exchange location. (Verified — Gazette + KRDO.) Confirm current address/hours via CSPD non-emergency 719-444-7000 — station addresses occasionally change (est.).",
+   "Any CSPD station lobby can be used per CSPD's own guidance — pick the one nearest you. (Verified)",
+   "Standard safe-deal practice: meet in daylight at the police lot or a busy lit store entrance; bring a buddy; count cash on the spot; for higher-value cards verify authenticity before money changes hands; cash only (no Zelle/Venmo 'oops' reversals, no checks); don't give your home address — 'local pickup' should mean a public meet, not your porch, for anything valuable."
+  ],
+  "byValueTier": [
+   {
+    "tier": "Under ~$20 / bulk",
+    "advice": "Don't ship — fees and time eat it. Trade in at a local shop for STORE CREDIT (Unbound, Card Cosmos, or Hite's — credit ~70-80% of market beats ~50% cash; %s are estimates, confirm in person), or list a LOT on Facebook Marketplace / OfferUp for local cash at 0% fee. Bulk commons -> just take store credit at any of the three. Benchmark a 'fair' shop offer against MeH's posted 60% credit / 40% cash."
+   },
+   {
+    "tier": "~$20-100",
+    "advice": "Facebook Marketplace or OfferUp, LOCAL PICKUP + CASH, meet at the Sand Creek CSPD safe-exchange zone. Keeps 100% vs ~50-60% at a shop counter and vs ~10-13% in shipping fees. Use the Hite's Pokemon group to find a buyer fast."
+   },
+   {
+    "tier": "$100+ / vintage / graded slabs",
+    "advice": "Two strong paths. (1) Sell to competing dealers in person at a Denver Card Show (free entry; Feb 27-Mar 1 and June 26-28, 2026) — multiple dealers under one roof = better offers + immediate cash. (2) Consign or sell to Impact Sports Cards (Springs) — they specialize in vintage WOTC + graded, do consignment, and buy collections; trade a cut for reach and not having to find a buyer. For raw vintage that might grade well, get it authenticated/graded first."
+   }
+  ]
+ },
+ "automation": {
+  "ebayApi": [
+   "Create AND publish a live eBay listing programmatically — no form, no browser — via Trading AddItem/AddFixedPriceItem (one call) or Sell Inventory API's createOrReplaceInventoryItem -> createOffer -> publishOffer (better for bulk). (Verified)",
+   "Programmatic photo upload: Trading UploadSiteHostedPictures pushes binary images to eBay Picture Services (EPS) and returns HTTPS URLs to attach. Inventory API instead takes imageUrls that must already be public HTTPS. Rules: up to 24 images, min 500px (1000px+ recommended), all HTTPS, and you can't mix self-hosted + EPS URLs in one listing. (Verified)",
+   "Bulk-list many cards in a batch; auto price/quantity/relist updates; and pull sold/active data back into the app. (Verified)",
+   "Catalog match for set/number item-specifics where eBay has the card in its catalog. (Verified)",
+   "Setup bar the user must clear once (BYOK dev account): join eBay Developers Program (free, ~1 business day approval (est.)); create Sandbox + Production app keysets (App ID/Cert ID/Dev ID); get a USER OAuth token via the authorization-code grant flow with scope sell.inventory (plus refresh-token handling); and opt into Business Policies with payment + fulfillment + return policies created — every Inventory offer requires all three, and this is the step that trips people up. (Verified)",
+   "Effort to wire up: a real coding project (OAuth dance + token refresh, business-policy setup, XML or JSON request bodies, image hosting/upload, category + item-specifics mapping) — roughly a weekend-to-a-week for someone comfortable with code, or wrapped once in a BYOK helper and reused (est.). Not click-and-go.",
+   "Note on URL prefill: eBay's quick-list now starts at a prelist suggestion page (ebay.com/sl/prelist/suggest) that keyword/catalog-matches what you type — it is a keyword nudge, NOT a documented title/price/description prefill query-string. There is no official URL scheme to one-shot-prefill the full Sell-Your-Item form; true prefill only exists via the API. (est. on absence — no documented param found)"
+  ],
+  "fbReality": [
+   "There is NO public Facebook Marketplace API to read or create personal P2P listings, and NO URL-parameter prefill for the create-listing form. Marketplace create is manual entry / copy-paste only. Every developer-facing source 2019->2026 reaches the same conclusion. (Verified)",
+   "Meta's Commerce Platform / Catalog API / Commerce Manager covers BUSINESS Shops (catalog-backed Facebook/Instagram storefronts, often Shopify-synced) — it does NOT put your card on personal peer-to-peer Marketplace. Different surface, different product. (Verified)",
+   "The 'Marketplace Partner Item/Seller API' and 'Marketplace Approval API' exist but are closed, approved-partner-only programs (large auto/retail/inventory partners) — an individual reseller cannot sign up. (Verified docs exist; est. on accessibility)",
+   "So the realistic ceiling on Facebook is 'prep-and-hand-off': the app copies the title to clipboard, copies the description, stages your actual photo files in a folder, and OPENS the create form — then YOU paste, drag the photos, and hit submit. This removes ~80% of the typing while keeping you the human doing the final action.",
+   "Auto-posting via browser puppetry (what some cross-listers do for FB) is against Facebook's automation ToS and carries real Marketplace-ban / shadow-ban risk if it looks bot-like (volume, speed, patterns). The prep-and-open-form assist is the ToS-safe, ban-resistant version. (Verified risk; est. on exact thresholds)",
+   "Architecture takeaway: same card record feeds both channels — eBay = real API automation (worth the one-time setup), Facebook = prep-and-open-form assist (the only thing legally/technically possible)."
+  ],
+  "crossListTools": [
+   {
+    "name": "Vendoo",
+    "how": "Chrome extension DOM automation: click 'List', it opens a tab, logs in as you, pastes photos + text, clicks submit. Browser must stay open the whole time (close laptop -> it stops). Max 3 marketplaces per listing. Covers eBay, Poshmark, Mercari, Depop, Whatnot, Etsy, and Facebook Marketplace.",
+    "price": "~$8.99/mo entry; realistically $20-$70/mo plus $5-$12 add-ons for useful features."
+   },
+   {
+    "name": "List Perfectly",
+    "how": "Opens multiple browser tabs per platform; you often finish/publish each form manually. Cross-posts to ~10 platforms incl. FB Marketplace + eBay. (Its FB behavior IS the 'prep-and-open-form' pattern this app should mirror.)",
+    "price": "$29-$249/mo."
+   },
+   {
+    "name": "Crosslist",
+    "how": "API-first when the marketplace supports it (e.g. eBay = clean API), falls back to a secure local browser extension when no API exists (e.g. Facebook). Covers eBay + FB Marketplace among others. This is the cleanest model of the 'eBay-API + FB-puppetry' split.",
+    "price": "Subscription (tiered); positioned around general-resale pricing (est.)."
+   },
+   {
+    "name": "Zentail",
+    "how": "Mid/enterprise multichannel commerce/PIM (Amazon, Walmart, eBay, Shopify via real APIs/feeds). Does NOT do personal Facebook Marketplace P2P — overkill and wrong-shaped for a single card seller. (est. on fit)",
+    "price": "Enterprise pricing — not appropriate for a cards-only/low-volume seller."
+   }
+  ],
+  "photoPolicy": [
+   "eBay's Images/videos/text policy (id=4240) is the governing rule: sellers should write their own text and take their own photos. (Verified)",
+   "USED items REQUIRE a photo of the actual item — stock images are prohibited as the main photo on used items. (Verified)",
+   "You may NOT use images from a manufacturer's website, Google Images, or another eBay listing / another seller / another website, even if publicly visible — that's copyright infringement, removable via VeRO (Verified Rights Owner), and can get your account sanctioned. (Verified)",
+   "Raw singles (used/ungraded) = the 'used item, actual photo' case: photograph YOUR actual card, front and back. A catalog/stock image of 'that card' doesn't represent your card's surface, centering, whitening — and using one both violates policy and misrepresents condition (-> buyer disputes). (Verified principle)",
+   "Graded slabs (PSA/CGC/BGS/SGC): photograph the ACTUAL slab, showing the grading company's label/logo and the cert number clearly through the case. eBay's Authenticity Guarantee for trading cards re-verifies the physical slab matches the listing, so a real slab photo is effectively required. (Verified)",
+   "Sealed product (booster boxes/ETBs, factory sealed = 'new'): catalog/manufacturer stock images CAN be acceptable when matched to eBay's catalog or with manufacturer permission — but you're still safer including an actual photo, and any seal damage must be shown. (Verified for catalog/permission cases; est. on 'also show actual')",
+   "eBay catalog images are sharable by all sellers ONLY when your item is matched to eBay's product catalog — that is the one legitimate 'stock photo' path, and it's eBay-provided, not grabbed from elsewhere. (Verified)",
+   "Facebook applies the same principle: your listing images should be your own photos / images you have rights to. There is no 'use a card stock image' carve-out for personal Marketplace. (Verified general FB IP policy; est. that cards follow the same rule)"
+  ],
+  "imageGuidance": [
+   "HONEST default the app should enforce: raw singles and graded slabs REQUIRE the user's own photo of the actual card/slab (front and back; slab shows label + cert #). Don't auto-fill a listing image from any Google/stock/other-seller source — that's a copyright + policy problem and misrepresents condition.",
+   "Catalog/stock images are a REFERENCE ONLY in-app (to help identify the card / autofill set + number + name), never the listing photo for a raw single or slab. The only time a stock/catalog image is OK as the actual listing image is sealed product matched to eBay's catalog or with manufacturer permission, or an eBay catalog-matched item.",
+   "Fast, repeatable photo workflow to bake into the app: phone + good diffuse light, plain/neutral background, card flat or in a stand, front and back, shot square-on to avoid glare on slabs/sleeves; angle raw cards slightly to reveal surface/whitening. (Verified eBay photo tips)",
+   "Use eBay's built-in AI background removal / 'Background enhancement' (in-app, iOS, US/UK/DE, rolling to Android) — free studio-look cleanup. Off-app, Photoroom or Simplified do the same. (Verified)",
+   "A small repeatable rig — phone clamp + fixed overhead copy-stand position + two soft lights or a lightbox — gives an identical top-down shot for every card so bulk photography is fast. NOTE: a specific product named 'GradeStage' could NOT be verified (no such product surfaced) — treat it as a generic copy-stand/lightbox concept, not a confirmed brand. (est./unverified)",
+   "The app should store the user's actual photos named per card in a folder ready to drag-drop into either listing form, so the same real images feed both the eBay API upload and the Facebook manual attach."
+  ],
+  "smoothestFlow": [
+   "Per card, the app preps everything up to the human submit: (1) prefilled title copied to clipboard (e.g. 'Charizard ex 199/165 SV151 PSA 10 — Holo Pokemon'); (2) copied description (condition, set, number, grade, cert #); (3) the user's actual photo(s) named per card, staged in a folder; (4) opens the create form (FB Marketplace Create > Item; eBay sl/prelist/suggest).",
+   "On Facebook this prep-and-open-form assist IS the realistic ceiling — full stop. You paste, drag photos, hit submit. It removes ~80% of the typing and is ToS-safe because YOU are the human doing the final action. (This mirrors what List Perfectly does for FB.)",
+   "On eBay, the same card record can go two ways: today, the same prep-and-open-form assist; OR, once the user does the BYOK dev-account setup, flip to full API automation — one-click create + publish via AddFixedPriceItem or Inventory createOffer/publishOffer, programmatic photo upload (UploadSiteHostedPictures -> EPS), batch listing, and auto price/relist + sold/active sync.",
+   "Right architecture for the BYOK app: eBay = real API automation (worth the one-time setup), Facebook = prep-and-open-form assist (the only thing possible). One card record feeds both — never duplicate data entry.",
+   "Honesty guardrail to surface in the UI: never auto-attach a non-owned image; require the user's own actual photo for raw singles and slabs; reserve catalog/stock images for identification/autofill and for the narrow sealed/catalog-matched cases where they're allowed."
+  ]
+ },
+ "sources": [
+  "Card shops (COS): Unbound Games https://www.unboundgames.shop/ ; Card Cosmos https://www.cardcosmos.store/ ; Hite's TCG Plus listing https://opengovco.com/business/20221589470 ; Impact Sports Cards consignment https://impactsportscards.com/pages/consignment ; Impact 'What we're buying' https://impactsportscards.com/pages/we-buy-collections ; Impact Yelp/address https://www.yelp.com/biz/impact-sports-cards-and-collectibles-colorado-springs",
+  "Card shops (Denver): Denver Card Shop https://denvercardshop.com/ ; My Hobby Source https://myhobbysource.com/ ; MeH Games (trade rates) https://mehgames.info/ ; Replay Sports Cards Denver https://www.replaysportscards.com/co-denver ; PayMore Denver https://paymore.com/regions/denver/pokemon-cards/",
+  "Buy-rate norms: Knight & Day TCG buy rates https://knightanddaygames.com/pages/tcg-buy-rates ; Well Kept Wallet — sell Pokemon for cash https://wellkeptwallet.com/sell-pokemon-cards-for-cash/",
+  "Facebook groups: Hite's TCG Plus Pokemon group https://www.facebook.com/groups/1469614203160422/ ; COS Buy|Sell|Trade|Want|Free https://www.facebook.com/groups/CoSpgs.buy.sell.trade/ ; Colorado Collectors Corner https://www.facebook.com/ColoradoCollectorsCorner/ ; CO BST group directory https://mygroupfinder.com/buy-sell-trade-facebook-groups-colorado/",
+  "Shows: Denver Card Shows https://denvercardshows.com/ ; Feb 2026 registration https://www.tickettailor.com/events/denvercardshows/1996350 ; June 2026 https://www.tickettailor.com/events/denvercardshows/2205463 ; Trading Card Con Denver 2026 https://tradingcardcon.com/event/denver-2026/ ; TCDb CO card-show calendar https://www.tcdb.com/CardShowCalendar.cfm?VIEW=Calendar&State=CO&Country=United+States",
+  "Platform fees: OfferUp selling guide 2026 https://www.voolist.com/blog/offerup-selling-guide-2026 ; Mercari fees 2026 https://www.voolist.com/blog/mercari-fees-2026 ; Facebook Marketplace fees 2026 https://www.underpriced.app/blog/facebook-marketplace-fees-2026 ; Mercari vs OfferUp https://www.homeowner.com/personal-finance/making-money/mercari-vs-offerup",
+  "Safe exchange: Gazette — CSPD safe meeting spot https://gazette.com/news/colorado-springs-police-urge-online-sellers-buyers-to-use-safe-meeting-spot/article_9a76f136-fc16-11e9-a885-d73ca4423617.html ; KRDO — CSPD safe space https://krdo.com/news/2019/12/20/colorado-springs-pd-promotes-safe-space-for-online-sellers/ ; City of Colorado Springs PD https://coloradosprings.gov/police-department",
+  "eBay APIs / dev setup / photos: Inventory API Overview https://developer.ebay.com/api-docs/sell/inventory/overview.html ; createOffer https://developer.ebay.com/api-docs/sell/inventory/resources/offer/methods/createOffer ; publishOffer https://developer.ebay.com/api-docs/sell/inventory/resources/offer/methods/publishOffer ; OAuth scopes https://developer.ebay.com/api-docs/static/oauth-scopes.html ; Accounts and keys required (KB 456) https://developer.ebay.com/support/kb-article?KBid=456 ; Create keysets https://developer.ebay.com/api-docs/static/gs_create-the-ebay-api-keysets.html ; Join Developers Program https://developer.ebay.com/api-docs/static/gs_join-the-ebay-developers-program.html",
+  "eBay listing/photo calls: AddItem (Trading) https://developer.ebay.com/devzone/xml/docs/reference/ebay/additem.html ; AddFixedPriceItem https://developer.ebay.com/devzone/merchant-data/callref/AddFixedPriceItem.html ; List an item (Trading user guide) https://developer.ebay.com/api-docs/user-guides/static/trading-user-guide/list-item.html ; UploadSiteHostedPictures https://developer.ebay.com/devzone/xml/docs/reference/ebay/UploadSiteHostedPictures.html ; Picture hosting https://developer.ebay.com/api-docs/user-guides/static/trading-user-guide/picture-hosting.html ; prelist/sell entry https://www.ebay.com/sl/prelist/suggest",
+  "eBay photo/copyright policy: Images, videos and text policy (id=4240) https://www.ebay.com/help/policies/listing-policies/images-text-policy?id=4240 ; Use eBay stock photos https://developer.ebay.com/api-docs/user-guides/static/trading-user-guide/stock-photos.html ; Authenticity Guarantee for Trading Cards https://www.ebay.com/authenticity-guarantee/tradingcards ; Take great photos https://www.ebay.com/sellercenter/listings/photo-tips ; eBay AI background tool https://innovation.ebayinc.com/stories/background-swap-tool-turns-any-photo-into-a-studio-quality-product-image/",
+  "Facebook Marketplace (no API / no prefill): SociaVault https://sociavault.com/blog/facebook-marketplace-api-alternative ; api2cart guide https://api2cart.com/api-technology/facebook-marketplace-api/ ; Marketplace Partner Item API (gated) https://developers.facebook.com/docs/marketplace/partnerships/itemAPI/ ; Marketplace Partner Seller API (gated) https://developers.facebook.com/docs/marketplace/partnerships/sellerAPI/ ; FB ban risk from automation https://multilogin.com/blog/web-scraping-on-facebook-marketplace/",
+  "Cross-listing tools: Crosslist https://crosslist.com/ ; Vendoo vs List Perfectly vs Crosslist https://crosslist.com/blog/vendoo-vs-list-perfectly ; Vendoo marketplaces/extension https://www.vendoo.co/marketplaces ; Vendoo pricing https://nifty.ai/post/vendoo-pricing ; List Perfectly pricing https://blog.vendoo.co/list-perfectly-pricing-how-much-does-this-crosslisting-app-cost"
+ ]
+}

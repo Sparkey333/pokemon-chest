@@ -26,10 +26,10 @@ Env:  POKECHEST_HOME (writable home; default: this script's directory)
 
 Run:  python3 server.py     (or double-click start.command)
 """
-import os, sys, json, html, subprocess, urllib.request, urllib.error, urllib.parse
+import os, sys, re, json, html, subprocess, urllib.request, urllib.error, urllib.parse
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "1.6.0"
+VERSION = "1.7.0"
 ROOT = os.path.dirname(os.path.abspath(__file__))
 HOME = os.path.abspath(os.environ.get("POKECHEST_HOME") or ROOT)
 SETTINGS = os.path.join(HOME, "settings.local.json")
@@ -69,7 +69,7 @@ def config_view(s):
         "priceCharting": bool(s.get("pricecharting_token")),
         "comps": {"enabled": bool(s.get("comps_key")), "provider": s.get("comps_provider", "pokemonpricetracker")},
         "ai": {"enabled": bool(s.get("ai_key")), "provider": s.get("ai_provider", "anthropic"),
-               "model": s.get("ai_model") or ("claude-fable-5" if s.get("ai_provider", "anthropic") == "anthropic" else "gpt-4o")},
+               "model": s.get("ai_model") or ("claude-sonnet-4-6" if s.get("ai_provider", "anthropic") == "anthropic" else "gpt-4o")},
     }
 
 # ---------------------------------------------------------------- http util ---
@@ -106,6 +106,30 @@ def pricecharting_price(pc_id, token):
             "tiers": {k: v for k, v in tiers.items() if v is not None},
             "raw": d}
 
+def save_reference_image(payload):
+    """Download a card's catalog image into a local 'listing-photos' folder so the
+    seller has a starting image file. Restricted to the TCGdex catalog source —
+    this is a reference image, not a scraper for arbitrary web photos."""
+    url = (payload.get("url") or "").strip()
+    name = (payload.get("name") or "card").strip()
+    host = urllib.parse.urlparse(url).hostname or ""
+    if not (url.startswith("https://") and host.endswith("tcgdex.net")):
+        return {"ok": False, "error": "Only the card's catalog image can be saved here. For a real listing, shoot a photo of your actual card."}
+    safe = (re.sub(r"[^A-Za-z0-9 _.#-]+", "", name)[:70].strip() or "card")
+    ext = ".webp" if url.lower().endswith(".webp") else ".png"
+    outdir = os.path.join(HOME, "listing-photos")
+    os.makedirs(outdir, exist_ok=True)
+    out = os.path.join(outdir, safe + ext)
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "PokemonChest/1.0"})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            data = r.read()
+        with open(out, "wb") as f:
+            f.write(data)
+        return {"ok": True, "path": out, "folder": outdir, "file": os.path.basename(out), "kb": len(data) // 1024}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
 def comps_lookup(payload, settings):
     """Live sold comps via a Pokémon comps API (BYOK). Provider-agnostic shell —
     normalization finalized per provider once a real key is present."""
@@ -127,8 +151,10 @@ AI_SYSTEM = (
     "values and (optionally) live sold comps, give a tight recommendation: sell now vs "
     "hold, raw vs grade-first (name the cheapest sensible grader and rough break-even), "
     "and the single best venue for the most NET money after fees (eBay ~13.6%, "
-    "TCGplayer/Mercari ~11%, Cardmarket cheapest in EU). Be concrete with numbers, 4-6 "
-    "sentences, no fluff, never overpromise. End with one clear action."
+    "TCGplayer/Mercari ~11%, Cardmarket cheapest in EU). If a gradingCostAllIn value is "
+    "given in the input, USE it as the all-in grading cost — do NOT invent a different "
+    "grading fee. Be concrete with numbers, 4-6 sentences, no fluff, never overpromise. "
+    "End with one clear action."
 )
 
 AI_LISTING_SYSTEM = (
@@ -149,7 +175,7 @@ AI_LISTING_SYSTEM = (
 def ai_recommend(payload, settings):
     provider = settings.get("ai_provider", "anthropic")
     key = settings.get("ai_key")
-    model = settings.get("ai_model") or ("claude-fable-5" if provider == "anthropic" else "gpt-4o")
+    model = settings.get("ai_model") or ("claude-sonnet-4-6" if provider == "anthropic" else "gpt-4o")
     mode = payload.pop("mode", None) if isinstance(payload, dict) else None
     system = AI_LISTING_SYSTEM if mode == "listing" else AI_SYSTEM
     user = ("Item facts:\n" if mode == "listing" else "Card and context:\n") + json.dumps(payload, ensure_ascii=False, indent=2)
@@ -344,6 +370,11 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json({"ok": False, "error": str(e)}, 200)
         if path == "/api/pocket":
             return self._json(build_pocket())
+        if path == "/api/saveimg":
+            try:
+                return self._json(save_reference_image(payload))
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)}, 200)
         if path == "/api/comps":
             s = load_settings()
             if not self._guard(s.get("comps_key"), "comps_key"):
