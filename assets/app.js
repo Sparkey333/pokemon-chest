@@ -1,7 +1,7 @@
 /* ===================== Pokémon Chest ===================== */
 'use strict';
 
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.6.0';
 const APP_REPO = 'https://github.com/Sparkey333/pokemon-chest';
 
 /* ---------- tiny helpers ---------- */
@@ -17,6 +17,8 @@ const LS_USER = 'pokechest.userdata.v1';
 const LS_ACTIONS = 'pokechest.actions.v1';
 const LS_POP = 'pokechest.pop.v1';
 const LS_MERCH = 'pokechest.merch.v1';
+const LS_CASE = 'pokechest.case.v1';          // display-case picks: {pcId:{tier,note,added}}
+const LS_CARDSNAP = 'pokechest.cardsnaps.v1'; // per-card price history for case cards
 
 // One-time migration from the PokéVault era — keeps existing snapshots & notes.
 (function migrateLegacyKeys() {
@@ -72,6 +74,7 @@ async function init() {
     State.sellerbiz = sellerbiz;
     State.plan = plan;
     recordSnapshot(col.meta.totalValue);
+    recordCardSnaps();
     State.live = await loadLiveConfig();
     updateLiveBtn();
     $('#vpValue').textContent = money0(col.meta.totalValue);
@@ -87,6 +90,7 @@ async function init() {
     renderLab();
     renderSubmit();
     renderAdmin();
+    renderCase();
   } catch (e) {
     $('#main').innerHTML = `<div class="panel" style="margin-top:30px"><h3>Couldn’t load your collection</h3>
       <p class="muted">Open this page through the <b>start.command</b> launcher (a local server), not by double-clicking index.html — browsers block data files on <code>file://</code>.</p>
@@ -1041,6 +1045,146 @@ function sellerPlaybookHTML() {
     </div>`;
 }
 
+/* ================= DISPLAY CASE ================= */
+const CASE_TIERS = ['🏆 Grails', '💎 Showcase', '📈 Risers', '👀 Watchlist'];
+function caseAll() { return loadJSON(LS_CASE, {}); }
+function caseGet(c) { return caseAll()[c.pcId] || null; }
+function caseSet(c, patch) {
+  const all = caseAll();
+  all[c.pcId] = Object.assign({ tier: CASE_TIERS[0], note: '', added: new Date().toISOString().slice(0, 10) }, all[c.pcId] || {}, patch);
+  localStorage.setItem(LS_CASE, JSON.stringify(all));
+  recordCardSnaps();
+}
+function caseRemove(c) { const all = caseAll(); delete all[c.pcId]; localStorage.setItem(LS_CASE, JSON.stringify(all)); }
+
+function recordCardSnaps() {
+  // record today's price for every card currently on display (small footprint)
+  const snaps = loadJSON(LS_CARDSNAP, {});
+  const today = new Date().toISOString().slice(0, 10);
+  const byId = {}; (State.cards || []).forEach(c => byId[c.pcId] = c);
+  Object.keys(caseAll()).forEach(pcId => {
+    const c = byId[pcId]; if (!c || c.price == null) return;
+    (snaps[pcId] = snaps[pcId] || {})[today] = Math.round(c.price * 100) / 100;
+  });
+  localStorage.setItem(LS_CARDSNAP, JSON.stringify(snaps));
+}
+
+function cardTrend(c) {
+  const hist = loadJSON(LS_CARDSNAP, {})[c.pcId] || {};
+  const series = Object.entries(hist).sort((a, b) => a[0] < b[0] ? -1 : 1);
+  if (series.length >= 2) {
+    const first = series[0][1], last = series[series.length - 1][1];
+    return { kind: 'tracked', pct: first ? (last - first) / first * 100 : 0, days: series.length, series };
+  }
+  if (c.cost > 0) return { kind: 'lifetime', pct: (c.value - c.cost * c.qty) / (c.cost * c.qty) * 100 };
+  return { kind: 'new' };
+}
+function trendSpark(series) {
+  if (!series || series.length < 2) return '';
+  const v = series.map(s => s[1]), mn = Math.min(...v), mx = Math.max(...v), W = 120, H = 32, p = 3;
+  const x = i => p + i * (W - 2 * p) / (series.length - 1), y = val => H - p - (mx === mn ? 0.5 : (val - mn) / (mx - mn)) * (H - 2 * p);
+  const pts = series.map((s, i) => `${x(i).toFixed(1)},${y(s[1]).toFixed(1)}`).join(' ');
+  const up = v[v.length - 1] >= v[0];
+  return `<svg viewBox="0 0 ${W} ${H}" class="dc-spark"><polyline points="${pts}" fill="none" stroke="${up ? 'var(--green)' : 'var(--red)'}" stroke-width="2" stroke-linejoin="round"/></svg>`;
+}
+
+function renderCase() {
+  const all = caseAll();
+  const byId = {}; State.cards.forEach(c => byId[c.pcId] = c);
+  const cards = Object.keys(all).map(id => byId[id]).filter(Boolean);
+  const totVal = sum(cards.map(c => c.value));
+  const head = `
+    <div class="section-head"><h2>🏛 Display Case</h2>
+      <span class="sub">${cards.length ? `${cards.length} favorites on display · ${money0(totVal)}` : 'Your curated showcase — favorites, grails, risers'}</span></div>
+    <div class="dc-add">
+      <input id="dc-search" list="dc-list" class="s-inp" style="margin:0;max-width:440px" placeholder="✚ Add a card to the case — type a name…">
+      <datalist id="dc-list">${State.cards.filter(c => !all[c.pcId]).slice(0, 1200).map(c => `<option value="${esc(c.name)} — ${esc(c.set)}${c.number ? ' #' + esc(c.number) : ''}" data-i="${c.i}">`).join('')}</datalist>
+    </div>`;
+  if (!cards.length) {
+    $('#view-case').innerHTML = head + `<div class="dc-empty"><div class="dc-empty-glow"></div>
+      <p style="font-size:15px">Nothing on display yet.</p>
+      <p class="reason">Open any card and hit <b>★ Display Case</b>, or use the search above. Sort favorites onto shelves (Grails, Risers, Watchlist…), add your own notes, watch each card’s value trend build over time, and jump straight to its full <b>PriceCharting</b> history.</p></div>`;
+    wireCaseAdd(); return;
+  }
+  const tiers = [...new Set([...CASE_TIERS, ...cards.map(c => all[c.pcId].tier)])];
+  const shelves = tiers.map(t => {
+    const inTier = cards.filter(c => all[c.pcId].tier === t).sort((a, b) => b.value - a.value);
+    if (!inTier.length) return '';
+    return `<div class="dc-shelf">
+      <div class="dc-shelf-h">${esc(t)} <span class="reason">${inTier.length} · ${money0(sum(inTier.map(c => c.value)))}</span></div>
+      <div class="dc-grid">${inTier.map(c => caseFrameHTML(c, all[c.pcId])).join('')}</div></div>`;
+  }).join('');
+  $('#view-case').innerHTML = head + shelves;
+  wireCaseAdd();
+  $$('#view-case .dc-img, #view-case .dc-name').forEach(el => el.onclick = () => openModal(byId[el.dataset.pc]));
+  $$('#view-case [data-edit]').forEach(b => b.onclick = (e) => { e.stopPropagation(); openCasePicker(byId[b.dataset.edit]); });
+  $$('#view-case [data-rm]').forEach(b => b.onclick = (e) => { e.stopPropagation(); caseRemove(byId[b.dataset.rm]); renderCase(); });
+}
+
+function caseFrameHTML(c, rec) {
+  const t = cardTrend(c);
+  let trend;
+  if (t.kind === 'tracked') {
+    const up = t.pct >= 0;
+    trend = `<div class="dc-trend">${trendSpark(t.series)}<span class="${up ? 'up' : 'dn'}">${up ? '▲' : '▼'} ${Math.abs(t.pct).toFixed(1)}%</span><span class="reason">${t.days}d tracked</span></div>`;
+  } else if (t.kind === 'lifetime') {
+    const up = t.pct >= 0;
+    trend = `<div class="dc-trend"><span class="${up ? 'up' : 'dn'}">${up ? '▲' : '▼'} ${Math.abs(t.pct).toFixed(0)}%</span><span class="reason">since you bought it · trend builds daily</span></div>`;
+  } else {
+    trend = `<div class="dc-trend reason">tracking starts today — history on PriceCharting →</div>`;
+  }
+  return `<div class="dc-frame">
+    <div class="dc-img" data-pc="${c.pcId}">${c.img ? `<img loading="lazy" src="${c.img}" onerror="this.outerHTML=phHTML(${c.i})">` : phHTML(c.i)}
+      ${c.graded ? `<span class="grade-chip" style="position:absolute;top:7px;right:7px">${esc(c.grader || '')} ${c.grade || ''}</span>` : ''}</div>
+    <div class="dc-name" data-pc="${c.pcId}">${esc(c.name)}</div>
+    <div class="dc-set">${esc(c.set)}${c.number ? ' · #' + esc(c.number) : ''}</div>
+    <div class="dc-val">${money(c.value)}</div>
+    ${trend}
+    ${rec.note ? `<div class="dc-note">“${esc(rec.note)}”</div>` : ''}
+    <a class="btn gold sm dc-pc" href="${c.pcUrl || '#'}" target="_blank" rel="noopener">📈 PriceCharting history</a>
+    <div class="dc-actions"><button class="btn ghost sm" data-edit="${c.pcId}">Edit</button><button class="btn ghost sm" data-rm="${c.pcId}">Remove</button></div>
+  </div>`;
+}
+
+function wireCaseAdd() {
+  const s = $('#dc-search'); if (!s) return;
+  s.onchange = () => {
+    const opt = [...$('#dc-list').options].find(o => o.value === s.value);
+    if (opt) { openCasePicker(State.cards[+opt.dataset.i]); s.value = ''; }
+  };
+}
+
+function openCasePicker(c) {
+  const rec = caseGet(c) || { tier: CASE_TIERS[0], note: '' };
+  const presets = [...new Set([...CASE_TIERS, ...Object.values(caseAll()).map(r => r.tier)])];
+  $('#modalRoot').innerHTML = `<div class="modal-bg" id="modalBg"><div class="modal" style="max-width:480px">
+    <button class="close-x" id="modalClose">×</button>
+    <div class="modal-body" style="padding:24px">
+      <h2 style="font-size:18px;margin-bottom:2px">★ Display Case</h2>
+      <p class="muted" style="font-size:12.5px;margin-bottom:12px">${esc(c.name)}${c.number ? ' #' + esc(c.number) : ''} · ${esc(c.set)} — ${money(c.value)}</p>
+      <div class="subhead">Shelf / tier</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px" id="dc-tiers">
+        ${presets.map(t => `<button class="btn sm dc-tier ${t === rec.tier ? 'gold' : ''}" data-t="${esc(t)}">${esc(t)}</button>`).join('')}
+      </div>
+      <input id="dc-tier-custom" class="s-inp" placeholder="…or type a custom shelf name">
+      <div class="subhead">Note / label</div>
+      <textarea id="dc-note" class="s-inp" style="min-height:72px" placeholder="Why it's special, condition, a memory, a target price…">${esc(rec.note || '')}</textarea>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn primary" id="dc-save">${caseGet(c) ? 'Save' : 'Add to case'}</button>
+        ${caseGet(c) ? '<button class="btn ghost" id="dc-rm">Remove</button>' : ''}
+      </div>
+    </div></div></div>`;
+  let tier = rec.tier;
+  $$('#dc-tiers .dc-tier').forEach(b => b.onclick = () => { tier = b.dataset.t; $$('#dc-tiers .dc-tier').forEach(x => x.classList.remove('gold')); b.classList.add('gold'); $('#dc-tier-custom').value = ''; });
+  $('#modalClose').onclick = closeModal; $('#modalBg').onclick = e => { if (e.target.id === 'modalBg') closeModal(); };
+  $('#dc-save').onclick = () => {
+    const custom = $('#dc-tier-custom').value.trim();
+    caseSet(c, { tier: custom || tier, note: $('#dc-note').value.trim() });
+    closeModal(); switchView('case'); renderCase(); toast('Added to your Display Case.');
+  };
+  if ($('#dc-rm')) $('#dc-rm').onclick = () => { caseRemove(c); closeModal(); renderCase(); toast('Removed from case.'); };
+}
+
 /* ================= MERCH VAULT ================= */
 const MERCH_CONDS = ['Factory sealed', 'CIB / with box', 'Built — all pieces + box', 'Built — no box', 'Loose', 'Display-cased'];
 function merchItems() { return loadJSON(LS_MERCH, []); }
@@ -1620,6 +1764,7 @@ function openModal(c) {
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn primary sm" id="mk-list">📤 List for sale</button>
+          <button class="btn ${caseGet(c) ? 'gold' : ''} sm" id="mk-case">${caseGet(c) ? '★ In case' : '★ Display Case'}</button>
           <button class="btn ${u.status === 'forsale' ? 'gold' : ''} sm" id="mk-fs">${u.status === 'forsale' ? '✓ For sale' : 'Mark “For sale”'}</button>
           <button class="btn ${u.status === 'sold' ? 'primary' : ''} sm" id="mk-sold">${u.status === 'sold' ? '✓ Sold' : 'Mark “Sold”'}</button>
           ${u.status ? `<button class="btn ghost sm" id="mk-clear">Clear</button>` : ''}
@@ -1660,6 +1805,7 @@ function openModal(c) {
   $('#modalClose').onclick = closeModal;
   $('#modalBg').onclick = e => { if (e.target.id === 'modalBg') closeModal(); };
   $('#mk-list').onclick = () => openListingComposer(c, true);
+  $('#mk-case').onclick = () => openCasePicker(c);
   $('#mk-fs').onclick = () => { uset(c, { status: uget(c).status === 'forsale' ? '' : 'forsale' }); openModal(c); refreshAfterUser(); };
   $('#mk-sold').onclick = () => { uset(c, { status: uget(c).status === 'sold' ? '' : 'sold' }); openModal(c); refreshAfterUser(); };
   if ($('#mk-clear')) $('#mk-clear').onclick = () => { uset(c, { status: '' }); openModal(c); refreshAfterUser(); };

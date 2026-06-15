@@ -166,8 +166,27 @@ def resolve_set(console):
     return "en", EN_BY_NORM.get(norm(short))
 
 # ---- per-set card image maps (cached) --------------------------------------
+def name_key(s):
+    """Normalize a card name for comparison (drop brackets, suffixes, accents)."""
+    s = unicodedata.normalize("NFKD", s or "")
+    s = "".join(c for c in s if not unicodedata.combining(c)).lower()
+    s = re.sub(r"\[[^\]]*\]", " ", s)          # drop [Reverse Holo] etc.
+    return re.sub(r"[^a-z0-9]+", "", s)
+
+def name_matches(a, b):
+    """True if two card names plausibly refer to the same card (lenient)."""
+    ka, kb = name_key(a), name_key(b)
+    if not ka or not kb:
+        return False
+    if ka == kb or ka.startswith(kb) or kb.startswith(ka):
+        return True
+    # share the leading species token (e.g. "charizardex" vs "charizard")
+    ta = re.match(r"[a-z]+", ka); tb = re.match(r"[a-z]+", kb)
+    return bool(ta and tb and ta.group() == tb.group() and len(ta.group()) >= 4)
+
 _set_cards = {}
 def set_card_index(lang, set_id):
+    """Return (idx, name, year). idx[localId] = {"img":..., "name":...}."""
     key = (lang, set_id)
     if key in _set_cards:
         return _set_cards[key]
@@ -182,12 +201,31 @@ def set_card_index(lang, set_id):
     for c in data.get("cards", []):
         lid = str(c.get("localId", "")).strip()
         if lid and c.get("image"):
-            idx[lid] = c["image"]
-            idx[lid.lstrip("0") or "0"] = c["image"]
+            entry = {"img": c["image"], "name": c.get("name", "")}
+            idx[lid] = entry
+            idx[lid.lstrip("0") or "0"] = entry
     rd = data.get("releaseDate") or ""
     year = int(rd[:4]) if rd[:4].isdigit() else None
     _set_cards[key] = (idx, data.get("name", ""), year)
     return _set_cards[key]
+
+# ---- "classic reprint" resolver (Celebrations Classic Collection etc.) -------
+# These subsets reprint original WOTC/Neo/LC card faces but TCGdex doesn't carry
+# the subset, so when a number-match fails the name check we look the card up by
+# NAME in the original sets — the artwork is identical.
+CLASSIC_SETS = ["base1", "base2", "base3", "base4", "base5",
+                "gym1", "gym2", "neo1", "neo2", "neo3", "neo4", "lc", "si1"]
+CLASSIC_CONSOLES = {"Pokemon Celebrations"}
+_classic_by_name = None
+def classic_image(card_name):
+    global _classic_by_name
+    if _classic_by_name is None:
+        _classic_by_name = {}
+        for sid in CLASSIC_SETS:
+            idx, _n, _y = set_card_index("en", sid)
+            for entry in idx.values():
+                _classic_by_name.setdefault(name_key(entry["name"]), entry["img"])
+    return _classic_by_name.get(name_key(card_name))
 
 # ---- parse the export -------------------------------------------------------
 HDR = ['PRICE','product-name','console-name','price-in-pennies','id','include-string',
@@ -245,10 +283,19 @@ for i, d in enumerate(rows):
     if sid:
         idx, tcg_name, set_year = set_card_index(rl, sid)
         if number:
-            base = idx.get(number) or idx.get(number.lstrip("0"))
-            if base:
-                img = base + "/high.webp"
+            entry = idx.get(number) or idx.get(number.lstrip("0"))
+            # Name-verify English only (JA TCGdex names are Japanese script, so
+            # we trust the curated JA set map + number there).
+            if entry and (rl == "ja" or name_matches(disp, entry["name"])):
+                img = entry["img"] + "/high.webp"          # number (+ name) agree
                 matched = True
+            elif console in CLASSIC_CONSOLES:
+                ci = classic_image(disp)                    # subset reprint → original art
+                if ci:
+                    img = ci + "/high.webp"
+                    matched = True
+            # else: English number hit but name disagrees (or no hit) → leave img
+            #       None rather than show the wrong card's art.
     # era classification for the grading recommendation engine
     if set_year is None:
         era = "unknown"
