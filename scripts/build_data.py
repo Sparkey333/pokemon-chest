@@ -21,7 +21,7 @@ At the very end prints one machine-readable line for the in-app refresh:
 Run:  python3 scripts/build_data.py
 (or just double-click refresh-data.command in the project folder)
 """
-import os, re, json, sys, unicodedata, datetime, urllib.request, urllib.error
+import os, re, json, sys, unicodedata, datetime, urllib.request, urllib.error, urllib.parse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -296,6 +296,10 @@ for i, d in enumerate(rows):
                     matched = True
             # else: English number hit but name disagrees (or no hit) → leave img
             #       None rather than show the wrong card's art.
+    # NB: user-saved card-art is NOT baked into `img` here. The app layers it at
+    # runtime (localStorage override + GET /api/cardart hydration) and keeps the
+    # catalog art separate, so "Reset to catalog image" still works after a
+    # rebuild. Baking it in would overwrite the true catalog art irreversibly.
     # era classification for the grading recommendation engine
     if set_year is None:
         era = "unknown"

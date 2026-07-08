@@ -43,12 +43,14 @@
       <span class="vp-value" id="vpValue">—</span>
     </div>
     <button class="btn ghost" id="refreshBtn" title="Re-read the data file and record a new price snapshot">↻ Refresh</button>
+    <button class="btn ghost" id="helpBtn" title="How it works — the first-run walkthrough">？ Guide</button>
     <button class="btn ghost" id="settingsBtn" title="Connect live data &amp; AI (your own API keys)">⚙ Live</button>
   </div>
 </header>
 
 <nav class="tabs" id="tabs">
   <button data-view="dashboard" class="tab active">Dashboard</button>
+  <button data-view="arcade" class="tab">🕹 Arcade</button>
   <button data-view="collection" class="tab">Collection</button>
   <button data-view="case" class="tab">🏛 Display Case</button>
   <button data-view="sell" class="tab">Sell Hub</button>
@@ -61,6 +63,7 @@
 
 <main id="main">
   <section id="view-dashboard" class="view active"></section>
+  <section id="view-arcade" class="view"></section>
   <section id="view-collection" class="view">
     <div class="toolbar" id="collectionToolbar"></div>
     <div id="grid" class="grid"></div>

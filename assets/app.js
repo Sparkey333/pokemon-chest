@@ -1,7 +1,7 @@
 /* ===================== Pokémon Chest ===================== */
 'use strict';
 
-const APP_VERSION = '1.7.0';
+const APP_VERSION = '1.13.0';
 const APP_REPO = 'https://github.com/Sparkey333/pokemon-chest';
 
 /* ---------- tiny helpers ---------- */
@@ -19,6 +19,8 @@ const LS_POP = 'pokechest.pop.v1';
 const LS_MERCH = 'pokechest.merch.v1';
 const LS_CASE = 'pokechest.case.v1';          // display-case picks: {pcId:{tier,note,added}}
 const LS_CARDSNAP = 'pokechest.cardsnaps.v1'; // per-card price history for case cards
+const LS_ONBOARD = 'pokechest.onboarded.v2';  // first-run walkthrough seen
+const LS_ARCADE = 'pokechest.arcade.v1';      // capsule-machine tokens, pulls, won cards
 
 // One-time migration from the PokéVault era — keeps existing snapshots & notes.
 (function migrateLegacyKeys() {
@@ -66,6 +68,7 @@ async function init() {
       grab('data/local-venues.json'),  // Colorado Springs local venues + automation/photo guidance
     ]);
     State.cards = col.cards;
+    applyImgOverrides();          // your saved card-art (localStorage) wins over the catalog art
     State.meta = col.meta;
     State.intel = intel;
     State.gintel = gintel;
@@ -78,6 +81,7 @@ async function init() {
     recordSnapshot(col.meta.totalValue);
     recordCardSnaps();
     State.live = await loadLiveConfig();
+    await hydrateServerArt();     // merge card-art saved as real files (survives a localStorage wipe)
     updateLiveBtn();
     $('#vpValue').textContent = money0(col.meta.totalValue);
     $('#search').placeholder = `Search ${col.meta.totalEntries.toLocaleString()} cards — name, set, number…`;
@@ -93,6 +97,8 @@ async function init() {
     renderSubmit();
     renderAdmin();
     renderCase();
+    renderArcade();
+    maybeOnboard();
   } catch (e) {
     $('#main').innerHTML = `<div class="panel" style="margin-top:30px"><h3>Couldn’t load your collection</h3>
       <p class="muted">Open this page through the <b>start.command</b> launcher (a local server), not by double-clicking index.html — browsers block data files on <code>file://</code>.</p>
@@ -124,6 +130,7 @@ function wireChrome() {
     renderCollection(true);
   };
   $('#refreshBtn').onclick = refreshData;
+  if ($('#helpBtn')) $('#helpBtn').onclick = () => openWalkthrough(0);
   $('#settingsBtn').onclick = openSettings;
   document.onkeydown = e => {
     if (e.key === 'Escape') closeModal();
@@ -134,6 +141,7 @@ function switchView(v) {
   State.view = v;
   $$('#tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.view === v));
   $$('.view').forEach(s => s.classList.toggle('active', s.id === 'view-' + v));
+  if (v === 'arcade') renderArcade();   // refresh daily tokens / shelf on entry
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -203,6 +211,13 @@ const GRADE_FALLBACK = {
 };
 function gradeIntel() { return State.gintel || GRADE_FALLBACK; }
 function eraKey(c) { return c.era === 'vintage' ? 'vintage' : c.era === 'retro' ? 'mid' : 'modern'; }
+// Premium slabs above a PSA 10 (research-verified multiples vs the PSA 10 price)
+const PREMIUM_GRADES = [
+  { key: 'bgs10', label: 'BGS 10', mult: 1.10, kw: 'BGS 10', cls: 'prem',
+    note: 'Beckett (BGS) 10 Pristine / gold label ≈ 110% of a PSA 10 (est.)' },
+  { key: 'bgsBlack', label: 'BGS Black 10', mult: 2.50, kw: 'BGS Black Label 10', cls: 'prem black',
+    note: 'BGS Black Label 10 (all four subgrades a perfect 10) ≈ 250% of a PSA 10 — typically 3–5× a regular BGS 10 (est.)' },
+];
 function gradeLadder(c) {
   const gi = gradeIntel();
   let r = gi.gradeRatios[eraKey(c)] || gi.gradeRatios.modern;
@@ -213,10 +228,12 @@ function gradeLadder(c) {
   const psa10 = raw * r.psa10OfRaw;
   const services = {};
   for (const s of gi.serviceDeltas || []) services[s.service] = { v: psa10 * (s.vsPsaPct / 100), note: s.note };
+  const premium = {};
+  PREMIUM_GRADES.forEach(p => premium[p.key] = { v: psa10 * p.mult, label: p.label, kw: p.kw, note: p.note, cls: p.cls });
   return {
     raw,
     psa10, psa9: psa10 * r.psa9OfPsa10, psa8: psa10 * r.psa8OfPsa10,
-    services,
+    services, premium,
     ratios: r,
   };
 }
@@ -302,7 +319,7 @@ function cap(s) { return s ? s[0].toUpperCase() + s.slice(1) : s; }
 
 /* ---------- image helpers ---------- */
 function imgHTML(c, cls) {
-  if (c.img) return `<img class="${cls || ''}" loading="lazy" src="${c.img}" alt="${esc(c.name)}" onerror="this.outerHTML=phHTML(${c.i})">`;
+  if (c.img) return `<img class="${cls || ''}" loading="lazy" src="${esc(c.img)}" alt="${esc(c.name)}" onerror="this.outerHTML=phHTML(${c.i})">`;
   return phHTML(c.i);
 }
 function phHTML(i) {
@@ -310,6 +327,497 @@ function phHTML(i) {
   return `<div class="ph"><div class="pb"></div><div class="pn">${esc(c.name)}<br><span class="muted">${esc(c.set)}</span></div></div>`;
 }
 window.phHTML = phHTML; // referenced by inline onerror
+
+/* ---------- card image overrides ----------
+   Many high-value cards (Japanese secret/special rares like Team Rocket's
+   Mewtwo ex #125, Mew 25th-anniversary promos, McDonald's promos…) are numbered
+   BEYOND their set on the free TCGdex catalog, so it can never auto-match their
+   art. You find the real art (Google Images), then paste/save it here. Saved
+   images live as real files in the app's writable card-art/ folder (via the
+   backend) AND as a fast localStorage override, so a fix shows instantly and
+   survives a data refresh. */
+function applyImgOverrides() {
+  for (const c of State.cards) {
+    if (c._catalogImg === undefined) c._catalogImg = c.img || null; // remember catalog art
+    const o = State.user[c.pcId];
+    c.img = (o && o.imgOverride) ? o.imgOverride : (c._catalogImg || null);
+  }
+}
+async function hydrateServerArt() {
+  // Fold in any card-art files saved on disk that this browser has no local
+  // override for (e.g. a fresh install, or images set from another device),
+  // and self-heal overrides whose file has since gone missing.
+  if (!State.live) return false;
+  let art;
+  try {
+    const j = await (await fetch('/api/cardart', { cache: 'no-store' })).json();
+    if (!j || !j.ok || !j.art) return false;
+    art = j.art;
+  } catch { return false; }
+  let changed = false;
+  for (const c of State.cards) {               // loop CARDS so duplicate pcIds all get art
+    const path = art[c.pcId];                  // art is keyed by pcId (string) — number key coerces
+    const o = State.user[c.pcId];
+    if (o && o.imgOverride) {
+      // a saved override that pointed at a card-art file now gone → drop it back to catalog
+      if (/^\/card-art\//.test(o.imgOverride) && !path) { uset(c, { imgOverride: '' }); c.img = c._catalogImg || null; changed = true; }
+      continue;                                // otherwise an explicit local choice wins
+    }
+    if (path && c.img !== path) { c.img = path; changed = true; }
+  }
+  return changed;
+}
+function blobToDataUrl(blob) {
+  return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(new Error('read failed')); r.readAsDataURL(blob); });
+}
+async function setCardImage(c, { url, dataUrl }) {
+  let src = null;
+  if (State.live) {
+    // Backend present: persist a real file in POKECHEST_HOME/card-art/<pcId>.
+    const body = url ? { pcId: c.pcId, url } : { pcId: c.pcId, dataUrl };
+    let j; try { j = await (await fetch('/api/cardart', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).json(); }
+    catch (e) { return { ok: false, error: e.message }; }
+    if (!j.ok) return { ok: false, error: j.error || 'Save failed' };
+    src = j.path + '?t=' + Date.now();          // cache-bust the fixed filename
+  } else {
+    if (!url && !dataUrl) return { ok: false, error: 'Nothing to save.' };
+    if (dataUrl && dataUrl.length > 3_500_000) return { ok: false, error: 'That image is too big to keep without the local engine. Open via the app (or paste a URL) to save large images.' };
+    src = url || dataUrl;
+  }
+  uset(c, { imgOverride: src });
+  if (c._catalogImg === undefined) c._catalogImg = c.img || null;
+  c.img = src;
+  return { ok: true, src };
+}
+async function resetCardImage(c) {
+  if (State.live) { try { await fetch('/api/cardart/delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pcId: c.pcId }) }); } catch { /* best effort */ } }
+  uset(c, { imgOverride: '' });
+  c.img = c._catalogImg || null;
+}
+function googleImgUrl(c) {
+  return 'https://www.google.com/search?tbm=isch&q=' + enc(((c.fullName || c.name) + ' ' + c.set + (c.lang === 'ja' ? ' japanese' : '') + ' pokemon card').trim());
+}
+function afterImgChange(c) {
+  if (State.view === 'collection') renderCollection(true);
+  if (State.view === 'case') renderCase();
+  if (State.view === 'sell') renderSell();
+}
+function openImageEditor(c, backTo) {
+  const hasOverride = !!(State.user[c.pcId] && State.user[c.pcId].imgOverride);
+  const hasCatalog = !!c._catalogImg;
+  const live = !!State.live;
+  const phBox = `<div class="ph mini"><div class="pb"></div><div class="pn">no image</div></div>`;
+  const html = `<div class="modal-bg" id="modalBg"><div class="modal" style="max-width:560px">
+    <button class="close-x" id="modalClose">×</button>
+    <div class="modal-body" style="padding:26px">
+      <h2 style="font-size:20px;margin-bottom:4px">🖼 Set card image</h2>
+      <p class="muted" style="font-size:12.5px;margin-bottom:14px">${esc(c.name)}${c.number ? ' #' + esc(c.number) : ''} · ${esc(c.set)}${c.lang === 'ja' ? ' · 🇯🇵' : ''}</p>
+      <div style="display:flex;gap:16px;align-items:flex-start;margin-bottom:14px">
+        <div class="ie-preview" id="ie-preview">${c.img ? `<img src="${esc(c.img)}" alt="">` : phBox}</div>
+        <div class="reason" style="flex:1;line-height:1.55">
+          <b>1.</b> Find the card art →
+          <div class="sr-links" style="margin:6px 0">
+            <a class="minilink" href="${googleImgUrl(c)}" target="_blank" rel="noopener">🔍 Google Images</a>
+            <a class="minilink" href="https://www.bing.com/images/search?q=${enc((c.fullName || c.name) + ' ' + c.set + ' pokemon card')}" target="_blank" rel="noopener">Bing</a>
+            <a class="minilink" href="https://www.tcgplayer.com/search/pokemon/product?q=${enc((c.name || '') + ' ' + (c.number || ''))}" target="_blank" rel="noopener">TCGplayer</a>
+          </div>
+          <b>2.</b> Right-click the art → <b>Copy Image</b>, then hit Paste below — or paste its image URL.
+        </div>
+      </div>
+      <div class="subhead">Paste image or URL</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button class="btn sm gold" id="ie-paste">📋 Paste image from clipboard</button>
+        <button class="btn sm" id="ie-file">📁 Choose file…</button>
+        <input id="ie-fileinput" type="file" accept="image/*" style="display:none">
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <input id="ie-url" class="s-inp" style="margin:0;flex:1" placeholder="…or paste a direct image URL (ends in .jpg / .png / .webp)">
+        <button class="btn sm" id="ie-useurl">Use URL</button>
+      </div>
+      <p class="reason" id="ie-status" style="margin-top:10px">${live
+        ? '✓ Saved <b>permanently</b> into your app’s <b>card-art</b> vault — it sticks through data refreshes <i>and</i> app updates.'
+        : 'Running without the local engine — a pasted <b>URL</b> is remembered on this device.'}</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+        ${(hasOverride && hasCatalog) ? `<button class="btn ghost sm" id="ie-reset">↩ Revert to original catalog art</button>` : ''}
+        ${backTo ? '<button class="btn ghost sm" id="ie-back">← Back to card</button>' : ''}
+      </div>
+    </div></div></div>`;
+  $('#modalRoot').innerHTML = html;
+  const status = (m) => $('#ie-status').innerHTML = m;
+  const showPreview = () => $('#ie-preview').innerHTML = c.img ? `<img src="${esc(c.img)}" alt="">` : phBox;
+  const done = (res, label) => {
+    if (!res.ok) { status('✕ ' + esc(res.error || 'failed')); return; }
+    status('✓ ' + esc(label) + ' — image set.'); showPreview(); afterImgChange(c);
+  };
+  $('#ie-useurl').onclick = async () => {
+    const u = $('#ie-url').value.trim();
+    if (!u) { status('Paste an image URL first.'); return; }
+    if (!/^https?:\/\//i.test(u)) { status('That doesn’t look like a URL. It should start with https://'); return; }
+    status('Saving…'); done(await setCardImage(c, { url: u }), 'From URL');
+  };
+  $('#ie-paste').onclick = async () => {
+    status('Reading clipboard…');
+    try {
+      if (navigator.clipboard && navigator.clipboard.read) {
+        const items = await navigator.clipboard.read();
+        for (const it of items) {
+          const type = it.types.find(t => t.startsWith('image/'));
+          if (type) { const blob = await it.getType(type); const dataUrl = await blobToDataUrl(blob); status('Saving…'); return done(await setCardImage(c, { dataUrl }), 'Pasted image'); }
+        }
+      }
+      const txt = (await navigator.clipboard.readText().catch(() => ''))?.trim();
+      if (txt && /^https?:\/\//i.test(txt)) { status('Saving image from copied link…'); return done(await setCardImage(c, { url: txt }), 'From copied link'); }
+      status('No image on the clipboard. Right-click the card art → <b>Copy Image</b>, then try again — or use “Choose file”.');
+    } catch (e) { status('Clipboard blocked: ' + esc(e.message) + '. Use “Choose file” or paste a URL instead.'); }
+  };
+  $('#ie-file').onclick = () => $('#ie-fileinput').click();
+  $('#ie-fileinput').onchange = async (e) => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    status('Reading file…'); const dataUrl = await blobToDataUrl(f); status('Saving…');
+    done(await setCardImage(c, { dataUrl }), esc(f.name));
+  };
+  if ($('#ie-reset')) $('#ie-reset').onclick = async () => { status('Resetting…'); await resetCardImage(c); afterImgChange(c); openImageEditor(c, backTo); };
+  $('#modalClose').onclick = closeModal;
+  $('#modalBg').onclick = e => { if (e.target.id === 'modalBg') closeModal(); };
+  if (backTo) $('#ie-back').onclick = () => openModal(c);
+}
+window.openImageEditor = openImageEditor;
+
+/* ================= 📸 PHOTO STUDIO — guided seller photos ================= */
+/* Your OWN photos of the real card, one per angle, saved for a listing. Each
+   slot recommends the angle + lighting so the shot comes out clean. */
+const LISTING_SHOTS = [
+  { slot: 'front',   icon: '🃏', label: 'Front',           core: true,
+    angle: 'Straight-on, card centered and filling the frame',
+    light: 'Soft even light at ~45° — tilt the card until the holo glare disappears' },
+  { slot: 'back',    icon: '🔄', label: 'Back',            core: true,
+    angle: 'Straight-on, fill the frame',
+    light: 'Even light — watch for edge whitening and scratches' },
+  { slot: 'corners', icon: '📐', label: 'Corners',         core: true,
+    angle: 'Close macro of the corners (or the weakest one)',
+    light: 'Low raking light to reveal any wear or whitening' },
+  { slot: 'surface', icon: '✨', label: 'Surface / holo',  core: true,
+    angle: 'Tilt ~20° and shoot across the card',
+    light: 'Raking light skimming the surface — shows print lines & scratches' },
+  { slot: 'flaw',    icon: '🔍', label: 'Any flaw (be honest)', core: false,
+    angle: 'Macro right on the defect — skip if it’s truly clean',
+    light: 'Whatever lighting shows it most clearly' },
+];
+function psBust(p) { return p + (p.indexOf('?') < 0 ? '?t=' : '&t=') + Date.now(); }
+async function openPhotoStudio(c, backTo) {
+  const live = !!State.live;
+  const rows = LISTING_SHOTS.map(sh => `
+    <div class="ps-shot" data-slot="${sh.slot}">
+      <div class="ps-ico">${sh.icon}</div>
+      <div class="ps-info">
+        <div class="ps-label">${esc(sh.label)}${sh.core ? '' : ' <span class="reason">optional</span>'} <span class="ps-check" data-slot="${sh.slot}" hidden>✓ saved</span></div>
+        <div class="ps-tip"><b>Angle:</b> ${esc(sh.angle)}</div>
+        <div class="ps-tip"><b>Light:</b> ${esc(sh.light)}</div>
+        <div class="ps-actions">
+          <button class="btn-lightblue sm ps-up" data-slot="${sh.slot}" ${live ? '' : 'disabled'}>📸 Upload photo</button>
+          <button class="minilink ps-paste" data-slot="${sh.slot}" ${live ? '' : 'disabled'}>📋 Paste</button>
+          <button class="minilink ps-del" data-slot="${sh.slot}" hidden>Remove</button>
+          <span class="reason ps-stat" data-slot="${sh.slot}"></span>
+        </div>
+      </div>
+      <div class="ps-preview" data-slot="${sh.slot}"><span class="ps-empty">no shot</span></div>
+      <input type="file" accept="image/*" capture="environment" class="ps-file" data-slot="${sh.slot}" style="display:none">
+    </div>`).join('');
+  $('#modalRoot').innerHTML = `<div class="modal-bg" id="modalBg"><div class="modal accent-sapphire" style="max-width:640px">
+    <button class="close-x" id="modalClose">×</button>
+    <div class="modal-body" style="padding:26px">
+      <h2 style="font-size:20px;margin-bottom:2px">📸 Photo Studio <span class="reason" style="font-weight:400">— shoot it clean, save it for sale</span></h2>
+      <p class="muted" style="font-size:12.5px;margin-bottom:6px">${esc(c.name)}${c.number ? ' #' + esc(c.number) : ''} · ${esc(c.set)} — snap each angle with the tip shown, then Upload. On iPhone the Upload button opens your camera.${live ? '' : ' <b style="color:var(--gold)">Open via the app to save photos.</b>'}</p>
+      <div class="ps-prog"><div class="ps-prog-bar" id="ps-bar" style="width:0%"></div></div>
+      <div class="ps-prog-txt reason" id="ps-prog">0 / 4 core shots</div>
+      <div class="ps-shots">${rows}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;align-items:center">
+        <button class="btn sm" id="ps-reveal" ${live ? '' : 'disabled'}>📁 Reveal photo folder</button>
+        <span class="reason" style="flex:1">Photos are saved on your Mac, private — attach them when you build the listing.</span>
+        ${backTo ? '<button class="btn ghost sm" id="ps-back">← Back</button>' : ''}
+        <button class="btn primary sm" id="ps-done">Done</button>
+      </div>
+    </div></div></div>`;
+  const bar = $('#ps-bar'), prog = $('#ps-prog');
+  const state = {};                               // slot -> path
+  const updateProg = () => {
+    const core = LISTING_SHOTS.filter(s => s.core);
+    const done = core.filter(s => state[s.slot]).length;
+    if (bar) bar.style.width = Math.round(done / core.length * 100) + '%';
+    if (prog) prog.textContent = `${done} / ${core.length} core shots` + (state.flaw ? ' · +flaw' : '');
+  };
+  const setSlot = (slot, path) => {
+    state[slot] = path || null;
+    const prev = $(`.ps-preview[data-slot="${slot}"]`);
+    const del = $(`.ps-del[data-slot="${slot}"]`);
+    const chk = $(`.ps-check[data-slot="${slot}"]`);
+    if (prev) prev.innerHTML = path ? `<img src="${esc(psBust(path))}" alt="">` : '<span class="ps-empty">no shot</span>';
+    if (del) del.hidden = !path;
+    if (chk) chk.hidden = !path;
+    updateProg();
+  };
+  const save = async (slot, body) => {
+    const stat = $(`.ps-stat[data-slot="${slot}"]`); if (stat) stat.textContent = 'Saving…';
+    try {
+      const j = await (await fetch('/api/listingphoto', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(Object.assign({ pcId: c.pcId, slot }, body)) })).json();
+      if (j.ok) { setSlot(slot, j.path); if (stat) stat.textContent = `✓ ${j.kb} KB`; }
+      else if (stat) stat.textContent = '✕ ' + (j.error || 'failed');
+    } catch (e) { if (stat) stat.textContent = 'Error: ' + e.message; }
+  };
+  $$('.ps-up').forEach(b => b.onclick = () => $(`.ps-file[data-slot="${b.dataset.slot}"]`).click());
+  $$('.ps-file').forEach(inp => inp.onchange = async (e) => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    const stat = $(`.ps-stat[data-slot="${inp.dataset.slot}"]`); if (stat) stat.textContent = 'Reading…';
+    save(inp.dataset.slot, { dataUrl: await blobToDataUrl(f) });
+  });
+  $$('.ps-paste').forEach(b => b.onclick = async () => {
+    const slot = b.dataset.slot, stat = $(`.ps-stat[data-slot="${slot}"]`);
+    if (stat) stat.textContent = 'Reading clipboard…';
+    try {
+      if (navigator.clipboard && navigator.clipboard.read) {
+        for (const it of await navigator.clipboard.read()) {
+          const t = it.types.find(x => x.startsWith('image/'));
+          if (t) return save(slot, { dataUrl: await blobToDataUrl(await it.getType(t)) });
+        }
+      }
+      const txt = (await navigator.clipboard.readText().catch(() => ''))?.trim();
+      if (txt && /^https?:\/\//i.test(txt)) return save(slot, { url: txt });
+      if (stat) stat.textContent = 'No image on the clipboard.';
+    } catch (e) { if (stat) stat.textContent = 'Clipboard blocked — use Upload.'; }
+  });
+  $$('.ps-del').forEach(b => b.onclick = async () => {
+    const slot = b.dataset.slot;
+    try { await fetch('/api/listingphoto/delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pcId: c.pcId, slot }) }); } catch {}
+    setSlot(slot, null);
+    const stat = $(`.ps-stat[data-slot="${slot}"]`); if (stat) stat.textContent = '';
+  });
+  if ($('#ps-reveal')) $('#ps-reveal').onclick = async () => {
+    try { await fetch('/api/listingphotos/reveal', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pcId: c.pcId }) }); } catch {}
+  };
+  $('#modalClose').onclick = () => backTo ? openListingComposer(c, true) : closeModal();
+  $('#ps-done').onclick = $('#modalClose').onclick;
+  if ($('#ps-back')) $('#ps-back').onclick = () => openListingComposer(c, true);
+  $('#modalBg').onclick = e => { if (e.target.id === 'modalBg') ($('#ps-done').onclick)(); };
+  // load whatever's already saved
+  if (live) {
+    try {
+      const j = await (await fetch('/api/listingphotos?pcId=' + enc(c.pcId), { cache: 'no-store' })).json();
+      if (j && j.ok) Object.entries(j.photos || {}).forEach(([slot, path]) => setSlot(slot, path));
+    } catch { /* offline — start blank */ }
+  }
+  updateProg();
+}
+async function listingPhotoCount(c) {
+  if (!State.live) return 0;
+  try { const j = await (await fetch('/api/listingphotos?pcId=' + enc(c.pcId), { cache: 'no-store' })).json(); return j && j.ok ? Object.keys(j.photos || {}).length : 0; }
+  catch { return 0; }
+}
+window.openPhotoStudio = openPhotoStudio;
+
+/* ================= FIRST-RUN WALKTHROUGH ================= */
+const WALK_STEPS = [
+  { icon: '🗝️', accent: 'gold', title: 'Welcome to your Chest',
+    body: `This is your private vault for your Pokémon card collection — <b>live values</b>, <b>P/L</b>, one-click <b>sold comps</b>, grading math, and a sell hub. 100% on your Mac. Here’s the 60-second tour — you can reopen it anytime with <b>？ Guide</b> up top.` },
+  { icon: '💰', accent: 'emerald', title: 'Your collection & its value',
+    body: `Your cards come from your <b>PriceCharting export</b>. The <b>Portfolio</b> pill (top-right) is your live total; hit <b>↻ Refresh</b> after you update your export to re-price everything and log a new snapshot. Browse everything under the <b>Collection</b> tab.` },
+  { icon: '📸', accent: 'sapphire', title: 'Give any card its picture',
+    body: `See a card with no art (or the wrong art)? Click <b>🔍 Add image</b> on the card. Then:<br>• <b>iPhone:</b> snap the card, AirDrop it to your Mac, hit <b>📁 Choose file</b>.<br>• <b>Mac/PC:</b> tap <b>🔍 Google Images</b>, right-click the real art → <b>Copy Image</b> → <b>📋 Paste</b>.<br>Every image is saved <b>forever</b> in your Card Art Vault (Admin tab).` },
+  { icon: '➕', accent: 'amethyst', title: 'Adding brand-new cards',
+    body: `Today, new cards flow in from your <b>PriceCharting export</b> — add them there, drop the file in, then <b>↻ Refresh</b>. <span class="reason">Coming next: <b>snap a card to add it</b> and <b>type-in quick-add</b> — part of the big card→game update below.</span>` },
+  { icon: '🏷️', accent: 'ruby', title: 'Sell the smart way',
+    body: `Open any card → <b>📤 List for sale</b>. Pick your venue — <b>Facebook, eBay, OfferUp, Mercari, Whatnot, Craigslist</b> — and it writes a keyword title + honest description, shows your <b>net after fees</b>, and opens the site with everything copied to paste.` },
+  { icon: '🎮', accent: 'emerald', title: 'Play — Emerald Lab & what’s coming',
+    body: `Under <b>Admin → Emerald Lab</b> you can build & play a <b>100% legal</b> Pokémon Emerald, compiled from open source right here — no downloads, no Terminal.<br><br><b>The big idea we’re building:</b> turn <i>your real cards</i> into a game — pull them from a nostalgic machine, win the rare ones, and take your collection into the wild to catch. Let’s go. 🌟` },
+];
+function openWalkthrough(step) {
+  step = Math.max(0, Math.min(step | 0, WALK_STEPS.length - 1));
+  const s = WALK_STEPS[step], last = step === WALK_STEPS.length - 1;
+  const dots = WALK_STEPS.map((_, i) => `<span class="wt-dot ${i === step ? 'on' : ''}" data-step="${i}"></span>`).join('');
+  $('#modalRoot').innerHTML = `<div class="modal-bg" id="modalBg"><div class="modal wt-card accent-${s.accent}" style="max-width:520px">
+    <button class="close-x" id="wtClose">×</button>
+    <div class="modal-body" style="padding:30px 30px 24px">
+      <div class="wt-icon">${s.icon}</div>
+      <div class="wt-step">Step ${step + 1} of ${WALK_STEPS.length}</div>
+      <h2 style="font-size:22px;margin:2px 0 10px">${s.title}</h2>
+      <p style="font-size:14px;line-height:1.65;color:var(--text)">${s.body}</p>
+      <div class="wt-dots">${dots}</div>
+      <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:14px">
+        <button class="btn ghost sm" id="wtSkip">${last ? '' : 'Skip'}</button>
+        <div style="display:flex;gap:8px">
+          ${step > 0 ? '<button class="btn sm" id="wtPrev">← Back</button>' : ''}
+          <button class="btn primary sm" id="wtNext">${last ? '🚀 Start collecting' : 'Next →'}</button>
+        </div>
+      </div>
+    </div></div></div>`;
+  const finish = () => { try { localStorage.setItem(LS_ONBOARD, '1'); } catch {} closeModal(); };
+  $('#wtClose').onclick = finish;
+  $('#modalBg').onclick = e => { if (e.target.id === 'modalBg') finish(); };
+  if ($('#wtSkip')) $('#wtSkip').onclick = finish;
+  if ($('#wtPrev')) $('#wtPrev').onclick = () => openWalkthrough(step - 1);
+  $('#wtNext').onclick = () => last ? finish() : openWalkthrough(step + 1);
+  $$('#modalRoot .wt-dot').forEach(d => d.onclick = () => openWalkthrough(+d.dataset.step));
+}
+function maybeOnboard() {
+  try { if (localStorage.getItem(LS_ONBOARD)) return; } catch { return; }
+  openWalkthrough(0);
+}
+window.openWalkthrough = openWalkthrough;
+
+/* ================= 🕹 ARCADE — Capsule Machine (Phase 1) ================= */
+/* Turn your real collection into a nostalgic gumball/capsule pull. Rarer &
+   pricier cards are harder to win (but not brutal). Phase 1b = Plinko;
+   Phase 2 = "beat Emerald → scan a card → catch it in the wild". */
+const ARCADE_DAILY = 8;                 // free crank tokens per day
+const ARC_TIERS = [
+  { key: 'legendary', label: 'Legendary', min: 300, pct: 3,  cls: 't-leg'  },
+  { key: 'epic',      label: 'Epic',      min: 100, pct: 8,  cls: 't-epic' },
+  { key: 'rare',      label: 'Rare',      min: 25,  pct: 16, cls: 't-rare' },
+  { key: 'uncommon',  label: 'Uncommon',  min: 5,   pct: 30, cls: 't-unc'  },
+  { key: 'common',    label: 'Common',    min: 0,   pct: 43, cls: 't-com'  },
+];
+function arcTierOf(c) { const p = c.price || 0; return ARC_TIERS.find(t => p >= t.min) || ARC_TIERS[ARC_TIERS.length - 1]; }
+function arcadeGet() {
+  const s = loadJSON(LS_ARCADE, { tokens: ARCADE_DAILY, day: '', pulls: 0, won: [] });
+  if (!Array.isArray(s.won)) s.won = [];
+  const today = new Date().toISOString().slice(0, 10);
+  if (s.day !== today) { s.day = today; s.tokens = ARCADE_DAILY; arcadeSet(s); }
+  return s;
+}
+function arcadeSet(s) { try { localStorage.setItem(LS_ARCADE, JSON.stringify(s)); } catch { /* storage off/full — play without persistence */ } }
+function arcadeDraw() {
+  const pool = (State.cards || []).filter(c => c.price != null);
+  if (!pool.length) return null;
+  const byTier = {}; ARC_TIERS.forEach(t => byTier[t.key] = []);
+  pool.forEach(c => byTier[arcTierOf(c).key].push(c));
+  const avail = ARC_TIERS.filter(t => byTier[t.key].length);
+  if (!avail.length) return null;
+  const total = avail.reduce((s, t) => s + t.pct, 0);
+  let r = Math.random() * total, chosen = avail[avail.length - 1];
+  for (const t of avail) { if (r < t.pct) { chosen = t; break; } r -= t.pct; }
+  const arr = byTier[chosen.key];
+  return { card: arr[Math.floor(Math.random() * arr.length)], tier: chosen };
+}
+function machineSVG() {
+  return `<svg viewBox="0 0 200 260" class="gm-svg" aria-hidden="true">
+    <defs>
+      <radialGradient id="gmGlass" cx="38%" cy="32%" r="75%"><stop offset="0" stop-color="#2b3a58"/><stop offset="1" stop-color="#0e1524"/></radialGradient>
+      <linearGradient id="gmBase" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c23a4e"/><stop offset="1" stop-color="#7c1d2c"/></linearGradient>
+      <linearGradient id="gmChrome" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e9eef7"/><stop offset="1" stop-color="#8792a8"/></linearGradient>
+    </defs>
+    <ellipse cx="100" cy="248" rx="66" ry="9" fill="#000" opacity=".35"/>
+    <rect x="44" y="150" width="112" height="92" rx="12" fill="url(#gmBase)"/>
+    <rect x="44" y="150" width="112" height="10" rx="5" fill="#e0566a" opacity=".6"/>
+    <circle cx="100" cy="78" r="66" fill="url(#gmGlass)" stroke="url(#gmChrome)" stroke-width="4"/>
+    <circle cx="100" cy="78" r="66" fill="none" stroke="#000" stroke-width="1" opacity=".3"/>
+    <ellipse cx="78" cy="52" rx="20" ry="13" fill="#fff" opacity=".12"/>
+    ${[['#e0556b',82,60],['#e8a33d',110,54],['#3ad6a0',72,92],['#4cc2ff',120,90],['#a97bff',96,74],['#f0c33c',132,72],['#4c7dff',66,66],['#3ad6a0',108,108],['#e0556b',134,102],['#a97bff',80,116]]
+      .map(([c,x,y]) => `<circle cx="${x}" cy="${y}" r="10" fill="${c}"/><circle cx="${x-3}" cy="${y-3}" r="3" fill="#fff" opacity=".5"/>`).join('')}
+    <rect x="86" y="140" width="28" height="20" rx="3" fill="url(#gmChrome)"/>
+    <rect x="70" y="196" width="60" height="30" rx="6" fill="#0c1220" stroke="url(#gmChrome)" stroke-width="2"/>
+    <text x="100" y="216" text-anchor="middle" font-size="9" fill="#8792a8" font-family="sans-serif">PUSH</text>
+    <g class="gm-crank"><circle cx="150" cy="176" r="12" fill="url(#gmChrome)"/><rect x="147" y="176" width="6" height="20" rx="3" fill="#8792a8"/><circle cx="150" cy="196" r="5" fill="#c23a4e"/></g>
+  </svg>`;
+}
+function renderArcade() {
+  const el = $('#view-arcade'); if (!el) return;
+  const s = arcadeGet();
+  const pool = (State.cards || []).filter(c => c.price != null);
+  // odds shown must match the actual draw (which renormalizes over tiers you own)
+  const tierHas = {}; ARC_TIERS.forEach(t => tierHas[t.key] = 0);
+  pool.forEach(c => tierHas[arcTierOf(c).key]++);
+  const availT = ARC_TIERS.filter(t => tierHas[t.key]);
+  const oddsTotal = availT.reduce((a, t) => a + t.pct, 0) || 1;
+  const oddsRow = availT.map(t => `<div class="arc-odd ${t.cls}"><span class="ao-dot"></span><span class="ao-l">${t.label}</span><span class="ao-p">${Math.round(t.pct / oddsTotal * 100)}%</span></div>`).join('');
+  // resolve won cards by array index (pcId isn't unique — 158 pcIds repeat across raw/graded variants)
+  const wonCard = (w) => (w.i != null && State.cards[w.i]) || (State.cards || []).find(c => c.pcId === w.pcId);
+  const shelf = s.won.slice(-24).reverse().map(w => {
+    const c = wonCard(w); if (!c) return '';
+    const t = arcTierOf(c);
+    return `<div class="arc-won ${t.cls}" data-i="${c.i}" title="${esc(c.name)} — ${money(c.price)}">${c.img ? `<img loading="lazy" src="${esc(c.img)}" onerror="this.outerHTML=phThumb(${c.i})">` : phThumb(c.i)}</div>`;
+  }).join('');
+  el.innerHTML = `
+    <div class="section-head"><h2>🕹 Arcade — turn your collection into a game</h2>
+      <span class="sub">Phase 1: the Capsule Machine. Every crank pulls a real card from your vault — chase cards are rarer to win.</span></div>
+
+    <div class="arc-grid">
+      <div class="panel accent-amethyst arc-machine">
+        <div class="arc-tokens">🎟️ <b id="arc-tok">${s.tokens}</b> crank${s.tokens === 1 ? '' : 's'} left today <span class="reason">· refills daily</span></div>
+        <div class="gm-stage" id="gm-stage">${machineSVG()}<div class="gm-capsule" id="gm-capsule"></div></div>
+        <button class="btn primary arc-crank" id="arc-crank" ${s.tokens > 0 && pool.length && !_arcBusy ? '' : 'disabled'}>🎰 Turn the crank</button>
+        <div class="reason" id="arc-msg" style="margin-top:8px;min-height:18px">${pool.length ? 'Give it a crank!' : 'Load your collection to play.'}</div>
+      </div>
+
+      <div class="panel accent-gold arc-prizewrap">
+        <div class="subhead" style="margin-top:0">Your pull</div>
+        <div class="arc-prize" id="arc-prize"><div class="arc-empty">Turn the crank to reveal a card ✨</div></div>
+        <div class="arc-odds">${oddsRow}</div>
+        <div class="reason" style="margin-top:8px">Lifetime cranks: <b>${s.pulls}</b></div>
+      </div>
+    </div>
+
+    <div class="panel arc-shelf-wrap" style="margin-top:16px">
+      <div class="subhead" style="margin-top:0">🏆 Capsule shelf — what you’ve pulled ${s.won.length ? `(${s.won.length})` : ''}</div>
+      <div class="arc-shelf" id="arc-shelf">${shelf || '<span class="reason">Nothing yet — your pulls collect here. Tap one to open the card.</span>'}</div>
+    </div>
+
+    <div class="cols two" style="margin-top:16px">
+      <div class="panel accent-emerald"><h3>🎳 Next up — Plinko drop (Phase 1b)</h3>
+        <p class="muted" style="font-size:13.5px;line-height:1.6">Drop a chip and watch it bounce through the pegs into a rarity slot — same odds, more suspense. Coming in the next build.</p></div>
+      <div class="panel accent-sapphire"><h3>🌍 The big one — Catch in the Wild (Phase 2)</h3>
+        <p class="muted" style="font-size:13.5px;line-height:1.6">Beat the Emerald hack, then <b>scan a card from your collection</b> → its Pokémon spawns in the game world for you to go find and catch. This is the ROM-hack build (personal-only) we’re working toward.</p></div>
+    </div>`;
+
+  $('#arc-crank').onclick = () => arcadePull();
+  $$('#arc-shelf .arc-won').forEach(w => w.onclick = () => { const c = State.cards[+w.dataset.i]; if (c) openModal(c); });
+}
+let _arcBusy = false;
+function arcadePull() {
+  if (_arcBusy) return;
+  const s = arcadeGet();
+  if (s.tokens <= 0) { $('#arc-msg').textContent = 'Out of cranks — they refill tomorrow.'; return; }
+  const draw = arcadeDraw();
+  if (!draw) { $('#arc-msg').textContent = 'No cards to pull yet.'; return; }
+  _arcBusy = true;
+  const { card, tier } = draw;
+  s.tokens -= 1; s.pulls += 1; s.won.push({ i: card.i, pcId: card.pcId, at: Date.now() });
+  if (s.won.length > 200) s.won = s.won.slice(-200);
+  arcadeSet(s);
+  const crank = $('#arc-crank'); if (crank) crank.disabled = true;
+  const stage = $('#gm-stage'), cap = $('#gm-capsule'), tok = $('#arc-tok'), msg = $('#arc-msg');
+  if (tok) tok.textContent = s.tokens;
+  if (stage) stage.classList.add('cranking');
+  if (cap) { cap.className = 'gm-capsule drop ' + tier.cls; cap.style.display = 'block'; }
+  if (msg) msg.textContent = 'Cranking…';
+  const prize = $('#arc-prize');
+  setTimeout(() => {
+    if (stage) stage.classList.remove('cranking');
+    if (cap) cap.style.display = 'none';
+    if (prize) prize.innerHTML = `
+      <div class="arc-reveal ${tier.cls}">
+        <div class="arc-glow"></div>
+        <div class="arc-card">${card.img ? `<img src="${esc(card.img)}" alt="${esc(card.name)}" onerror="this.outerHTML=phHTML(${card.i})">` : phHTML(card.i)}</div>
+        <div class="arc-badge">${tier.label}</div>
+        <div class="arc-name">${esc(card.name)}</div>
+        <div class="arc-meta">${esc(card.set)}${card.number ? ' · #' + esc(card.number) : ''} · <b style="color:var(--gold)">${money(card.price)}</b></div>
+        <div class="arc-sparks">${'<i></i>'.repeat(8)}</div>
+        <button class="btn sm" id="arc-open">Open card ↗</button>
+      </div>`;
+    const open = $('#arc-open'); if (open) open.onclick = () => openModal(card);
+    if (msg) msg.textContent = tier.key === 'legendary' || tier.key === 'epic' ? `🌟 ${tier.label}! Nice pull.` : 'Nice — added to your shelf.';
+    // refresh the shelf strip
+    const shelf = $('#arc-shelf');
+    if (shelf) {
+      const t2 = arcTierOf(card);
+      const chip = `<div class="arc-won ${t2.cls}" data-i="${card.i}" title="${esc(card.name)} — ${money(card.price)}">${card.img ? `<img loading="lazy" src="${esc(card.img)}" onerror="this.outerHTML=phThumb(${card.i})">` : phThumb(card.i)}</div>`;
+      if (shelf.querySelector('.reason')) shelf.innerHTML = '';
+      shelf.insertAdjacentHTML('afterbegin', chip);
+      const first = shelf.querySelector('.arc-won'); if (first) first.onclick = () => openModal(card);
+    }
+    _arcBusy = false;
+    const ck = $('#arc-crank'); if (ck) ck.disabled = s.tokens <= 0;  // re-query: may be a new button after a re-render
+  }, 1050);
+}
+window.renderArcade = renderArcade;
 
 /* ================= DASHBOARD ================= */
 function renderDashboard() {
@@ -642,7 +1150,7 @@ function wireFeedback() {
 function miniRow(c) {
   const pl = uget(c).status;
   return `<div class="mini" data-i="${c.i}">
-    ${c.img ? `<img class="thumb" loading="lazy" src="${c.img}" onerror="this.outerHTML=phThumb(${c.i})">` : phThumb(c.i)}
+    ${c.img ? `<img class="thumb" loading="lazy" src="${esc(c.img)}" onerror="this.outerHTML=phThumb(${c.i})">` : phThumb(c.i)}
     <div class="mtext"><div class="mname">${esc(c.name)} ${c.graded ? `<span class="grade-chip" style="font-size:9px">${esc(c.grader || '')} ${c.grade || ''}</span>` : ''}</div>
       <div class="mset">${esc(c.set)} · ${c.lang === 'ja' ? 'JP' : 'EN'}${c.number ? ' · #' + esc(c.number) : ''}</div></div>
     <div class="mval">${money(c.price)}</div>
@@ -766,6 +1274,7 @@ function renderCollection(reset) {
   const html = slice.map(cardHTML).join('');
   $('#grid').insertAdjacentHTML('beforeend', html);
   $$('#grid .card:not([data-wired])').forEach(el => { el.dataset.wired = '1'; el.onclick = () => openModal(State.cards[+el.dataset.i]); });
+  $$('#grid .card-addimg:not([data-w2])').forEach(el => { el.dataset.w2 = '1'; el.onclick = (e) => { e.stopPropagation(); openImageEditor(State.cards[+el.dataset.i], false); }; });
   State.page++;
   setupSentinel();
 }
@@ -784,6 +1293,7 @@ function cardHTML(c) {
   return `<div class="card" data-i="${c.i}">
     <div class="card-img">
       ${imgHTML(c, '')}
+      ${!c.img ? `<button class="card-addimg" data-i="${c.i}" title="Find &amp; add an image for this card">🔍 Add image</button>` : ''}
       <div class="card-badges">
         <span class="flag ${c.lang}">${c.lang === 'ja' ? 'JP' : 'EN'}</span>
         ${c.graded ? `<span class="grade-chip">${esc(c.grader || 'GRD')} ${c.grade || ''}</span>` : ''}
@@ -889,7 +1399,7 @@ function wirePopWatch(list) {
 
 function sellCardCell(c) {
   return `<div class="sr-card" data-i="${c.i}">
-      ${c.img ? `<img loading="lazy" src="${c.img}" onerror="this.outerHTML=phThumb(${c.i})">` : phThumb(c.i)}
+      ${c.img ? `<img loading="lazy" src="${esc(c.img)}" onerror="this.outerHTML=phThumb(${c.i})">` : phThumb(c.i)}
       <div><div class="sr-name">${esc(c.name)} ${c.graded ? `<span class="grade-chip" style="font-size:9px">${esc(c.grader || '')} ${c.grade || ''}</span>` : ''}</div>
         <div class="sr-set">${esc(c.set)} · ${c.lang === 'ja' ? 'JP' : 'EN'}${c.number ? ' · #' + esc(c.number) : ''}</div></div>
     </div>`;
@@ -1080,7 +1590,25 @@ function sellerPlaybookHTML() {
 }
 
 /* ================= DISPLAY CASE ================= */
-const CASE_TIERS = ['🏆 Grails', '💎 Showcase', '📈 Risers', '👀 Watchlist'];
+const CASE_TIERS = ['🏆 Grails', '💛 Memories', '💎 Showcase', '📈 Risers', '👀 Watchlist'];
+const LS_SMART = 'pokechest.smartshelves.v1';
+// Auto-built shelves — populated from the collection, no manual curation needed.
+function smartShelves() {
+  const c = State.cards;
+  const allIn = (State.intel.thresholds && State.intel.thresholds.allInGradingCost) || 35;
+  const best = [...c].sort((a, b) => b.value - a.value).slice(0, 8);
+  const toGrade = c.filter(x => !x.graded && x.game === 'Pokémon')
+    .map(x => ({ c: x, a: gradeAdvice(x) })).filter(o => o.a.verdict === 'strong')
+    .map(o => ({ c: o.c, up: o.a.lad.psa10 * 0.864 - allIn - o.c.price }))
+    .sort((p, q) => q.up - p.up).slice(0, 8).map(o => o.c);
+  const toSell = [...c].filter(x => (x.value || 0) >= 25 && (uget(x).status || '') !== 'sold')
+    .sort((a, b) => sellNet(b).net - sellNet(a).net).slice(0, 8);
+  return [
+    { key: 'best', icon: '🏅', label: 'Best overall', sub: 'your most valuable cards', cards: best },
+    { key: 'grade', icon: '🔬', label: 'Top to grade', sub: 'biggest PSA-10 upside', cards: toGrade },
+    { key: 'sell', icon: '💸', label: 'Top to sell now', sub: 'best net after fees', cards: toSell },
+  ].filter(s => s.cards.length);
+}
 function caseAll() { return loadJSON(LS_CASE, {}); }
 function caseGet(c) { return caseAll()[c.pcId] || null; }
 function caseSet(c, patch) {
@@ -1127,35 +1655,45 @@ function renderCase() {
   const byId = {}; State.cards.forEach(c => byId[c.pcId] = c);
   const cards = Object.keys(all).map(id => byId[id]).filter(Boolean);
   const totVal = sum(cards.map(c => c.value));
+  const showSmart = localStorage.getItem(LS_SMART) !== 'false';
   const head = `
     <div class="section-head"><h2>🏛 Display Case</h2>
-      <span class="sub">${cards.length ? `${cards.length} favorites on display · ${money0(totVal)}` : 'Your curated showcase — favorites, grails, risers'}</span></div>
+      <span class="sub">${cards.length ? `${cards.length} on your shelves · ${money0(totVal)}` : 'Premade smart shelves below — pin any card to build your own'}</span></div>
     <div class="dc-add">
-      <input id="dc-search" list="dc-list" class="s-inp" style="margin:0;max-width:440px" placeholder="✚ Add a card to the case — type a name…">
+      <input id="dc-search" list="dc-list" class="s-inp" style="margin:0;max-width:440px" placeholder="✚ Add a card to a shelf — type a name…">
+      <button class="btn ghost sm" id="dc-smart-toggle">${showSmart ? '✓ Smart shelves' : 'Show smart shelves'}</button>
       <datalist id="dc-list">${State.cards.filter(c => !all[c.pcId]).slice(0, 1200).map(c => `<option value="${esc(c.name)} — ${esc(c.set)}${c.number ? ' #' + esc(c.number) : ''}" data-i="${c.i}">`).join('')}</datalist>
     </div>`;
-  if (!cards.length) {
-    $('#view-case').innerHTML = head + `<div class="dc-empty"><div class="dc-empty-glow"></div>
-      <p style="font-size:15px">Nothing on display yet.</p>
-      <p class="reason">Open any card and hit <b>★ Display Case</b>, or use the search above. Sort favorites onto shelves (Grails, Risers, Watchlist…), add your own notes, watch each card’s value trend build over time, and jump straight to its full <b>PriceCharting</b> history.</p></div>`;
-    wireCaseAdd(); return;
-  }
+
+  // Smart (auto) shelves
+  const smartHTML = showSmart ? `<div class="dc-seclabel">⚡ Smart shelves <span class="reason">auto-built from your collection</span></div>` +
+    smartShelves().map(s => `<div class="dc-shelf">
+      <div class="dc-shelf-h">${s.icon} ${esc(s.label)} <span class="reason">${esc(s.sub)}</span></div>
+      <div class="dc-grid">${s.cards.map(c => caseFrameHTML(c, { note: '' }, true)).join('')}</div></div>`).join('') : '';
+
+  // Your manual shelves
   const tiers = [...new Set([...CASE_TIERS, ...cards.map(c => all[c.pcId].tier)])];
-  const shelves = tiers.map(t => {
+  const manualShelves = tiers.map(t => {
     const inTier = cards.filter(c => all[c.pcId].tier === t).sort((a, b) => b.value - a.value);
     if (!inTier.length) return '';
     return `<div class="dc-shelf">
       <div class="dc-shelf-h">${esc(t)} <span class="reason">${inTier.length} · ${money0(sum(inTier.map(c => c.value)))}</span></div>
       <div class="dc-grid">${inTier.map(c => caseFrameHTML(c, all[c.pcId])).join('')}</div></div>`;
   }).join('');
-  $('#view-case').innerHTML = head + shelves;
+  const manualHTML = `<div class="dc-seclabel">⭐ Your shelves <span class="reason">favorites, memories, grails — your curation</span></div>` +
+    (cards.length ? manualShelves
+      : `<p class="reason" style="padding:6px 2px 0">Nothing pinned yet — hit <b>★ Pin</b> on any smart-shelf card above, or open a card and use <b>★ Display Case</b>. Drop sentimental cards on the <b>💛 Memories</b> shelf, chase cards on <b>🏆 Grails</b>.</p>`);
+
+  $('#view-case').innerHTML = head + smartHTML + manualHTML;
   wireCaseAdd();
+  $('#dc-smart-toggle').onclick = () => { localStorage.setItem(LS_SMART, JSON.stringify(!showSmart)); renderCase(); };
   $$('#view-case .dc-img, #view-case .dc-name').forEach(el => el.onclick = () => openModal(byId[el.dataset.pc]));
   $$('#view-case [data-edit]').forEach(b => b.onclick = (e) => { e.stopPropagation(); openCasePicker(byId[b.dataset.edit]); });
   $$('#view-case [data-rm]').forEach(b => b.onclick = (e) => { e.stopPropagation(); caseRemove(byId[b.dataset.rm]); renderCase(); });
+  $$('#view-case [data-pin]').forEach(b => b.onclick = (e) => { e.stopPropagation(); openCasePicker(byId[b.dataset.pin]); });
 }
 
-function caseFrameHTML(c, rec) {
+function caseFrameHTML(c, rec, smart) {
   const t = cardTrend(c);
   let trend;
   if (t.kind === 'tracked') {
@@ -1168,7 +1706,7 @@ function caseFrameHTML(c, rec) {
     trend = `<div class="dc-trend reason">tracking starts today — history on PriceCharting →</div>`;
   }
   return `<div class="dc-frame">
-    <div class="dc-img" data-pc="${c.pcId}">${c.img ? `<img loading="lazy" src="${c.img}" onerror="this.outerHTML=phHTML(${c.i})">` : phHTML(c.i)}
+    <div class="dc-img" data-pc="${c.pcId}">${c.img ? `<img loading="lazy" src="${esc(c.img)}" onerror="this.outerHTML=phHTML(${c.i})">` : phHTML(c.i)}
       ${c.graded ? `<span class="grade-chip" style="position:absolute;top:7px;right:7px">${esc(c.grader || '')} ${c.grade || ''}</span>` : ''}</div>
     <div class="dc-name" data-pc="${c.pcId}">${esc(c.name)}</div>
     <div class="dc-set">${esc(c.set)}${c.number ? ' · #' + esc(c.number) : ''}</div>
@@ -1176,7 +1714,9 @@ function caseFrameHTML(c, rec) {
     ${trend}
     ${rec.note ? `<div class="dc-note">“${esc(rec.note)}”</div>` : ''}
     <a class="btn gold sm dc-pc" href="${c.pcUrl || '#'}" target="_blank" rel="noopener">📈 PriceCharting history</a>
-    <div class="dc-actions"><button class="btn ghost sm" data-edit="${c.pcId}">Edit</button><button class="btn ghost sm" data-rm="${c.pcId}">Remove</button></div>
+    <div class="dc-actions">${smart
+      ? `<button class="btn ghost sm dc-pin" data-pin="${c.pcId}">★ Pin to my shelves</button>`
+      : `<button class="btn ghost sm" data-edit="${c.pcId}">Edit</button><button class="btn ghost sm" data-rm="${c.pcId}">Remove</button>`}</div>
   </div>`;
 }
 
@@ -1474,7 +2014,7 @@ function wirePregrade() {
     current = c;
     if (c) {
       const pre = saved[c.pcId];
-      $('#pg-cardbox').innerHTML = `<div class="mini" style="cursor:default">${c.img ? `<img class="thumb" src="${c.img}">` : ''}<div class="mtext"><div class="mname">${esc(c.name)}</div><div class="mset">${esc(c.set)} · raw ${money(c.price)}${pre ? ` · last pre-grade: PSA ${pre.est} (${pre.date})` : ''}</div></div></div>`;
+      $('#pg-cardbox').innerHTML = `<div class="mini" style="cursor:default">${c.img ? `<img class="thumb" src="${esc(c.img)}">` : ''}<div class="mtext"><div class="mname">${esc(c.name)}</div><div class="mset">${esc(c.set)} · raw ${money(c.price)}${pre ? ` · last pre-grade: PSA ${pre.est} (${pre.date})` : ''}</div></div></div>`;
       update();
     }
   };
@@ -1568,6 +2108,61 @@ function renderAdmin() {
     <div class="section-head"><h2>🛠 Admin — DarkHearts R&D</h2>
       <span class="sub">GradeStage: a 3D-printed card imaging rig — from collection scans to PSA-bench-grade capture. Build it, prove it, sell it.</span></div>
 
+    <div class="panel accent-amethyst" style="margin-bottom:16px">
+      <h3>🖼 Card Art Vault — the images you add stay forever</h3>
+      <p class="muted" style="font-size:13.5px;line-height:1.6">Every image you paste or upload for a card is saved <b>permanently</b> to your private art vault — it survives price refreshes <i>and</i> app updates, and loads automatically on every launch. No “reset to none” to worry about. ${liveOn ? '' : '<b style="color:var(--gold)">Launch via the app to manage the vault.</b>'}</p>
+      <div id="cav-stats" class="muted" style="font-size:13px;margin:8px 0">Checking your vault…</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px">
+        <button class="btn sm gold" id="cav-bake" ${liveOn ? '' : 'disabled'} title="Copy your saved images into the project source so the next build ships with them">💾 Bake into the app build</button>
+        <button class="btn sm" id="cav-reveal" ${liveOn ? '' : 'disabled'}>📁 Reveal vault folder</button>
+        <span class="reason" id="cav-status"></span>
+      </div>
+      <p class="reason" style="margin-top:8px">“Bake” copies your art into the project’s source <code>card-art/</code> folder so a future rebuild ships with them baked in (dev checkout only — the packaged app can’t rewrite itself, so there it just reveals the folder to back up).</p>
+    </div>
+
+    <div class="panel accent-emerald" style="margin-bottom:16px">
+      <h3>🎮 Emerald Lab — build &amp; play Pokémon Emerald, no Terminal</h3>
+      <p class="muted" style="font-size:13.5px;line-height:1.6">Compiles the open-source <b>pokeemerald</b> decompilation into a fresh, <b>fully legal</b> ROM right on your Mac — no downloaded ROM, no command line. ${liveOn ? '' : '<b style="color:var(--gold)">Launch via start.command / the app to enable the buttons.</b>'}</p>
+      <div id="em-status" class="muted" style="font-size:13px;margin:8px 0;display:flex;gap:16px;flex-wrap:wrap">Checking…</div>
+      <div style="display:flex;gap:8px;align-items:center;margin:6px 0;flex-wrap:wrap">
+        <span class="reason">Source folder:</span>
+        <input id="em-repo" class="s-inp" style="max-width:380px" placeholder="~/EmeraldLab/pokeemerald" ${liveOn ? '' : 'disabled'} />
+        <button class="btn ghost sm" id="em-save" ${liveOn ? '' : 'disabled'}>Save</button>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px">
+        <button class="btn sm" id="em-install" ${liveOn ? '' : 'disabled'}>① Install toolchain</button>
+        <button class="btn sm" id="em-build" ${liveOn ? '' : 'disabled'}>② Build ROM</button>
+        <button class="btn sm gold" id="em-play" ${liveOn ? '' : 'disabled'}>③ ▶ Play</button>
+      </div>
+      <p class="reason" style="margin-top:8px">🔒 The one-time toolchain install is the only step that needs your Mac password — and macOS itself asks for it (one click, never stored here). Build &amp; Play need no password. Nothing is downloaded except the free open-source build tools.</p>
+      <pre id="em-log" style="display:none;background:#0a0e16;border:1px solid #1f2a40;border-radius:8px;padding:10px;max-height:280px;overflow:auto;font-size:11.5px;line-height:1.5;white-space:pre-wrap;margin-top:8px"></pre>
+    </div>
+
+    <div class="panel" style="margin-bottom:16px">
+      <h3>🔐 Secure Inputs — saved in your macOS Keychain</h3>
+      <p class="muted" style="font-size:13.5px;line-height:1.6">Paste any key, token, or note here and it's stored in your <b>login Keychain</b> (encrypted by macOS) — never written to disk as plain text, never shown again, never sent anywhere. ${liveOn ? '' : '<b style="color:var(--gold)">Launch via the app to enable.</b>'}</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0">
+        <input id="sec-label" class="s-inp" style="max-width:240px" placeholder="Name (e.g. PriceCharting token)" ${liveOn ? '' : 'disabled'} />
+        <input id="sec-value" class="s-inp" type="password" style="max-width:300px" placeholder="Value (paste it here)" ${liveOn ? '' : 'disabled'} />
+        <button class="btn sm primary" id="sec-save" ${liveOn ? '' : 'disabled'}>Save securely</button>
+      </div>
+      <div id="sec-list" class="muted" style="font-size:13px"></div>
+      <p class="reason" style="margin-top:6px">Your Mac login password is never stored here — that's only ever typed into the macOS prompt at install time. Use <b>Copy</b> to put a value on the clipboard without it ever passing through this app.</p>
+    </div>
+
+    <div class="panel accent-sapphire" style="margin-bottom:16px"><h3>📱 iPhone app — Swipe Deck &amp; 3D Battle</h3>
+      <p class="muted" style="font-size:13.5px;line-height:1.6">A self-contained mobile app — <code>Pokémon Chest — Deck.html</code> — you AirDrop / iCloud / email to your iPhone and <b>Add to Home Screen</b> (full-screen, offline, its own icon). Swipe your deck, build a battle deck, and a 3D swirling-stadium battle buildup. <b>Only cards you’ve caught with a real photo</b> (📸 Photo Studio) are battle-playable — the rest show as “wild, go catch it.” ${liveOn ? '' : '<b style="color:var(--gold)">Launch via the app to build it.</b>'}</p>
+      <div id="mob-stat" class="muted" style="font-size:13px;margin:6px 0"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px">
+        <button class="btn-lightblue sm" id="mob-build" ${liveOn ? '' : 'disabled'}>📱 Build iPhone app</button>
+        <button class="btn sm" id="mob-deliver" ${liveOn ? '' : 'disabled'} title="Copy to iCloud Drive (Files app) + Desktop (AirDrop)">📤 Send to my devices</button>
+        <a class="btn sm" href="/Pok%C3%A9mon%20Chest%20%E2%80%94%20Deck.html" target="_blank" rel="noopener">▶ Preview here</a>
+        <button class="btn ghost sm" id="mob-reveal" ${liveOn ? '' : 'disabled'}>📁 Reveal file</button>
+        <span class="reason" id="mob-status"></span>
+      </div>
+      <p class="reason" style="margin-top:8px"><b>Get it on your phone:</b> ① <b>iCloud</b> → “Send to my devices” → open the <b>Files</b> app on iPhone → tap it → Share → <b>Add to Home Screen</b>. ② <b>AirDrop</b> from the Desktop copy. ③ Email it to yourself. Rebuild after you catch more cards.</p>
+    </div>
+
     <div class="panel" style="margin-bottom:16px"><h3>📱 Take it with you — iPhone Pocket Edition</h3>
       <p class="muted" style="font-size:13.5px;line-height:1.6">A single self-contained file — <code>Pokémon Chest — Pocket.html</code> in your project folder — with your whole collection, the Game Plan, and tap-to-open comp links baked in. Works offline; no app store, no account.</p>
       <ol class="bullets" style="padding-left:20px">
@@ -1623,6 +2218,56 @@ function renderAdmin() {
   $$('#view-admin [data-rnd]').forEach(cb => cb.onchange = () => {
     const d = loadJSON(LS_RND, {}); d[cb.dataset.rnd] = cb.checked; localStorage.setItem(LS_RND, JSON.stringify(d));
   });
+  /* ---- 🖼 Card Art Vault ---- */
+  async function cavRefresh() {
+    const box = $('#cav-stats'); if (!box) return;
+    if (!liveOn) { box.innerHTML = 'Open the app to see your vault.'; return; }
+    try {
+      const s = await (await fetch('/api/cardart/stats')).json();
+      box.innerHTML = `<b style="color:var(--gold)">${s.saved}</b> image${s.saved === 1 ? '' : 's'} you added${s.bundled ? ` · <b>${s.bundled}</b> baked into the build` : ''} · <b>${s.kb} KB</b> in the vault`;
+      const bake = $('#cav-bake'); if (bake) bake.disabled = !s.saved;
+    } catch { box.innerHTML = 'Backend not running — launch via the app.'; }
+  }
+  cavRefresh();
+  if ($('#cav-bake')) $('#cav-bake').onclick = async () => {
+    $('#cav-status').textContent = 'Baking…';
+    try {
+      const j = await (await fetch('/api/cardart/bake', { method: 'POST' })).json();
+      if (j.ok) { $('#cav-status').innerHTML = `✓ Baked <b>${j.baked}</b> image${j.baked === 1 ? '' : 's'} into the source — next build ships with them.`; cavRefresh(); }
+      else if (j.readonly) { $('#cav-status').innerHTML = 'ℹ️ Packaged app can’t rewrite itself — your images are already safe. Opening the vault folder…'; try { await fetch('/api/cardart/reveal', { method: 'POST' }); } catch {} }
+      else $('#cav-status').textContent = '✕ ' + (j.error || 'failed');
+    } catch (e) { $('#cav-status').textContent = 'Error: ' + e.message; }
+  };
+  if ($('#cav-reveal')) $('#cav-reveal').onclick = async () => {
+    try { const j = await (await fetch('/api/cardart/reveal', { method: 'POST' })).json();
+      $('#cav-status').textContent = j.ok ? '📁 Opened your vault folder in Finder.' : (j.error || 'Could not open folder.'); }
+    catch (e) { $('#cav-status').textContent = 'Error: ' + e.message; }
+  };
+  /* ---- 📱 iPhone Deck & Battle app ---- */
+  if ($('#mob-build')) $('#mob-build').onclick = async () => {
+    $('#mob-status').textContent = 'Building your iPhone app (embedding caught cards)…';
+    try {
+      const j = await (await fetch('/api/mobile', { method: 'POST' })).json();
+      if (j.ok) { const r = j.report || {}; $('#mob-status').innerHTML = `✓ Built (${j.kb} KB) · <b>${r.caught ?? 0}</b> caught · ${r.wild ?? 0} wild.`; if ($('#mob-stat')) $('#mob-stat').innerHTML = `Deck file ready — <b>${r.caught ?? 0}</b> battle-ready caught card${(r.caught === 1) ? '' : 's'}${(r.caught === 0) ? ' — snap photos in 📸 Photo Studio to fill your deck' : ''}.`; }
+      else $('#mob-status').textContent = '✕ ' + (j.error || 'failed');
+    } catch (e) { $('#mob-status').textContent = 'Error: ' + e.message; }
+  };
+  if ($('#mob-deliver')) $('#mob-deliver').onclick = async () => {
+    $('#mob-status').textContent = 'Building + copying to iCloud Drive & Desktop…';
+    try {
+      await fetch('/api/mobile', { method: 'POST' });
+      const j = await (await fetch('/api/mobile/deliver', { method: 'POST' })).json();
+      if (j.ok) {
+        const oks = (j.delivered || []).filter(d => !d.error).map(d => d.where);
+        $('#mob-status').innerHTML = oks.length ? `✓ Copied to: <b>${oks.map(esc).join('</b>, <b>')}</b>. On iPhone open <b>Files</b> (iCloud Drive) or AirDrop from Desktop → Add to Home Screen.` : 'Built, but could not copy — use “Reveal file”.';
+      } else $('#mob-status').textContent = '✕ ' + (j.error || 'failed');
+    } catch (e) { $('#mob-status').textContent = 'Error: ' + e.message; }
+  };
+  if ($('#mob-reveal')) $('#mob-reveal').onclick = async () => {
+    try { const j = await (await fetch('/api/mobile/reveal', { method: 'POST' })).json();
+      $('#mob-status').textContent = j.ok ? '📁 Revealed in Finder.' : (j.error || 'Build it first.'); }
+    catch (e) { $('#mob-status').textContent = 'Error: ' + e.message; }
+  };
   if ($('#ad-pocket')) $('#ad-pocket').onclick = async () => {
     $('#ad-pocket-status').textContent = 'Regenerating…';
     try {
@@ -1630,6 +2275,98 @@ function renderAdmin() {
       $('#ad-pocket-status').textContent = j.ok ? `✓ Rebuilt (${j.kb} KB) — re-AirDrop it to your iPhone.` : 'Failed: ' + (j.error || 'unknown');
     } catch (e) { $('#ad-pocket-status').textContent = 'Error: ' + e.message; }
   };
+
+  /* ---- 🎮 Emerald Lab + 🔐 Secure Inputs ---- */
+  if (window.__emPoll) { clearInterval(window.__emPoll); window.__emPoll = null; }
+  const emLog = $('#em-log'), emStatus = $('#em-status');
+  let emNext = 0;
+  const chip = (on, label) => `<span>${on ? '✅' : '⬜️'} ${esc(label)}</span>`;
+  async function emRefreshStatus() {
+    if (!emStatus) return null;
+    try {
+      const s = await (await fetch('/api/emerald/status')).json();
+      const repoBox = $('#em-repo');
+      if (repoBox && document.activeElement !== repoBox) repoBox.value = s.repo || '';
+      emStatus.innerHTML = chip(s.toolchain, 'GBA toolchain') + chip(s.repoFound, 'Source code') +
+        chip(s.romFound, 'Built ROM') + chip(s.emulator, 'Emulator (mGBA)');
+      const inst = $('#em-install'), build = $('#em-build'), play = $('#em-play');
+      if (inst) { inst.disabled = !liveOn || s.running || s.toolchain; if (s.toolchain) inst.textContent = '① Toolchain installed ✓'; }
+      if (build) build.disabled = !liveOn || s.running || !s.toolchain || !s.repoFound;
+      if (play) play.disabled = !liveOn || !s.romFound;
+      return s;
+    } catch { emStatus.textContent = 'Backend not running — launch via the app.'; return null; }
+  }
+  function emStartPolling() {
+    if (!emLog) return;
+    emLog.style.display = 'block';
+    if (window.__emPoll) clearInterval(window.__emPoll);
+    window.__emPoll = setInterval(async () => {
+      try {
+        const j = await (await fetch('/api/emerald/log?since=' + emNext)).json();
+        if (j.lines && j.lines.length) {
+          emLog.textContent += (emLog.textContent ? '\n' : '') + j.lines.join('\n');
+          emNext = j.next; emLog.scrollTop = emLog.scrollHeight;
+        }
+        if (!j.running) {
+          clearInterval(window.__emPoll); window.__emPoll = null;
+          emRefreshStatus();
+          toast(j.lastOk ? 'Emerald: done ✓' : 'Emerald: finished with errors — see log.');
+        }
+      } catch {}
+    }, 700);
+  }
+  const emRun = (path) => async () => {
+    if (!emLog) return;
+    emNext = 0; emLog.style.display = 'block'; emLog.textContent = 'Starting…';
+    try {
+      const j = await (await fetch(path, { method: 'POST' })).json();
+      if (!j.ok) { emLog.textContent = '⚠️ ' + (j.error || 'Could not start.'); return; }
+      emLog.textContent = ''; emStartPolling();
+    } catch (e) { emLog.textContent = 'Error: ' + e.message; }
+  };
+  if ($('#em-save')) $('#em-save').onclick = async () => {
+    await fetch('/api/emerald/config', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ repo: $('#em-repo').value.trim() }) });
+    toast('Folder saved.'); emRefreshStatus();
+  };
+  if ($('#em-install')) $('#em-install').onclick = emRun('/api/emerald/install');
+  if ($('#em-build')) $('#em-build').onclick = emRun('/api/emerald/build');
+  if ($('#em-play')) $('#em-play').onclick = async () => {
+    try { const j = await (await fetch('/api/emerald/play', { method: 'POST' })).json();
+      toast(j.ok ? '▶ Launching mGBA…' : (j.error || 'Could not launch.')); }
+    catch (e) { toast('Error: ' + e.message); }
+  };
+  async function secRefresh() {
+    const box = $('#sec-list'); if (!box) return;
+    try {
+      const list = ((await (await fetch('/api/secrets')).json()).secrets) || [];
+      box.innerHTML = list.length ? list.map(x => `
+        <div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px solid #1f2a40">
+          <span style="flex:1">${x.present ? '🔐' : '⚠️'} ${esc(x.label)}${x.present ? '' : ' <span class="reason">(missing from Keychain)</span>'}</span>
+          <button class="btn ghost sm" data-seccopy="${esc(x.label)}">Copy</button>
+          <button class="btn ghost sm" data-secdel="${esc(x.label)}">Delete</button>
+        </div>`).join('') : '<p class="reason" style="margin-top:6px">Nothing saved yet.</p>';
+      $$('#sec-list [data-seccopy]').forEach(b => b.onclick = async () => {
+        const j = await (await fetch('/api/secrets/copy', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ label: b.dataset.seccopy }) })).json();
+        toast(j.ok ? 'Copied to clipboard (never touched the app).' : (j.error || 'Copy failed'));
+      });
+      $$('#sec-list [data-secdel]').forEach(b => b.onclick = async () => {
+        await fetch('/api/secrets/delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ label: b.dataset.secdel }) });
+        toast('Deleted.'); secRefresh();
+      });
+    } catch { box.innerHTML = '<p class="reason">Launch via the app to manage secure inputs.</p>'; }
+  }
+  if ($('#sec-save')) $('#sec-save').onclick = async () => {
+    const label = $('#sec-label').value.trim(), value = $('#sec-value').value;
+    if (!label || !value) { toast('Enter a name and a value.'); return; }
+    const j = await (await fetch('/api/secrets', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ label, value }) })).json();
+    if (j.ok) { $('#sec-label').value = ''; $('#sec-value').value = ''; toast('Saved to Keychain 🔐'); secRefresh(); }
+    else toast(j.error || 'Could not save.');
+  };
+  emRefreshStatus(); secRefresh();
+  // Resume a live log if a build/install is already running when this tab renders.
+  fetch('/api/emerald/log?since=0').then(r => r.json()).then(j => {
+    if (j && j.running && emLog) { emLog.style.display = 'block'; emLog.textContent = (j.lines || []).join('\n'); emNext = j.next; emStartPolling(); }
+  }).catch(() => {});
 }
 
 /* ================= EBAY LISTING COMPOSER ================= */
@@ -1667,11 +2404,42 @@ function ebayDescription(c) {
     'From a smoke-free collection. Check my other listings — happy to combine shipping.',
   ].filter(x => x !== null).join('\n');
 }
+// Listing venues. `prefill:true` means the create page accepts a query in the
+// URL (only eBay does) — everything else has no public prefill, so we copy the
+// title + description to the clipboard and open the create page ready to paste.
+// All keyless: FB / OfferUp / Mercari / Whatnot / Craigslist offer no public
+// listing-creation API for individuals, and eBay's Sell API needs a heavy
+// approved dev app — so the fast, reliable path is copy-and-open. (A note in the
+// UI says as much.)
 const VENUES = {
-  ebay: { name: 'eBay', fee: 0.136, feeLabel: 'after ~13.6% fees',
-    launch: (t) => 'https://www.ebay.com/sl/prelist/suggest?q=' + enc(t), launchLabel: '📤 Open eBay — title auto-copied' },
-  fb: { name: 'Facebook Marketplace', fee: 0, feeLabel: 'local cash — you keep 100% (shipped = 10% fee)',
-    launch: () => 'https://www.facebook.com/marketplace/create/item', launchLabel: '📤 Open FB Marketplace — copy goes with you' },
+  fb: { name: 'Facebook Marketplace', tag: '⭐ 0% local', fee: 0, prefill: false, local: true,
+    feeLabel: 'local cash — you keep 100% (shipped ≈ 10%)',
+    launch: () => 'https://www.facebook.com/marketplace/create/item', launchLabel: '📤 Open FB Marketplace' },
+  ebay: { name: 'eBay', tag: 'widest reach', fee: 0.136, prefill: true, local: false,
+    feeLabel: 'after ~13.6% fees',
+    launch: (t) => 'https://www.ebay.com/sl/prelist/suggest?q=' + enc(t), launchLabel: '📤 Open eBay — title auto-filled' },
+  offerup: { name: 'OfferUp', tag: 'local', fee: 0, prefill: false, local: true,
+    feeLabel: 'local cash 0% (shipped ≈ 12.9%)',
+    launch: () => 'https://offerup.com/post/', launchLabel: '📤 Open OfferUp' },
+  mercari: { name: 'Mercari', tag: 'low ship fee', fee: 0.10, prefill: false, local: false,
+    feeLabel: 'after ~10% sale fee',
+    launch: () => 'https://www.mercari.com/sell/', launchLabel: '📤 Open Mercari' },
+  whatnot: { name: 'Whatnot', tag: 'live shows', fee: 0.08, prefill: false, local: false,
+    feeLabel: 'after ~8% + 2.9% (live auctions)',
+    launch: () => 'https://www.whatnot.com/sell', launchLabel: '📤 Open Whatnot' },
+  craigslist: { name: 'Craigslist', tag: 'local', fee: 0, prefill: false, local: true,
+    feeLabel: 'local cash — 100% yours',
+    launch: () => 'https://post.craigslist.org/', launchLabel: '📤 Open Craigslist' },
+};
+const VENUE_ORDER = ['fb', 'ebay', 'offerup', 'mercari', 'whatnot', 'craigslist'];
+// the fields each platform's create form actually asks for (so you know what to paste)
+const VENUE_FIELDS = {
+  fb: ['Title', 'Price', 'Category → Toys & Games', 'Condition', 'Description', 'Photos'],
+  ebay: ['Title (80 char)', 'Category → Trading Card Singles', 'Condition', 'Price', 'Item specifics', 'Description', 'Photos'],
+  offerup: ['Title', 'Price', 'Condition', 'Category', 'Description', 'Photos'],
+  mercari: ['Name (title)', 'Description', 'Category', 'Brand → Pokémon', 'Condition', 'Price', 'Shipping'],
+  whatnot: ['Title', 'Category', 'Starting price', 'Condition', 'Description', 'Photos'],
+  craigslist: ['Title', 'Price', 'Description', 'Photos'],
 };
 function localVenueStripHTML(c) {
   const q = enc('pokemon ' + (c.name || '') + (c.number ? ' ' + c.number : ''));
@@ -1692,7 +2460,7 @@ function openListingComposer(c, backTo, venueKey) {
   const V = VENUES[venue];
   const mkt = c.price || 0;
   const title = ebayTitle(c);
-  const desc = ebayDescription(c) + (venue === 'fb'
+  const desc = ebayDescription(c) + (V.local
     ? '\n\nLocal pickup preferred — cash or tap-to-pay at a public safe-exchange spot. Can ship at buyer’s cost, tracked & insured.'
     : '');
   const net = (p) => p * (1 - V.fee);
@@ -1701,11 +2469,10 @@ function openListingComposer(c, backTo, venueKey) {
     <button class="close-x" id="modalClose">×</button>
     <div class="modal-body" style="padding:26px">
       <h2 style="font-size:20px;margin-bottom:6px">📤 List for sale</h2>
-      <div class="seg" style="display:inline-flex;margin-bottom:8px">
-        <button id="lc-v-fb" class="${venue === 'fb' ? 'active' : ''}">⭐ Facebook · 0% local</button>
-        <button id="lc-v-ebay" class="${venue === 'ebay' ? 'active' : ''}">eBay</button>
+      <div class="seg venue-seg" style="display:flex;flex-wrap:wrap;margin-bottom:8px">
+        ${VENUE_ORDER.map(k => `<button data-venue="${k}" class="${venue === k ? 'active' : ''}" title="${esc(VENUES[k].feeLabel)}">${esc(VENUES[k].tag ? VENUES[k].tag + ' · ' : '')}${esc(VENUES[k].name.replace(' Marketplace', ''))}</button>`).join('')}
       </div>
-      <p class="muted" style="font-size:12.5px;margin-bottom:14px">${esc(c.name)}${c.number ? ' #' + esc(c.number) : ''} · ${esc(c.set)} — copy what you need, then launch ${esc(V.name)} with the title ready to paste.${venue === 'fb' ? ' <b style="color:var(--green)">Local sales keep 100%</b> — shops, groups &amp; safe-meetup spots in the Seller Playbook.' : ''}</p>
+      <p class="muted" style="font-size:12.5px;margin-bottom:14px">${esc(c.name)}${c.number ? ' #' + esc(c.number) : ''} · ${esc(c.set)} — copy what you need, then launch ${esc(V.name)} with your listing ready to paste.${V.local ? ' <b style="color:var(--green)">Local sales keep 100%</b> — shops, groups &amp; safe-meetup spots in the Seller Playbook.' : ''} ${V.prefill ? '' : '<span class="reason">No public listing API here — we copy your title + description and open the create page to paste.</span>'}</p>
 
       <div class="subhead">Title <span style="text-transform:none;letter-spacing:0">(<span id="lc-count">${title.length}</span>/80)</span></div>
       <div style="display:flex;gap:8px"><input id="lc-title" class="s-inp" style="margin:0" value="${esc(title)}" maxlength="80">
@@ -1728,18 +2495,25 @@ function openListingComposer(c, backTo, venueKey) {
 
       ${localVenueStripHTML(c)}
 
-      <div class="subhead">Photos <span style="text-transform:none;letter-spacing:0">— reference fast, then shoot the real thing</span></div>
-      <div style="display:flex;gap:14px;align-items:flex-start">
-        ${c.img ? `<img src="${c.img}" style="width:72px;border-radius:6px">` : ''}
-        <div class="reason" style="flex:1">Pull a reference instantly, then take <b>your own photos</b> (raw singles legally need a shot of the actual card — using others’ web images breaks policy &amp; copyright). GradeStage shot list: <b>1</b> front · <b>2</b> back · <b>3</b> corners · <b>4</b> surface under raking light · <b>5</b> any flaw.
-        </div>
+      <div class="subhead">Your photos <span style="text-transform:none;letter-spacing:0">— what buyers actually see</span></div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button class="btn-lightblue" id="lc-studio">📸 Add my photos (guided)</button>
+        <button class="btn sm" id="lc-reveal-photos" ${State.live ? '' : 'disabled'}>📁 Reveal folder</button>
+        <span class="reason" id="lc-photos-count">—</span>
       </div>
+      <div class="lc-photos" id="lc-photos"></div>
       <div class="sr-links" style="margin-top:8px">
-        <a class="minilink" href="https://www.google.com/search?tbm=isch&q=${enc((c.fullName || c.name) + ' ' + c.set + ' pokemon card')}" target="_blank" rel="noopener">🔍 Google Images</a>
+        <a class="minilink" href="https://www.google.com/search?tbm=isch&q=${enc((c.fullName || c.name) + ' ' + c.set + ' pokemon card')}" target="_blank" rel="noopener">🔍 Reference: Google Images</a>
         <a class="minilink" href="${gradeSoldLink(c, c.graded ? gradeKeyword(c) : 'PSA 10')}" target="_blank" rel="noopener">📷 How others shot it (eBay)</a>
-        ${c.img ? `<a class="minilink" href="${c.img}" target="_blank" rel="noopener">Catalog art ↗</a>` : ''}
-        ${c.img && State.live ? `<button class="minilink" id="lc-saveimg" style="cursor:pointer">💾 Save reference image</button>` : ''}
+        <button class="minilink" id="lc-setimg" style="cursor:pointer">🖼 ${c.img ? 'Change catalog image' : 'Set catalog image'}</button>
         <span class="reason" id="lc-imgstatus"></span>
+      </div>
+      <p class="reason" style="margin-top:4px">Raw singles need a photo of <b>your actual card</b> — web images break policy &amp; copyright. The guided studio recommends each angle + light.</p>
+
+      <div class="subhead">Listing kit <span style="text-transform:none;letter-spacing:0">— tap to copy any field for ${esc(V.name)}</span></div>
+      <p class="reason" style="margin:-2px 0 8px">${esc(V.name)} asks for: ${VENUE_FIELDS[venue].map(f => esc(f)).join(' · ')}</p>
+      <div class="kit-grid" id="lc-kit">
+        ${['Title', 'Price', 'Condition', 'Category', 'Item specifics'].map(k => `<button class="kit-chip" data-key="${k}"><span class="kit-k">${k}</span><span class="kit-c">📋 copy</span></button>`).join('')}
       </div>
 
       <div class="subhead">Description ${aiOn ? '<button class="btn sm gold" id="lc-ai" style="margin-left:8px">✨ AI polish</button>' : ''}</div>
@@ -1759,19 +2533,35 @@ function openListingComposer(c, backTo, venueKey) {
   const setPrice = (v) => { $('#lc-price').value = (+v).toFixed(2); $('#lc-net').textContent = `nets ≈ ${money(net(+v))} ${V.feeLabel}`; };
   $$('.lc-price').forEach(b => b.onclick = () => setPrice(+b.dataset.p));
   $('#lc-price').oninput = () => $('#lc-net').textContent = `nets ≈ ${money(net(P()))} ${V.feeLabel}`;
-  $('#lc-v-ebay').onclick = () => { if (venue !== 'ebay') openListingComposer(c, backTo, 'ebay'); };
-  $('#lc-v-fb').onclick = () => { if (venue !== 'fb') openListingComposer(c, backTo, 'fb'); };
+  $$('.venue-seg [data-venue]').forEach(b => b.onclick = () => { if (b.dataset.venue !== venue) openListingComposer(c, backTo, b.dataset.venue); });
   const copy = async (txt, msg) => { try { await navigator.clipboard.writeText(txt); toast(msg); } catch { toast('Copy blocked — select & copy manually.'); } };
   $('#lc-copy-title').onclick = () => copy(T(), 'Title copied.');
   $('#lc-copy-desc').onclick = () => copy($('#lc-desc').value, 'Description copied.');
   $('#lc-copy-all').onclick = () => copy(`${T()}\n\nPrice: ${money(P())}\n\n${$('#lc-desc').value}`, 'Title + price + description copied.');
-  if ($('#lc-saveimg')) $('#lc-saveimg').onclick = async () => {
-    $('#lc-imgstatus').textContent = 'Saving…';
-    try {
-      const j = await (await fetch('/api/saveimg', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: c.img, name: (c.fullName || c.name) + (c.number ? ' ' + c.number : '') + ' ' + c.set }) })).json();
-      $('#lc-imgstatus').innerHTML = j.ok ? `✓ saved to <b>listing-photos/</b> (${j.kb} KB) — your reference shot` : '✕ ' + esc(j.error || 'failed');
-    } catch (e) { $('#lc-imgstatus').textContent = 'Error: ' + e.message; }
+  if ($('#lc-setimg')) $('#lc-setimg').onclick = () => openImageEditor(c, false);
+  // Listing kit — copy any field for the chosen platform
+  const kitCond = c.graded ? `${c.grader || 'PSA'} ${c.grade || ''}`.trim() : (c.wear || 'Near Mint');
+  const kitSpecs = [`Set: ${c.set}`, `Card number: ${c.number || '—'}`, c.setYear ? `Year: ${c.setYear}` : '',
+    `Language: ${c.lang === 'ja' ? 'Japanese' : 'English'}`, `Game: Pokémon TCG`, `Condition: ${kitCond}`].filter(Boolean).join('\n');
+  const kitValue = (k) => k === 'Title' ? T() : k === 'Price' ? P().toFixed(2) : k === 'Condition' ? kitCond
+    : k === 'Category' ? 'Collectible Card Games → Pokémon → Singles' : k === 'Item specifics' ? kitSpecs : '';
+  $$('#lc-kit .kit-chip').forEach(b => b.onclick = () => copy(kitValue(b.dataset.key), b.dataset.key + ' copied — paste into ' + V.name + '.'));
+  // Guided seller photos
+  $('#lc-studio').onclick = () => openPhotoStudio(c, true);
+  if ($('#lc-reveal-photos')) $('#lc-reveal-photos').onclick = async () => {
+    try { await fetch('/api/listingphotos/reveal', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pcId: c.pcId }) }); } catch {}
   };
+  async function lcLoadPhotos() {
+    const box = $('#lc-photos'), cnt = $('#lc-photos-count'); if (!box) return;
+    if (!State.live) { box.innerHTML = ''; if (cnt) cnt.textContent = 'Open via the app to add photos.'; return; }
+    try {
+      const j = await (await fetch('/api/listingphotos?pcId=' + enc(c.pcId), { cache: 'no-store' })).json();
+      const ph = (j && j.ok) ? (j.photos || {}) : {}, keys = Object.keys(ph);
+      if (cnt) cnt.textContent = keys.length ? `${keys.length} photo${keys.length === 1 ? '' : 's'} ready to attach` : 'No photos yet — tap “Add my photos”.';
+      box.innerHTML = keys.map(k => `<div class="lc-ph"><img src="${esc(psBust(ph[k]))}" alt="${esc(k)}"><span>${esc(k)}</span></div>`).join('');
+    } catch { if (cnt) cnt.textContent = ''; }
+  }
+  lcLoadPhotos();
   if ($('#lc-ai')) $('#lc-ai').onclick = async () => {
     $('#lc-status').textContent = 'Asking the AI for polished copy…';
     try {
@@ -1789,10 +2579,11 @@ function openListingComposer(c, backTo, venueKey) {
     } catch (e) { $('#lc-status').textContent = 'AI error: ' + e.message; }
   };
   $('#lc-launch').onclick = async () => {
-    // FB's create form has no URL prefill — copy title AND description together so
-    // one paste fills the title and the rest drops into the description box.
-    await copy(venue === 'fb' ? `${T()}\n\n${$('#lc-desc').value}` : T(),
-      venue === 'fb' ? 'Title + description copied — paste into the FB form.' : 'Title copied — paste anywhere eBay asks.');
+    // Only eBay prefills from the URL. For every other venue the create form has
+    // no prefill, so copy title AND description together — one paste fills the
+    // title box and the rest drops into the description.
+    await copy(V.prefill ? $('#lc-desc').value : `${T()}\n\n${$('#lc-desc').value}`,
+      V.prefill ? 'Description copied — the title rides in the URL; paste this into eBay’s description box.' : `Title + description copied — paste into ${V.name}.`);
     uset(c, { status: 'forsale', note: ((uget(c).note || '') + `\n[${new Date().toISOString().slice(0, 10)}] ${V.name} draft @ ${money(P())} — "${T()}"`).trim() });
     window.open(V.launch(T()), '_blank', 'noopener');
     $('#lc-status').textContent = `✓ ${V.name} opened in your browser · card marked “For sale” · listing note saved.`;
@@ -1811,7 +2602,7 @@ function openModal(c) {
   const html = `<div class="modal-bg" id="modalBg"><div class="modal">
     <button class="close-x" id="modalClose">×</button>
     <div class="modal-top">
-      <div class="modal-imgwrap">${c.img ? `<img src="${c.img}" alt="${esc(c.name)}" onerror="this.outerHTML=phHTML(${c.i})">` : phHTML(c.i)}</div>
+      <div class="modal-imgwrap" id="mk-imgwrap">${c.img ? `<img src="${esc(c.img)}" alt="${esc(c.name)}" onerror="this.outerHTML=phHTML(${c.i})">` : phHTML(c.i)}<button class="img-edit-btn" id="mk-imgedit" title="${c.img ? 'Change this card’s image' : 'Find &amp; add an image'}">${c.img ? '🖼 Change' : '🔍 Add image'}</button></div>
       <div class="modal-info">
         <div class="mi-set">${esc(c.set)}${c.number ? ' · #' + esc(c.number) : ''}</div>
         <h2>${esc(c.name)}</h2>
@@ -1828,6 +2619,7 @@ function openModal(c) {
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn primary sm" id="mk-list">📤 List for sale</button>
+          <button class="btn-lightblue sm" id="mk-photos">📸 Add my photos</button>
           <button class="btn ${caseGet(c) ? 'gold' : ''} sm" id="mk-case">${caseGet(c) ? '★ In case' : '★ Display Case'}</button>
           <button class="btn ${u.status === 'forsale' ? 'gold' : ''} sm" id="mk-fs">${u.status === 'forsale' ? '✓ For sale' : 'Mark “For sale”'}</button>
           <button class="btn ${u.status === 'sold' ? 'primary' : ''} sm" id="mk-sold">${u.status === 'sold' ? '✓ Sold' : 'Mark “Sold”'}</button>
@@ -1848,7 +2640,9 @@ function openModal(c) {
         <a class="lad-cell g9" href="${gradeSoldLink(c, 'PSA 9')}" target="_blank" rel="noopener"><span class="lc-g">PSA 9</span><span class="lc-v">${money(a.lad.psa9)}</span></a>
         <a class="lad-cell g8" href="${gradeSoldLink(c, 'PSA 8')}" target="_blank" rel="noopener"><span class="lc-g">PSA 8</span><span class="lc-v">${money(a.lad.psa8)}</span></a>
         ${(gradeIntel().serviceDeltas || []).slice(0, 2).map(sd => `<a class="lad-cell svc" href="${gradeSoldLink(c, sd.service + ' 10')}" target="_blank" rel="noopener" title="${esc(sd.note)}"><span class="lc-g">${esc(sd.service)} 10</span><span class="lc-v">${money(a.lad.services[sd.service] ? a.lad.services[sd.service].v : 0)}</span></a>`).join('')}
-      </div>` : ''}
+        ${PREMIUM_GRADES.map(p => `<a class="lad-cell ${p.cls}" href="${gradeSoldLink(c, p.kw)}" target="_blank" rel="noopener" title="${esc(p.note)}"><span class="lc-g">${esc(p.label)}</span><span class="lc-v">${money(a.lad.premium[p.key].v)}</span></a>`).join('')}
+      </div>
+      <p class="reason" style="margin:2px 0 0">BGS Black Label 10 = all four subgrades a perfect 10 (rarest, biggest premium). Estimates — tap any tier for its real eBay solds.</p>` : ''}
 
       <div class="subhead">Check live prices &amp; sold comps</div>
       <div class="linkgrid">
@@ -1869,6 +2663,8 @@ function openModal(c) {
   $('#modalClose').onclick = closeModal;
   $('#modalBg').onclick = e => { if (e.target.id === 'modalBg') closeModal(); };
   $('#mk-list').onclick = () => openListingComposer(c, true);
+  if ($('#mk-photos')) $('#mk-photos').onclick = () => openPhotoStudio(c, false);
+  if ($('#mk-imgedit')) $('#mk-imgedit').onclick = () => openImageEditor(c, true);
   $('#mk-case').onclick = () => openCasePicker(c);
   $('#mk-fs').onclick = () => { uset(c, { status: uget(c).status === 'forsale' ? '' : 'forsale' }); openModal(c); refreshAfterUser(); };
   $('#mk-sold').onclick = () => { uset(c, { status: uget(c).status === 'sold' ? '' : 'sold' }); openModal(c); refreshAfterUser(); };
