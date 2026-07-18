@@ -56,8 +56,11 @@ function rvSoldCards() {
     .sort((a, b) => ((saleGet(b) || {}).date || '').localeCompare((saleGet(a) || {}).date || ''));
 }
 function rvMergeCustom() {
+  const key = c => [c.name, c.number || '', c.set].join('|').toLowerCase();
+  const inExport = new Set(State.cards.filter(c => !String(c.pcId).startsWith('custom-')).map(key));
   for (const cc of loadJSON(LS_CUSTOM, [])) {
     if (State.cards.some(c => String(c.pcId) === String(cc.pcId))) continue;
+    if (inExport.has(key(cc))) continue;   // it arrived via the export — the export copy wins
     const card = Object.assign({
       img: null, era: 'modern', game: 'Pokémon', pcUrl: null, setRaw: cc.set || 'Custom',
       setId: null, setYear: null, condition: cc.graded ? 'Graded' : 'Ungraded', wear: '',
