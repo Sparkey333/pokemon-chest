@@ -16,6 +16,9 @@ on:
       - "icon-source.png"
       - ".github/workflows/build-dmg.yml"
 
+permissions:
+  contents: write   # lets the job publish the dmg as a release asset
+
 jobs:
   dmg:
     runs-on: macos-latest
@@ -46,10 +49,29 @@ jobs:
           --target universal-apple-darwin
           --config '{"bundle":{"macOS":{"signingIdentity":"-"}}}'
 
-      - name: Upload the dmg
+      # Primary delivery: a rolling "dmg-latest" release — release assets do NOT
+      # count against the Actions artifact-storage quota (which is what failed
+      # on run #1). Download from the repo's Releases page.
+      - name: Publish the dmg to the dmg-latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          DMG=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg)
+          echo "publishing: $DMG"
+          gh release delete dmg-latest --cleanup-tag --yes || true
+          gh release create dmg-latest "$DMG" \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "Pokémon Chest — latest macOS build" \
+            --notes "Universal (Apple Silicon + Intel) build of commit ${GITHUB_SHA:0:7}. Ad-hoc signed — first launch: right-click the app → Open."
+
+      # Best-effort secondary copy; skipped gracefully while the artifact
+      # storage quota is exhausted.
+      - name: Upload the dmg as a workflow artifact
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: Pokemon-Chest-dmg
           path: src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 14
