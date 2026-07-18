@@ -29,7 +29,7 @@ Run:  python3 server.py     (or double-click start.command)
 import os, sys, re, json, html, base64, socket, ssl, time, datetime, ipaddress, subprocess, threading, shutil, shlex, urllib.request, urllib.error, urllib.parse
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "2.0.0"
+VERSION = "2.1.0"
 ROOT = os.path.dirname(os.path.abspath(__file__))
 HOME = os.path.abspath(os.environ.get("POKECHEST_HOME") or ROOT)
 SETTINGS = os.path.join(HOME, "settings.local.json")
@@ -971,6 +971,152 @@ def pc_sync_status():
     with PC_LOCK:
         return dict(PC_SYNC, ok=True)
 
+def pc_search(q, token):
+    """Search PriceCharting's product catalog — powers no-typing card adds."""
+    q = (q or "").strip()
+    if not q:
+        return {"ok": True, "products": []}
+    url = "https://www.pricecharting.com/api/products?" + urllib.parse.urlencode({"t": token, "q": q})
+    d = http_json(url)
+    if d.get("status") == "error":
+        return {"ok": False, "error": d.get("error-message", "PriceCharting error")}
+    out = []
+    for p in (d.get("products") or [])[:12]:
+        name = p.get("product-name") or ""
+        m = re.search(r"#\s*([A-Za-z0-9-]+)\s*$", name)
+        out.append({
+            "id": p.get("id"),
+            "name": re.sub(r"\s*#\s*[A-Za-z0-9-]+\s*$", "", name).strip(),
+            "number": m.group(1) if m else None,
+            "set": p.get("console-name") or "",
+            "price": cents(p.get("loose-price")),
+        })
+    return {"ok": True, "products": out}
+
+# ------------------------------------------------- AI card identification ---
+AI_IDENTIFY_SYSTEM = (
+    "You identify trading cards from a photo. Look at the card and respond with ONLY a JSON object, "
+    "no prose, no code fences: {\"name\": card name, \"number\": collector number without the set-size "
+    "denominator, \"set\": set name, \"lang\": \"en\" or \"ja\", \"game\": e.g. \"Pokémon\", "
+    "\"graded\": true/false (is it in a grading slab), \"confidence\": 0-1}. Use null for anything unreadable.")
+
+def ai_identify(payload, settings):
+    provider = settings.get("ai_provider", "anthropic")
+    key = settings.get("ai_key")
+    model = settings.get("ai_model") or ("claude-sonnet-4-6" if provider == "anthropic" else "gpt-4o")
+    data_url = (payload.get("dataUrl") or "")
+    m = re.match(r"data:(image/[a-z+.-]+);base64,(.+)$", data_url, re.S)
+    if not m:
+        return {"ok": False, "error": "Send the photo as a data URL."}
+    media_type, b64 = m.group(1), m.group(2).strip()
+    prompt = "Identify this trading card."
+    if provider == "anthropic":
+        d = http_json(
+            "https://api.anthropic.com/v1/messages", method="POST",
+            headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+            body={"model": model, "max_tokens": 300, "system": AI_IDENTIFY_SYSTEM,
+                  "messages": [{"role": "user", "content": [
+                      {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": b64}},
+                      {"type": "text", "text": prompt}]}]})
+        text = "".join(b.get("text", "") for b in d.get("content", []) if b.get("type") == "text")
+    elif provider == "openai":
+        d = http_json(
+            "https://api.openai.com/v1/chat/completions", method="POST",
+            headers={"Authorization": f"Bearer {key}", "content-type": "application/json"},
+            body={"model": model, "max_tokens": 300,
+                  "messages": [{"role": "system", "content": AI_IDENTIFY_SYSTEM},
+                               {"role": "user", "content": [
+                                   {"type": "image_url", "image_url": {"url": data_url}},
+                                   {"type": "text", "text": prompt}]}]})
+        text = d["choices"][0]["message"]["content"]
+    else:
+        return {"ok": False, "error": f"Unknown AI provider: {provider}"}
+    j = re.search(r"\{.*\}", text, re.S)
+    if not j:
+        return {"ok": False, "error": "The model returned no JSON.", "raw": text[:300]}
+    try:
+        guess = json.loads(j.group(0))
+    except Exception:
+        return {"ok": False, "error": "Could not parse the model's JSON.", "raw": text[:300]}
+    return {"ok": True, "guess": guess, "provider": provider, "model": model}
+
+# --------------------------------------------------- auto inventory import ---
+# Watches for a new/updated PriceCharting export (project folder, POKECHEST_HOME,
+# ~/Downloads) and rebuilds the collection automatically — download the export,
+# and the app pulls the new inventory in on its own, no clicks, no typing.
+AUTOSYNC = {"enabled": True, "running": False, "lastCheck": None, "lastImport": None,
+            "lastReport": None, "lastError": None, "source": None, "seq": 0}
+AUTOSYNC_LOCK = threading.Lock()
+
+def _newest_export():
+    """Mirror scripts/build_data.py find_source(), but non-fatal."""
+    files = []
+    seen = set()
+    for d in (HOME, ROOT, os.path.expanduser("~/Downloads")):
+        d = os.path.abspath(d)
+        if d in seen or not os.path.isdir(d):
+            continue
+        seen.add(d)
+        try:
+            names = os.listdir(d)
+        except OSError:
+            continue
+        for f in names:
+            if f.lower().endswith(".xlsx") and not f.startswith("~$") \
+                    and "pricecharting" in f.lower():
+                files.append(os.path.join(d, f))
+    return max(files, key=os.path.getmtime) if files else None
+
+def _built_mtime():
+    for p in (os.path.join(HOME, "data", "collection.json"),
+              os.path.join(ROOT, "data", "collection.json")):
+        if os.path.isfile(p):
+            return os.path.getmtime(p)
+    return 0
+
+def _autosync_tick():
+    src = _newest_export()
+    AUTOSYNC["lastCheck"] = datetime.datetime.now().isoformat(timespec="seconds")
+    if not src or os.path.getmtime(src) <= _built_mtime():
+        return
+    with PC_LOCK:
+        if PC_SYNC["running"]:      # don't fight the price-sync writer
+            return
+    AUTOSYNC["running"] = True
+    try:
+        r = refresh_data()
+        if r.get("ok"):
+            AUTOSYNC.update(source=os.path.basename(src), lastReport=r.get("report"),
+                            lastImport=datetime.datetime.now().isoformat(timespec="seconds"),
+                            lastError=None)
+            AUTOSYNC["seq"] += 1
+        else:
+            AUTOSYNC["lastError"] = r.get("error")
+    finally:
+        AUTOSYNC["running"] = False
+
+def _autosync_loop():
+    time.sleep(6)                   # let the server settle before the first pass
+    while True:
+        try:
+            AUTOSYNC["enabled"] = bool(load_settings().get("autosync", True))
+            if AUTOSYNC["enabled"]:
+                with AUTOSYNC_LOCK:
+                    _autosync_tick()
+        except Exception as e:
+            AUTOSYNC["lastError"] = str(e)
+        time.sleep(20)
+
+def autosync_status():
+    return dict(AUTOSYNC, ok=True)
+
+def autosync_set(enabled):
+    s = load_settings()
+    s["autosync"] = bool(enabled)
+    _write_settings(s)
+    AUTOSYNC["enabled"] = bool(enabled)
+    return autosync_status()
+
 # ------------------------------------------------------------- emerald lab ---
 # Build the open-source pokeemerald decompilation into a fresh, legal ROM and run
 # it — entirely from the dashboard, no Terminal. The only privileged step is the
@@ -1246,6 +1392,17 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(lan_status())
         if path == "/api/pc/sync/status":
             return self._json(pc_sync_status())
+        if path == "/api/autosync":
+            return self._json(autosync_status())
+        if path == "/api/pc/search":
+            s = load_settings()
+            if not self._guard(s.get("pricecharting_token"), "pricecharting_token"):
+                return
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            try:
+                return self._json(pc_search((qs.get("q") or [""])[0], s["pricecharting_token"]))
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)}, 200)
         if path == "/api/secrets":
             return self._json(secret_list())
         if path == "/api/cardart":
@@ -1324,6 +1481,19 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/pc/sync":
             try:
                 return self._json(pc_sync_start())
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)}, 200)
+        if path == "/api/autosync":
+            return self._json(autosync_set(payload.get("enabled", True)))
+        if path == "/api/ai/identify":
+            s = load_settings()
+            if not self._guard(s.get("ai_key"), "ai_key"):
+                return
+            try:
+                return self._json(ai_identify(payload, s))
+            except urllib.error.HTTPError as e:
+                detail = e.read().decode("utf-8", "replace")[:400]
+                return self._json({"ok": False, "error": f"{e.code} {detail}"}, 200)
             except Exception as e:
                 return self._json({"ok": False, "error": str(e)}, 200)
         if path == "/api/pocket":
@@ -1430,5 +1600,7 @@ if __name__ == "__main__":
         st = lan_start()
         for u in st.get("urls", []):
             print(f"  LAN (phone) → {u}")
+    # Auto inventory import: new PriceCharting exports are pulled in on their own.
+    threading.Thread(target=_autosync_loop, daemon=True).start()
     print(f"POKECHEST_READY port={PORT}", flush=True)
     server.serve_forever()

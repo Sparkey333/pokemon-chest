@@ -55,13 +55,25 @@ one‑time warning; it's your own Mac). Scan the QR on your phone and the full a
 there, Scanner included: snap a card with the phone camera and the photo lands in that
 card's file on your Mac. Home networks only — turn it off when you're done.
 
-## Keeping prices current — the ↻ Refresh flow
+## Keeping inventory current — now automatic
 
 1. On **PriceCharting.com**: Collection → **Download** (Excel).
-2. Drop the new `.xlsx` into this project folder **or just leave it in `~/Downloads`**
-   (any name containing "PriceCharting").
-3. Click **↻ Refresh** in the app's top bar. It finds the newest export, rebuilds
-   `data/collection.json` (new prices + new cards, re‑fetching card art), and reloads.
+2. Leave the `.xlsx` in `~/Downloads` (any name containing "PriceCharting"). **That's it** —
+   the app watches for new exports and pulls new cards + prices in on its own within
+   ~20 seconds (toggle in 📷 Scanner → PriceCharting sync). ↻ Refresh still works as the
+   manual trigger.
+3. One-off adds without an export: **➕ Add & Sold → search the PriceCharting catalog**
+   (token required) and add any card with one click — name, set, number, and price fill
+   themselves. No typing card details.
+
+## Rebuilding the Mac app (.dmg)
+
+The native app wraps this exact server + UI, so every new feature lands in it on the
+next build. On your Mac, from the project folder:
+
+```
+cd src-tauri && cargo tauri build     # produces Pokemon Chest.app + .dmg in target/release/bundle
+```
 
 Fallback: double‑clicking `refresh-data.command` does exactly the same rebuild from
 Terminal. Your value‑over‑time history, For‑sale / Sold tags, and notes are stored

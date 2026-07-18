@@ -101,9 +101,34 @@ function rvRecalcMeta() {
   };
   // the very first init() ran before this file loaded — patch it in once ready
   const t = setInterval(() => {
-    if (rvReady()) { clearInterval(t); rvMergeCustom(); rvRecalcMeta(); try { renderDashboard(); } catch { } }
+    if (rvReady()) {
+      clearInterval(t);
+      rvMergeCustom(); rvRecalcMeta();
+      try { renderDashboard(); } catch { }
+      rvWatchAutosync();
+    }
   }, 250);
 })();
+
+/* auto inventory import: the server watches for new PriceCharting exports and
+   rebuilds on its own — we just notice, reload, and say so */
+let rvAsSeq = null;
+function rvWatchAutosync() {
+  setInterval(async () => {
+    if (!State.live || document.hidden) return;
+    try {
+      const s = await (await fetch('/api/autosync', { cache: 'no-store' })).json();
+      if (!s || !s.ok) return;
+      if (rvAsSeq === null) { rvAsSeq = s.seq; return; }
+      if (s.seq !== rvAsSeq) {
+        rvAsSeq = s.seq;
+        const r = s.lastReport || {};
+        await init();
+        toast(`📥 New inventory pulled in automatically — ${(r.entries ?? 0).toLocaleString()} entries · ${money0(r.value)}`);
+      }
+    } catch { /* server briefly away — try again next tick */ }
+  }, 25000);
+}
 
 /* ---------- routing hook: lazy-render the new views ---------- */
 const RV_VIEWS = {
@@ -689,11 +714,12 @@ function renderScan() {
       </div>
       <div class="rv-row" style="margin-top:10px;flex-wrap:wrap">
         <button class="btn primary" id="sc-start">🎥 Start camera</button>
-        <button class="btn gold" id="sc-snap" disabled>📸 Capture &amp; save</button>
+        <button class="btn gold" id="sc-snap" disabled>📸 Capture</button>
         <select id="sc-device" class="s-inp" style="max-width:200px" title="Camera — your iPhone shows up here via Continuity"></select>
         <label class="rv-check"><input type="checkbox" id="sc-mirror" ${RV.cam.mirror ? 'checked' : ''}> mirror</label>
       </div>
-      <p class="reason" style="margin-top:8px">Tip: your iPhone appears in the camera list automatically (Continuity Camera). Fill the guide frame, avoid glare, snap. Each capture saves as the card's next <code>scan-N</code> photo.</p>
+      <div id="sc-staged"></div>
+      <p class="reason" style="margin-top:8px">Snap first, then pick — or pick first and every capture saves straight to the card as its next <code>scan-N</code> photo. Your iPhone appears in the camera list automatically (Continuity Camera).</p>
       <div class="rv-row" style="margin-top:6px">
         <label class="btn sm" style="cursor:pointer">📱 Or take/upload a photo
           <input id="sc-file" type="file" accept="image/*" capture="environment" style="display:none"></label>
@@ -723,8 +749,12 @@ function renderScan() {
   };
   $('#sc-q').oninput = e => {
     const q = e.target.value.trim().toLowerCase();
-    if (!q) { results.innerHTML = '<p class="reason" style="padding:8px">Type to search — or snap first and pick after.</p>'; return; }
-    renderResults(State.cards.filter(c => (c.name + ' ' + c.set + ' ' + (c.number || '')).toLowerCase().includes(q)).slice(0, 8));
+    if (!q) { results.innerHTML = '<p class="reason" style="padding:8px">Type to search — or snap first and let 🔮 Identify fill this in.</p>'; return; }
+    const toks = q.split(/\s+/);
+    renderResults(State.cards.filter(c => {
+      const hay = (c.name + ' ' + c.set + ' ' + (c.number || '')).toLowerCase();
+      return toks.every(t => hay.includes(t));
+    }).slice(0, 8));
   };
   $('#sc-q').oninput({ target: $('#sc-q') });
   if (RV.scan.card) scSelect(RV.scan.card);
@@ -736,17 +766,79 @@ function renderScan() {
   $('#sc-snap').onclick = scCapture;
   $('#sc-file').onchange = async e => {
     const f = e.target.files && e.target.files[0]; if (!f) return;
-    if (!RV.scan.card) return toast('Pick the card first (step 1) so the photo files with it.');
-    scSave(await blobToDataUrl(f));
+    const dataUrl = await blobToDataUrl(f);
+    if (RV.scan.card) scSave(dataUrl);
+    else { RV.scan.staged = { dataUrl }; scRenderStaged(); }
     e.target.value = '';
   };
   $('#sc-studio').onclick = () => RV.scan.card && window.openPhotoStudio && openPhotoStudio(RV.scan.card);
 
+  scRenderStaged();
+  // camera permission already granted? start the preview without another click
+  if (live && navigator.permissions && navigator.permissions.query) {
+    navigator.permissions.query({ name: 'camera' })
+      .then(p => { if (p.state === 'granted' && State.view === 'scan' && !RV.cam.stream) rvCamStart(); })
+      .catch(() => { });
+  }
   if (live) { scRenderLan(); scRenderPc(); }
+}
+
+/* staged shot: captured before a card was picked — identify it, then file it */
+function scRenderStaged() {
+  const box = $('#sc-staged'); if (!box) return;
+  const st = RV.scan.staged;
+  if (!st) { box.innerHTML = ''; return; }
+  const aiOn = State.live && State.live.ai && State.live.ai.enabled;
+  const pcOn = State.live && State.live.priceCharting;
+  box.innerHTML = `<div class="sc-stagedcard">
+    <img src="${st.dataUrl}" alt="staged shot">
+    <div style="flex:1;min-width:0">
+      <b>Captured — now match it</b>
+      <div class="reason" id="sc-guess">${st.guess ? esc(st.guessLine) : (aiOn ? 'Let the AI read the card, or pick it on the left.' : 'Pick the card on the left to file this shot.')}</div>
+      <div class="rv-row" style="margin-top:7px;flex-wrap:wrap">
+        ${aiOn ? `<button class="btn sm primary" id="sc-ident">🔮 Identify card</button>` : ''}
+        ${st.guess && pcOn ? `<button class="btn sm gold" id="sc-pcadd">➕ Not in the chest? Add via PriceCharting</button>` : ''}
+        <button class="minilink" id="sc-discard">✕ discard shot</button>
+      </div>
+    </div></div>`;
+  if ($('#sc-ident')) $('#sc-ident').onclick = scIdentify;
+  if ($('#sc-pcadd')) $('#sc-pcadd').onclick = () => {
+    RV.lgQuery = [st.guess.name, st.guess.number].filter(Boolean).join(' ');
+    switchView('ledger');
+  };
+  $('#sc-discard').onclick = () => { RV.scan.staged = null; scRenderStaged(); };
+}
+async function scIdentify() {
+  const st = RV.scan.staged; if (!st) return;
+  const g = $('#sc-guess'); if (g) g.textContent = 'Reading the card…';
+  try {
+    const j = await (await fetch('/api/ai/identify', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ dataUrl: st.dataUrl })
+    })).json();
+    if (!j.ok) { if (g) g.textContent = '✕ ' + (j.error || 'could not identify'); return; }
+    st.guess = j.guess || {};
+    st.guessLine = `Looks like: ${st.guess.name || '?'}${st.guess.number ? ' #' + st.guess.number : ''} · ${st.guess.set || 'set unknown'} · ${st.guess.lang === 'ja' ? '🇯🇵' : '🇺🇸'}${st.guess.confidence != null ? ' · ' + Math.round(st.guess.confidence * 100) + '% sure' : ''}`;
+    // drop the guess into the card search so your matches surface instantly
+    const q = $('#sc-q');
+    if (q && st.guess.name) {
+      q.value = [st.guess.name, st.guess.number].filter(Boolean).join(' ');
+      q.oninput({ target: q });
+      // number+name may over-filter — fall back to name only if nothing matched
+      if (!$('.sc-res', $('#sc-results'))) { q.value = st.guess.name; q.oninput({ target: q }); }
+    }
+    scRenderStaged();
+  } catch (e) { if (g) g.textContent = '✕ ' + e.message; }
 }
 
 function scSelect(c) {
   RV.scan.card = c;
+  if (RV.scan.staged) {           // a waiting shot files itself the moment you pick
+    const d = RV.scan.staged.dataUrl;
+    RV.scan.staged = null;
+    scRenderStaged();
+    scSave(d);
+  }
   $('#sc-selected').innerHTML = `<div class="sc-sel-card">${rvThumb(c)}<div><b>${esc(c.name)}</b>${c.number ? ' <span class="reason">#' + esc(c.number) + '</span>' : ''}<br><span class="reason">${esc(c.set)} · ${money(c.price)}</span><br><button class="minilink" id="sc-open">open card ↗</button></div></div>`;
   $('#sc-open').onclick = () => openModal(c);
   const st = $('#sc-studio'); if (st) st.disabled = !State.live;
@@ -784,9 +876,16 @@ async function rvCamStart() {
     $('#sc-device').innerHTML = devs.map((d, i) => `<option value="${esc(d.deviceId)}"${d.deviceId === RV.cam.deviceId ? ' selected' : ''}>${esc(d.label || 'Camera ' + (i + 1))}</option>`).join('');
     if (!RV.cam.deviceId && devs[0]) RV.cam.deviceId = devs[0].deviceId;
   } catch (e) {
-    toast(location.protocol === 'http:' && !/^(127\.|localhost)/.test(location.hostname)
-      ? 'Live camera needs the HTTPS phone-mode link — or use “take/upload a photo” below.'
-      : 'Camera blocked: ' + e.message);
+    if (location.protocol === 'http:' && !/^(127\.|localhost)/.test(location.hostname))
+      return toast('Live camera needs the HTTPS phone-mode link — or use “take/upload a photo” below.');
+    const msgs = {
+      NotAllowedError: 'Camera permission denied — allow it in System Settings → Privacy & Security → Camera (then reload), or via the 🎥 icon in the address bar.',
+      NotFoundError: 'No camera found — plug one in, or bring your iPhone nearby for Continuity Camera.',
+      NotReadableError: 'The camera is busy in another app — close it (Zoom, FaceTime…) and try again.',
+      OverconstrainedError: 'That camera went away — pick another one from the list.',
+    };
+    if (e.name === 'OverconstrainedError') { RV.cam.deviceId = null; }
+    toast(msgs[e.name] || 'Camera blocked: ' + e.message);
   }
 }
 function rvCamStop() {
@@ -798,7 +897,6 @@ function rvCamStop() {
 function scCapture() {
   const video = $('#sc-video');
   if (!RV.cam.stream || !video.videoWidth) return toast('Start the camera first.');
-  if (!RV.scan.card) return toast('Pick the card first (step 1) so the photo files with it.');
   const scale = Math.min(1, 1600 / Math.max(video.videoWidth, video.videoHeight));
   const cv = document.createElement('canvas');
   cv.width = Math.round(video.videoWidth * scale);
@@ -808,7 +906,10 @@ function scCapture() {
   ctx.drawImage(video, 0, 0, cv.width, cv.height);
   const flash = $('#sc-flash');
   if (flash) { flash.classList.add('on'); setTimeout(() => flash.classList.remove('on'), 220); }
-  scSave(cv.toDataURL('image/jpeg', 0.92));
+  const dataUrl = cv.toDataURL('image/jpeg', 0.92);
+  if (RV.scan.card) return scSave(dataUrl);       // card picked → straight to its file
+  RV.scan.staged = { dataUrl };                   // no card yet → stage it for identify/pick
+  scRenderStaged();
 }
 async function scSave(dataUrl) {
   const c = RV.scan.card;
@@ -867,13 +968,28 @@ async function scRenderPc() {
   const box = $('#sc-pc'); if (!box) return;
   if (RV.pcPoll) { clearInterval(RV.pcPoll); RV.pcPoll = null; }
   const hasToken = State.live && State.live.priceCharting;
-  let st = null;
+  let st = null, auto0 = null;
   try { st = await (await fetch('/api/pc/sync/status', { cache: 'no-store' })).json(); } catch { }
+  try { auto0 = await (await fetch('/api/autosync', { cache: 'no-store' })).json(); } catch { }
+  const autoBlock = a => a ? `
+    <div class="rv-row" style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
+      <span>${a.enabled ? '🟢' : '⚪'} <b>Auto inventory import ${a.enabled ? 'ON' : 'off'}</b></span>
+      <button class="minilink" id="sc-auto-t">${a.enabled ? 'turn off' : 'turn on'}</button>
+    </div>
+    <p class="reason">Watching for new PriceCharting exports (~/Downloads or this folder). New cards pull in on their own${a.lastImport ? ` — last import ${esc(a.lastImport.replace('T', ' '))} from ${esc(a.source || 'export')}` : ''}${a.lastError ? ` · <span style="color:var(--red)">last error: ${esc(String(a.lastError))}</span>` : ''}.</p>` : '';
+  const wireAutoToggle = a => {
+    if ($('#sc-auto-t')) $('#sc-auto-t').onclick = async () => {
+      await fetch('/api/autosync', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ enabled: !a.enabled }) });
+      scRenderPc();
+    };
+  };
   if (!hasToken) {
     box.innerHTML = `<p class="reason">No PriceCharting token yet.</p>
       <div class="rv-row"><button class="btn sm" id="sc-pc-key">⚙ Add token</button></div>
-      <p class="reason" style="margin-top:8px">Until then: PriceCharting → Collection → Download (Excel), drop the file here or in ~/Downloads, hit <b>↻ Refresh</b> up top. Your account collection stays the source of truth either way.</p>`;
+      <p class="reason" style="margin-top:8px">No token needed for inventory: download your export from PriceCharting (or leave it in ~/Downloads) and it pulls in automatically below. The token adds live re-pricing + one-click catalog adds.</p>
+      ${autoBlock(auto0)}`;
     $('#sc-pc-key').onclick = () => openSettings();
+    wireAutoToggle(auto0);
     return;
   }
   if (st && st.running) {
@@ -896,12 +1012,14 @@ async function scRenderPc() {
   const last = st && st.finishedAt
     ? `<p class="reason">Last sync ${esc(st.finishedAt.replace('T', ' '))} — ${st.updated} repriced, ${st.errors} errors${st.lastError ? ' · last error: ' + esc(String(st.lastError)) : ''}.</p>` : '';
   box.innerHTML = `<button class="btn primary" id="sc-pc-go">🔄 Sync all prices now</button> ${last}
-    <p class="reason" style="margin-top:8px">Re-prices every card by its PriceCharting id (raw + graded tiers), then rebuilds totals. ~${Math.ceil((State.meta ? State.meta.totalEntries : 1300) * 0.13 / 60)} min for your collection.</p>`;
+    <p class="reason" style="margin-top:8px">Re-prices every card by its PriceCharting id (raw + graded tiers), then rebuilds totals. ~${Math.ceil((State.meta ? State.meta.totalEntries : 1300) * 0.13 / 60)} min for your collection.</p>
+    ${autoBlock(auto0)}`;
   $('#sc-pc-go').onclick = async () => {
     const r = await (await fetch('/api/pc/sync', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).json();
     if (!r.ok) return toast(r.error || 'Could not start sync');
     scRenderPc();
   };
+  wireAutoToggle(auto0);
 }
 
 /* ============================================================
@@ -934,7 +1052,9 @@ function renderLedger() {
   <div class="rv-2col">
     <div class="panel">
       <h3>➕ Add a card</h3>
-      <p class="reason">For cards not in your PriceCharting export yet — pulls, trades, show pickups. They join every tab instantly and survive refreshes. Add it on PriceCharting later and it'll de-dupe on the next export.</p>
+      <p class="reason">New inventory pulls in <b>automatically</b> from your PriceCharting exports (drop the file in ~/Downloads — no clicks needed). For one-off adds, search the PriceCharting catalog below: no typing card details, ever.</p>
+      <div id="lg-pcadd"></div>
+      <details class="lg-manualwrap" id="lg-manualwrap"><summary class="reason">Manual add (last resort — type it in)</summary>
       <div class="lg-form">
         <input id="lg-name" class="s-inp" placeholder="Card name * (e.g. Charizard ex)">
         <div class="rv-row"><input id="lg-set" class="s-inp" placeholder="Set" style="flex:2"><input id="lg-num" class="s-inp" placeholder="#" style="flex:1"></div>
@@ -954,6 +1074,7 @@ function renderLedger() {
           <button class="btn gold" id="lg-addscan">📷 Add &amp; scan photo</button>
         </div>
       </div>
+      </details>
     </div>
 
     <div class="panel">
@@ -986,6 +1107,7 @@ function renderLedger() {
     }).join('')}</div>` : '<p class="reason">Nothing sold yet — record your first sale above and it lands here.</p>'}
   </div>`;
 
+  lgRenderPcAdd();
   $('#lg-graded').onchange = e => {
     $('#lg-grader').style.display = e.target.checked ? '' : 'none';
     $('#lg-grade').style.display = e.target.checked ? '' : 'none';
@@ -1003,9 +1125,7 @@ function renderLedger() {
       grade: graded ? ($('#lg-grade').value.trim() || null) : null,
       dateAdded: new Date().toISOString().slice(0, 10),
     };
-    const all = loadJSON(LS_CUSTOM, []); all.push(cc);
-    localStorage.setItem(LS_CUSTOM, JSON.stringify(all));
-    rvMergeCustom(); rvRecalcMeta();
+    lgStore(cc);
     toast(`Added ${name} — it's in your collection now.`);
     return State.cards[State.cards.length - 1];
   };
@@ -1044,6 +1164,67 @@ function renderLedger() {
     a.download = 'pokemon-chest-sales.csv'; a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   };
+}
+
+function lgStore(cc) {
+  const all = loadJSON(LS_CUSTOM, []);
+  all.push(cc);
+  localStorage.setItem(LS_CUSTOM, JSON.stringify(all));
+  rvMergeCustom(); rvRecalcMeta();
+}
+
+/* no-typing adds: search the PriceCharting catalog, one click to add */
+function lgRenderPcAdd() {
+  const box = $('#lg-pcadd'); if (!box) return;
+  const hasToken = State.live && State.live.priceCharting;
+  if (!hasToken) {
+    box.innerHTML = `<div class="rv-row" style="margin:6px 0 10px">
+      <button class="btn sm" id="lg-pckey">⚙ Add your PriceCharting token</button>
+      <span class="reason">unlocks catalog search — add any card with one click</span></div>`;
+    $('#lg-pckey').onclick = () => openSettings();
+    const mw = $('#lg-manualwrap'); if (mw) mw.open = true;
+    return;
+  }
+  box.innerHTML = `
+    <input id="lg-pcq" class="s-inp" style="width:100%;margin:6px 0 4px" placeholder="Search the PriceCharting catalog — e.g. moonbreon, charizard 151…">
+    <div id="lg-pcres" class="sc-results"></div>`;
+  const inp = $('#lg-pcq'), res = $('#lg-pcres');
+  let timer = null, lastQ = '';
+  const run = async q => {
+    if (!q) { res.innerHTML = ''; return; }
+    res.innerHTML = '<p class="reason" style="padding:6px">Searching PriceCharting…</p>';
+    try {
+      const j = await (await fetch('/api/pc/search?q=' + enc(q), { cache: 'no-store' })).json();
+      if (q !== lastQ) return;                       // a newer search superseded this one
+      if (!j.ok) { res.innerHTML = `<p class="reason" style="padding:6px">✕ ${esc(j.error || 'search failed')}</p>`; return; }
+      const owned = new Set(State.cards.map(c => String(c.pcId)));
+      const prods = j.products;
+      res.innerHTML = prods.map((p, i) => `
+        <button class="sc-res lg-pcrow" data-x="${i}">
+          <span class="lg-pcprice">${p.price != null ? money(p.price) : '—'}</span>
+          <span><b>${esc(p.name)}</b>${p.number ? ' #' + esc(p.number) : ''}<br>
+          <span class="reason">${esc(p.set)}${owned.has(String(p.id)) ? ' · <b style="color:var(--green)">already in your chest</b>' : ''}</span></span>
+        </button>`).join('') || '<p class="reason" style="padding:6px">No catalog matches.</p>';
+      $$('.lg-pcrow', res).forEach(b => b.onclick = () => {
+        const p = prods[+b.dataset.x];
+        if (State.cards.some(c => String(c.pcId) === String(p.id))) return toast('Already in your collection.');
+        lgStore({
+          pcId: String(p.id), name: p.name, number: p.number, set: p.set,
+          lang: /japanese/i.test(p.set) ? 'ja' : 'en',
+          price: p.price || 0, cost: 0, qty: 1, graded: false,
+          dateAdded: new Date().toISOString().slice(0, 10),
+        });
+        toast(`Added ${p.name} @ ${p.price != null ? money(p.price) : 'no price yet'} — straight from PriceCharting.`);
+        renderLedger();
+      });
+    } catch (e) { res.innerHTML = `<p class="reason" style="padding:6px">✕ ${esc(e.message)}</p>`; }
+  };
+  inp.oninput = e => {
+    lastQ = e.target.value.trim();
+    clearTimeout(timer);
+    timer = setTimeout(() => run(lastQ), 380);
+  };
+  if (RV.lgQuery) { inp.value = lastQ = RV.lgQuery; RV.lgQuery = null; run(lastQ); }
 }
 
 function lgSaleForm(c) {

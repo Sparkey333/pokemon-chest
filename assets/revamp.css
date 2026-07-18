@@ -137,10 +137,23 @@
 .den-hud{position:absolute;left:0;right:0;bottom:0;display:flex;gap:18px;justify-content:center;padding:9px;
   font-size:11.5px;color:var(--muted2);background:linear-gradient(180deg,transparent,rgba(5,8,14,.85));pointer-events:none;z-index:5}
 
-/* themes */
-.theme-amber{--den-bg:#120d06;--den-wall:#2a1e10;--den-wall2:#170f06;--den-accent:#ffce4d;--den-glow:rgba(255,190,80,.5);
-  --den-frame:#8a6f25;--den-plank:#5a4318;--den-ceil:#0d0904;
-  --den-floor:repeating-linear-gradient(90deg,#241708 0 62px,#2c1d0b 62px 130px)}
+/* themes — "Amber Den" matches the DarkHearts Studios Amber Den palette:
+   night #0a0e12, amber #e8a95c / #a66a1f, bone #efe6d4, jewel accents */
+.theme-amber{--den-bg:#0a0e12;--den-wall:#231a10;--den-wall2:#100c07;--den-accent:#e8a95c;--den-glow:rgba(232,169,92,.55);
+  --den-frame:#a66a1f;--den-plank:#5f451c;--den-ceil:#0a0906;
+  --den-floor:repeating-linear-gradient(90deg,#1d1309 0 62px,#251809 62px 130px)}
+.theme-amber .den-hud{color:#b8ad99}
+.theme-amber .den-disp-title{color:#efe6d4;opacity:.6}
+.theme-amber .den-sign{color:#e8a95c;text-shadow:0 0 18px rgba(232,169,92,.9),0 0 60px rgba(232,169,92,.55)}
+.theme-amber .den-feat-label{color:#efe6d4}
+/* the jewel-lit lamp glow + film grain that make it feel like the Den */
+.den-viewport::before{content:'';position:absolute;inset:0;z-index:4;pointer-events:none;
+  background:radial-gradient(120% 80% at 70% 12%,var(--den-glow) 0%,transparent 45%),
+             radial-gradient(70% 50% at 18% 88%,rgba(39,176,139,.12) 0%,transparent 60%),
+             radial-gradient(60% 45% at 88% 80%,rgba(79,127,212,.10) 0%,transparent 60%);
+  opacity:.5;mix-blend-mode:screen}
+.den-viewport::after{content:'';position:absolute;inset:0;z-index:4;pointer-events:none;opacity:.05;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
 .theme-midnight{--den-bg:#070b14;--den-wall:#101a2e;--den-wall2:#080d18;--den-accent:#4cc2ff;--den-glow:rgba(76,194,255,.45);
   --den-frame:#24466b;--den-plank:#1a2b47;--den-ceil:#05080f;
   --den-floor:repeating-linear-gradient(90deg,#0b1322 0 62px,#0f1930 62px 130px)}
@@ -172,6 +185,15 @@
 .sc-shot img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;border:1px solid var(--border)}
 .sc-shot figcaption{font-size:11px;color:var(--muted2);display:flex;justify-content:space-between;padding:2px 2px 0}
 .sc-qr{border-radius:10px;border:4px solid #fff;flex:none}
+
+/* staged scanner shot + PC catalog add */
+.sc-stagedcard{display:flex;gap:12px;align-items:flex-start;margin-top:10px;padding:10px;
+  border:1px solid var(--accent);border-radius:10px;background:rgba(76,194,255,.05)}
+.sc-stagedcard img{width:74px;height:74px;object-fit:cover;border-radius:8px;flex:none}
+.lg-pcprice{flex:none;min-width:64px;text-align:right;color:var(--gold);font-weight:800;font-variant-numeric:tabular-nums}
+.lg-manualwrap{margin-top:12px}
+.lg-manualwrap summary{cursor:pointer}
+.lg-manualwrap[open] summary{margin-bottom:6px}
 
 /* ================= ➕ ADD & SOLD ================= */
 .lg-form{display:grid;gap:8px;margin-top:8px}
