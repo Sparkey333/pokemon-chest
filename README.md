@@ -33,6 +33,12 @@ same local server and UI.
 |------|--------------|
 | **Dashboard** | Your action board: portfolio value, cost basis, unrealized P/L, EN‑vs‑JP & raw‑vs‑graded splits, top sets, most valuable cards, a value‑over‑time chart, and a **feedback card** for sending suggestions. |
 | **Collection** | Every entry with card art. Search + filter by language, set, era, graded/raw, status, and price; sort by value, profit, return %, name, or date added. Click any card for full detail. |
+| **➕ Add & Sold** | The ledger: **add cards in‑app** (typed or scanned — they survive refreshes and join every tab), **record every sale** (price/fees/venue/date), and **archive** sold cards — kept forever with their photos & sale data on the **Sold Shelf**, just out of your collection totals. Exports a sales CSV. |
+| **📷 Scanner** | Smooth camera capture: hold a card up to your Mac camera (or iPhone via Continuity), snap it, and the photo is **stored with that card's file**. Includes **Phone mode** — a LAN/QR link (HTTPS when possible) so your phone opens the app and scans directly — and the **PriceCharting sync** panel (below). |
+| **🏠 The Den** | Your collection as a walk‑in 3D display room (Amber‑Den‑style): trophy wall, slab shelf, side gallery, a spinning pedestal card, a live value ticker, and a **💸 Sold Shelf**. Drag to look, scroll to walk, click any card. Every display is auto‑loaded and editable (source pickers + 3 themes). |
+| **🧊 3D Studio** | Turn any card into a 3D visual asset — draggable/auto‑spin viewer with a holo‑foil effect and a fullscreen **Showcase mode** (screen‑record it for Shorts) — plus **3D‑print STL exports**: an easel stand and a wall frame, auto‑sized to raw / toploader / slab. |
+| **💰 Best Sellers** | What to sell *right now*: every card scored for liquidity (price band × era × set heat), the top‑25 **Best‑Sell Board** with fee‑adjusted nets, and the channel matrix + playbooks for **eBay auctions (bidding), Whatnot live, YouTube, Facebook, TCGplayer, Mercari**. |
+| **🏷 Brand Lab** | The brand build‑out for your millions of spare cards: IP‑safe name/logo directions, packaging product lines (Era Vault Packs, Mystery Chests, Frame‑Ready Sets…), AI art prompts, print‑cost tables, stand‑out moves, and a phased roadmap. |
 | **Sell Hub** | Cards ranked for selling with fee‑adjusted **net estimates**, one‑click **sold comps** (eBay raw + graded, TCGplayer, 130point, Mercari, PriceCharting), a **Grading Candidates** list with break‑even math and estimated PSA‑10 value, and your **For‑sale** worklist. |
 | **Sell & Grade Guide** | Current grading tiers & costs, when to grade vs. not, grade‑value multiples, marketplace fees, and the best venue for raw English / graded / Japanese cards — with sources. |
 
@@ -40,6 +46,14 @@ Every card also gets a tailored grade/sell recommendation, direct live‑comp se
 that exact card, sell math, and a private note + "For sale / Sold" tags.
 
 ---
+
+## Phone mode — scan from your phone
+
+In **📷 Scanner → Phone mode**, one click starts a same‑Wi‑Fi address (HTTPS with a
+locally generated self‑signed certificate when `openssl` is available — accept the
+one‑time warning; it's your own Mac). Scan the QR on your phone and the full app opens
+there, Scanner included: snap a card with the phone camera and the photo lands in that
+card's file on your Mac. Home networks only — turn it off when you're done.
 
 ## Keeping prices current — the ↻ Refresh flow
 
@@ -62,7 +76,7 @@ in‑app and paste your own keys (bring‑your‑own‑key):
 
 | Key | Unlocks |
 |-----|---------|
-| **PriceCharting token** | Live current prices straight from PriceCharting's API. |
+| **PriceCharting token** | Live current prices straight from PriceCharting's API — including **one‑click bulk sync** (Scanner tab) that re‑prices the *whole* collection (raw + graded tiers) without downloading an export. New cards you add on PriceCharting still arrive via the export + ↻ Refresh flow. |
 | **Comps API key** | Live sold comps (eBay / TCGplayer / JP marketplaces) without leaving the app. |
 | **Claude or OpenAI key** | AI sell/grade recommendations per card. Default model: `claude-fable-5` (Anthropic) or `gpt-4o` (OpenAI). |
 

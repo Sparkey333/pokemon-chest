@@ -1,7 +1,7 @@
 /* ===================== Pokémon Chest ===================== */
 'use strict';
 
-const APP_VERSION = '1.13.0';
+const APP_VERSION = '2.0.0';
 const APP_REPO = 'https://github.com/Sparkey333/pokemon-chest';
 
 /* ---------- tiny helpers ---------- */
