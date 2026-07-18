@@ -213,6 +213,29 @@
 .den-soldshelf{width:430px;left:230px;top:-30px;transform:rotateY(90deg) translateZ(-796px)}
 .den-soldshelf .den-card{width:110px}
 
+/* ================= UI POLISH PASS =================
+   Tasteful overrides on top of styles.css — warmer active states,
+   gold-gradient headings, lift-on-hover cards, tidy scrollbars. */
+.tabs{gap:2px;background:rgba(8,11,18,.84);backdrop-filter:blur(14px) saturate(1.15);scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{padding:9px 13px}
+.tab.active{color:#fff;background:linear-gradient(180deg,var(--panel3),var(--panel2));
+  box-shadow:inset 0 -2px 0 var(--gold),0 4px 18px rgba(255,206,77,.10)}
+.section-head h2{font-size:20px;background:linear-gradient(100deg,#fff 35%,var(--gold));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.kpi::after{background:radial-gradient(140px 90px at 90% -20%,rgba(255,206,77,.10),transparent)}
+.kpi:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.rv-cards .panel{transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.rv-cards .panel:hover{transform:translateY(-3px);border-color:var(--border2);box-shadow:0 14px 34px rgba(0,0,0,.4)}
+.btn:focus-visible,.tab:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn.gold{box-shadow:0 4px 16px rgba(255,206,77,.22)}
+.btn.primary{box-shadow:0 4px 16px rgba(76,194,255,.20)}
+.value-pill{border-color:var(--gold-dim);box-shadow:0 0 22px rgba(255,206,77,.10)}
+::-webkit-scrollbar{width:11px;height:11px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--panel3);border-radius:8px;border:2px solid var(--bg)}
+::-webkit-scrollbar-thumb:hover{background:var(--accent-dim)}
+
 /* ---------- responsive ---------- */
 @media (max-width:1100px){
   .st3-wrap{grid-template-columns:1fr}

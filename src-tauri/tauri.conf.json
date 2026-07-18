@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Pokemon Chest",
-  "version": "1.13.0",
+  "version": "2.1.0",
   "identifier": "com.darkhearts.pokemonchest",
   "build": {
     "frontendDist": "../tauri-shell"
@@ -54,7 +54,13 @@
       "minimumSystemVersion": "11.0",
       "exceptionDomain": "",
       "signingIdentity": "Apple Development: Brandon Barkey (LFQPLFRKD2)",
-      "providerShortName": null
+      "providerShortName": null,
+      "dmg": {
+        "background": "dmg-background.png",
+        "windowSize": { "width": 660, "height": 420 },
+        "appPosition": { "x": 180, "y": 220 },
+        "applicationFolderPosition": { "x": 480, "y": 220 }
+      }
     },
     "iOS": {
       "minimumSystemVersion": "14.0",

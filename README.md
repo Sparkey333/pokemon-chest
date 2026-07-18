@@ -69,11 +69,10 @@ card's file on your Mac. Home networks only — turn it off when you're done.
 ## Rebuilding the Mac app (.dmg)
 
 The native app wraps this exact server + UI, so every new feature lands in it on the
-next build. On your Mac, from the project folder:
-
-```
-cd src-tauri && cargo tauri build     # produces Pokemon Chest.app + .dmg in target/release/bundle
-```
+next build. On your Mac, just double‑click **`build-app.command`** — it regenerates the
+full icon set from `icon-source.png` and produces `Pokemon Chest.app` + a styled `.dmg`
+(Amber Den background, drag‑to‑Applications layout) in `src-tauri/target/release/bundle`.
+(Equivalent by hand: `cd src-tauri && cargo tauri build`.)
 
 Fallback: double‑clicking `refresh-data.command` does exactly the same rebuild from
 Terminal. Your value‑over‑time history, For‑sale / Sold tags, and notes are stored
