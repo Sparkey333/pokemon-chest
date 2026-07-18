@@ -1,0 +1,55 @@
+name: Build macOS DMG
+
+# Builds "Pokemon Chest.app" + the styled .dmg on GitHub's macOS machines,
+# so a fresh installer is downloadable without building on your own Mac.
+# Runs on every push to the redesign branch, or on demand (Run workflow).
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/pokemon-chest-redesign-31io2c, main]
+    paths:
+      - "src-tauri/**"
+      - "assets/**"
+      - "tauri-shell/**"
+      - "index.html"
+      - "server.py"
+      - "icon-source.png"
+      - ".github/workflows/build-dmg.yml"
+
+jobs:
+  dmg:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Regenerate the full icon set from icon-source.png
+        run: npx --yes "@tauri-apps/cli@^2" icon icon-source.png
+
+      # CI has no Apple Developer certificate — ad-hoc sign ("-") instead of the
+      # configured identity. First launch needs right-click -> Open (Gatekeeper).
+      - name: Build app + dmg (universal, ad-hoc signed)
+        run: >
+          npx --yes "@tauri-apps/cli@^2" build
+          --target universal-apple-darwin
+          --config '{"bundle":{"macOS":{"signingIdentity":"-"}}}'
+
+      - name: Upload the dmg
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pokemon-Chest-dmg
+          path: src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+          retention-days: 30
