@@ -1,9 +1,13 @@
 # Pokémon Den → a publishable app: the roadmap
 
-Working name **Pokémon Den** (personal build). This doc is the living plan the
-automated build-out routine works from: naming, the researched feature backlog,
-the 3D "summon" spec, store strategy, and the open questions that need Brandon's
-answers. Keep it updated — done items get ✅ and a date.
+Working name **Pokémon Den** (personal build). This doc holds the strategy:
+naming, store paths, and the open questions that need Brandon's answers.
+
+> **The canonical execution tracker is `data/parity.json`**, rendered live in
+> the app's **📋 Parity** tab — every feature with status, executable spec,
+> acceptance criteria, file pointers, and a copy-able work order. Agents and
+> future sessions (any model): work from parity.json, update statuses there
+> when you ship, and keep this doc for strategy-level changes only.
 
 ---
 

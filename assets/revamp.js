@@ -138,6 +138,7 @@ const RV_VIEWS = {
   brand: () => renderBrand(),
   scan: () => renderScan(),
   ledger: () => renderLedger(),
+  parity: () => renderParity(),
 };
 (function hookSwitchView() {
   const base = window.switchView;
@@ -1258,4 +1259,142 @@ function lgSaleForm(c) {
     rvRecalcMeta(); renderLedger();
     toast(`Sold: ${c.name} — ${money(price)}. On the Sold Shelf now.`);
   };
+}
+
+/* ============================================================
+   📋 FEATURE PARITY — the living build tracker.
+   Renders data/parity.json: the canonical, machine-readable ledger
+   of every feature (shipped / partial / planned / blocked) with
+   executable specs, acceptance criteria and file pointers, plus a
+   competitor parity matrix. Agents & future sessions: data/parity.json
+   is the source of truth — update item statuses there when you ship.
+   ============================================================ */
+const PAR = { area: 'all', status: 'all', open: {} };
+const PAR_STATUS = {
+  shipped: { label: 'Shipped', icon: '✅', color: 'var(--green)' },
+  partial: { label: 'Partial', icon: '🟡', color: 'var(--gold)' },
+  planned: { label: 'Planned', icon: '🔵', color: 'var(--accent)' },
+  blocked: { label: 'Blocked', icon: '⛔', color: 'var(--red)' },
+};
+const PAR_AREAS = {
+  capture: '📷 Capture', market: '💰 Market', collection: '🗂 Collection',
+  den3d: '🏠 Den & 3D', platform: '⚙️ Platform', publish: '🚀 Publish',
+};
+
+async function renderParity() {
+  const el = $('#view-parity');
+  const p = await rvData('parity');
+  if (!p || !p.items) {
+    el.innerHTML = '<div class="panel" style="margin-top:20px"><p class="muted">data/parity.json missing — pull the latest app files.</p></div>';
+    return;
+  }
+  const items = p.items;
+  const counts = { shipped: 0, partial: 0, planned: 0, blocked: 0 };
+  items.forEach(i => { if (counts[i.status] != null) counts[i.status]++; });
+  const done = counts.shipped + counts.partial * 0.5;
+  const pct = Math.round(done / Math.max(1, items.length) * 100);
+  const shown = items.filter(i =>
+    (PAR.area === 'all' || i.area === PAR.area) && (PAR.status === 'all' || i.status === PAR.status));
+  const prioOrder = { P0: 0, P1: 1, P2: 2, P3: 3 };
+  const statusOrder = { partial: 0, planned: 1, blocked: 2, shipped: 3 };
+  shown.sort((a, b) => (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9)
+    || (prioOrder[a.priority] ?? 9) - (prioOrder[b.priority] ?? 9) || a.title.localeCompare(b.title));
+
+  const chip = (key, val, label, cur) =>
+    `<button class="pr-chip ${cur === val ? 'on' : ''}" data-k="${key}" data-v="${val}">${label}</button>`;
+  const kpi = (label, v, sub, cls) => `<div class="kpi ${cls || ''}"><div class="k-label">${label}</div><div class="k-value">${v}</div><div class="k-sub">${sub}</div></div>`;
+
+  const itemCard = i => {
+    const st = PAR_STATUS[i.status] || PAR_STATUS.planned;
+    const open = !!PAR.open[i.id];
+    return `<div class="pr-item ${open ? 'open' : ''}" data-id="${esc(i.id)}">
+      <button class="pr-head" data-id="${esc(i.id)}">
+        <span class="pr-st" style="color:${st.color}" title="${st.label}">${st.icon}</span>
+        <span class="pr-ico">${i.icon || '▫️'}</span>
+        <span class="pr-title">${esc(i.title)}</span>
+        <span class="pr-badges">
+          <i class="pr-b">${esc(PAR_AREAS[i.area] || i.area)}</i>
+          <i class="pr-b pr-${esc(i.priority)}">${esc(i.priority)}</i>
+          <i class="pr-b">${esc(i.est)}</i>
+          ${i.demand === 'high' ? '<i class="pr-b pr-hot">🔥 high demand</i>' : ''}
+        </span>
+        <span class="pr-caret">${open ? '▾' : '▸'}</span>
+      </button>
+      ${open ? `<div class="pr-body">
+        <p>${esc(i.spec)}</p>
+        <p class="reason"><b>Where:</b> ${esc(i.ux)}</p>
+        <div class="pr-files">${(i.files || []).map(f => `<code>${esc(f)}</code>`).join(' ')}</div>
+        <div class="pr-acc"><b>Acceptance</b><ul class="rv-ul">${(i.acceptance || []).map(a => `<li>${esc(a)}</li>`).join('')}</ul></div>
+        <p class="reason"><b>Verify:</b> ${esc(i.verify)}</p>
+        ${(i.dependsOn || []).length ? `<p class="reason"><b>Depends on:</b> ${i.dependsOn.map(esc).join(', ')}</p>` : ''}
+        ${i.notes ? `<p class="reason"><b>Notes:</b> ${esc(i.notes)}</p>` : ''}
+        <div class="rv-row" style="margin-top:8px">
+          <button class="btn sm primary pr-wo" data-id="${esc(i.id)}">📋 Copy work order</button>
+          <span class="reason">a complete, self-contained task prompt — paste it into any future Claude session (any model) to build or maintain this.</span>
+        </div>
+      </div>` : ''}
+    </div>`;
+  };
+
+  const m = p.matrix;
+  const usDot = v => v === 'shipped' ? '🟢' : v === 'partial' ? '🟡' : v === 'planned' ? '🔵' : '—';
+  const matrixHTML = m && m.rows ? `
+    <div class="panel" style="margin-top:16px"><h3>⚔️ Competitor parity matrix <span class="hint">🟢 shipped · 🟡 partial · 🔵 planned · — none · ✓ competitor has it (est.)</span></h3>
+    <div class="rv-tablewrap"><table class="rv-table pr-matrix">
+      <thead><tr><th>Feature</th><th>Us</th>${m.competitors.map(c => `<th title="${esc(c.note)}">${esc(c.name)}</th>`).join('')}</tr></thead>
+      <tbody>${m.rows.map(r => `<tr>
+        <td>${esc(r.label)}</td><td style="text-align:center">${usDot(r.us)}</td>
+        ${m.competitors.map(c => `<td style="text-align:center">${(r.have || []).includes(c.key) ? '✓' : ''}</td>`).join('')}
+      </tr>`).join('')}</tbody>
+    </table></div></div>` : '';
+
+  el.innerHTML = `
+  <div class="section-head"><div><h2>📋 Feature Parity</h2>
+    <div class="sub">The living build tracker — every feature's status, spec, and acceptance criteria, machine-readable in <code>data/parity.json</code> so any future session (any model) can pick up exactly where this left off.</div></div>
+    <span class="reason">updated ${esc(p.updated || '—')}</span></div>
+  <div class="kpis">
+    ${kpi('Build completion', pct + '%', `${counts.shipped} shipped · ${counts.partial} partial of ${items.length} tracked`, 'k-gold')}
+    ${kpi('Shipped', counts.shipped, 'working today, verified', 'k-green')}
+    ${kpi('Planned', counts.planned, 'specs ready to implement', 'k-blue')}
+    ${kpi('Blocked', counts.blocked, 'waiting on a decision — see roadmap questions', counts.blocked ? '' : 'k-green')}
+  </div>
+  <div class="pr-filters">
+    ${chip('status', 'all', 'All statuses', PAR.status)}
+    ${Object.entries(PAR_STATUS).map(([v, s]) => chip('status', v, s.icon + ' ' + s.label, PAR.status)).join('')}
+    <span class="dot">·</span>
+    ${chip('area', 'all', 'All areas', PAR.area)}
+    ${Object.entries(PAR_AREAS).map(([v, l]) => chip('area', v, l, PAR.area)).join('')}
+  </div>
+  <div class="pr-list">${shown.map(itemCard).join('') || '<p class="reason" style="padding:10px">Nothing matches this filter.</p>'}</div>
+  ${matrixHTML}
+  <p class="reason" style="margin-top:12px">🤖 <b>For agents &amp; future sessions:</b> <code>data/parity.json</code> is the canonical ledger. When you ship an item: set its status, append "✅ YYYY-MM-DD" to notes, bump "updated", verify headless, commit, push. Work orders below each item carry the full contract.</p>`;
+
+  $$('.pr-chip', el).forEach(b => b.onclick = () => { PAR[b.dataset.k] = b.dataset.v; renderParity(); });
+  $$('.pr-head', el).forEach(b => b.onclick = () => { PAR.open[b.dataset.id] = !PAR.open[b.dataset.id]; renderParity(); });
+  $$('.pr-wo', el).forEach(b => b.onclick = async () => {
+    const i = items.find(x => x.id === b.dataset.id);
+    const wo = parityWorkOrder(i);
+    try { await navigator.clipboard.writeText(wo); toast('Work order copied — paste it into any Claude session.'); }
+    catch { toast('Clipboard blocked — the work order was logged to the console.'); console.log(wo); }
+  });
+}
+
+function parityWorkOrder(i) {
+  return `WORK ORDER — ${i.title} (${i.id})
+Project: Pokémon Den · repo Sparkey333/pokemon-chest · branch claude/pokemon-chest-redesign-31io2c
+Current status: ${i.status} · priority ${i.priority} · size ${i.est} · area ${i.area}
+
+SPEC (implement exactly this; no other context needed):
+${i.spec}
+
+WHERE IT LIVES: ${i.ux}
+FILES: ${(i.files || []).join(', ')}
+${(i.dependsOn || []).length ? 'DEPENDS ON (check these ledger items first): ' + i.dependsOn.join(', ') + '\n' : ''}
+ACCEPTANCE CRITERIA (all must pass):
+${(i.acceptance || []).map((a, n) => `${n + 1}. ${a}`).join('\n')}
+
+VERIFY: ${i.verify}
+Standard verification: run POKECHEST_HOME=<scratch> python3 server.py, drive http://127.0.0.1:8787 headless with playwright-core (chromium at /opt/pw-browsers), assert zero JS pageerrors across all tabs.
+
+WHEN DONE: in data/parity.json set this item's status to "shipped", append "✅ <date>" to its notes, bump the top-level "updated" date; commit with a clear message; push to the branch (never merge PR #1 without Brandon's approval). Internal storage keys (pokechest.*) and the bundle identifier must never change.${i.notes ? '\n\nNOTES: ' + i.notes : ''}`;
 }
