@@ -10,6 +10,7 @@ on:
     paths:
       - "src-tauri/**"
       - "assets/**"
+      - "data/**"
       - "tauri-shell/**"
       - "index.html"
       - "server.py"
