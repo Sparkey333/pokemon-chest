@@ -1,0 +1,1621 @@
+{
+ "about": "Canonical machine-readable feature ledger for Pokémon Den. Rendered by the 📋 Parity tab. Agents & future sessions (any model): implement items from their spec alone, satisfy every acceptance criterion, run the verify steps, then set status=shipped, append \"✅ YYYY-MM-DD\" to notes, bump \"updated\", commit and push. Never change pokechest.* storage keys or the bundle identifier. Authored and adversarially verified by a multi-agent ultracode workflow.",
+ "schemaVersion": 1,
+ "updated": "2026-07-19",
+ "generatedBy": "ultracode parity-ledger workflow wf_fe2016aa-818 (claude-fable-5): repo inventory + 5 spec agents + competitor matrix + 3 adversarial verifiers; {\"authored\": 49, \"merged\": 49, \"corrections\": 15, \"deleted\": 0}",
+ "items": [
+  {
+   "id": "dashboard-action-board",
+   "title": "Dashboard: KPIs, game plan & action board",
+   "icon": "📊",
+   "area": "collection",
+   "status": "shipped",
+   "priority": "P1",
+   "spec": "renderDashboard() in assets/app.js (line ~823) fills #view-dashboard with five KPI tiles (Portfolio Value, Cost Basis, Unrealized P/L, Unique Entries, Graded Slabs) computed from State.meta and State.cards. Below the KPIs it renders gamePlanHTML() (a Now/Build/Invest game plan driven by buildNowMoves() and data/game-plan.json), actionBoardHTML() (a persisted checklist stored in localStorage key pokechest.actions.v1 via actionChecks()/setActionDone()), a portfolio value-over-time SVG sparkline() fed by snapshots recordSnapshot() writes to localStorage on every load/refresh, EN-vs-JP and raw-vs-graded barRows(), top sets by value, a clickable top-10 most-valuable minilist (miniRow(), opens openModal(card)), a 'Open Sell Hub' CTA, and feedbackCardHTML() which builds a mailto: feedback email from diagnostics(). The topbar #vpValue portfolio pill and #footMeta are also kept in sync. All data is local; no network calls are required.",
+   "ux": "The default 📊 Dashboard tab (#view-dashboard), active on app load; the Portfolio value pill lives in the topbar on every view.",
+   "files": [
+    "assets/app.js",
+    "index.html",
+    "data/game-plan.json",
+    "assets/styles.css"
+   ],
+   "acceptance": [
+    "Loading http://localhost:8787 renders five .kpi tiles with a non-empty Portfolio Value",
+    "Clicking a row in 'Your 10 most valuable cards' opens the card modal (#modalRoot populated)",
+    "Checking an action-board checkbox persists across a page reload (localStorage pokechest.actions.v1)",
+    "A value snapshot is appended so the sparkline gains points across days"
+   ],
+   "verify": "Start `python3 server.py`, then with playwright-core headless Chromium open localhost:8787 and assert `document.querySelectorAll('#view-dashboard .kpi').length >= 5` and that #vpValue text matches /\\$[\\d,]+/.",
+   "est": "L",
+   "dependsOn": [
+    "local-server-app-shell"
+   ],
+   "demand": "high",
+   "notes": "Comparable to Collectr/Dex portfolio dashboards; value-over-time chart is a top competitor-review request already covered here."
+  },
+  {
+   "id": "collection-browser",
+   "title": "Collection browser with filters, sort & card detail modal",
+   "icon": "🗂",
+   "area": "collection",
+   "status": "shipped",
+   "priority": "P0",
+   "spec": "renderCollection(reset) plus buildToolbar()/applyFilters() in assets/app.js render every card into #grid as cardHTML(c) tiles with TCGdex art (imgHTML/phHTML placeholder fallback). The toolbar filters by language, set, era, graded/raw, status (for-sale/sold) and min price, and sorts by value, profit, return %, name, or date added; the topbar #search input free-text searches name/set/number. Infinite scroll uses an IntersectionObserver on #gridSentinel (setupSentinel()). Clicking a card calls openModal(c) which shows full detail: price/value/P&L, gradeAdvice(c) verdict with gradeLadder(c) per-grade estimates, links(c) one-click sold-comp URLs (eBay raw/graded, TCGplayer, 130point, Mercari, PriceCharting), sellNet(c) fee math, a private note, 'For sale'/'Sold' status tags saved per-card via uset() into localStorage key pokechest.userdata.v1, an image editor (openImageEditor) and liveZoneHTML BYOK actions. Archived cards are filtered out of every grid except an explicit Sold status filter (applyFilters wrapper in assets/revamp.js hookDataLayer()).",
+   "ux": "🗂 Collection tab (#view-collection) with toolbar + card grid; the card modal opens from every view via openModal().",
+   "files": [
+    "assets/app.js",
+    "assets/revamp.js",
+    "index.html",
+    "data/collection.json",
+    "assets/styles.css"
+   ],
+   "acceptance": [
+    "The grid renders card tiles from data/collection.json and paginates as you scroll",
+    "Filtering by language=ja shows only Japanese entries; sort by value orders descending",
+    "Clicking a card opens a modal containing grade advice, comp links, and a savable note",
+    "Marking a card 'For sale' persists in localStorage and surfaces it in Sell Hub's for-sale list"
+   ],
+   "verify": "Headless playwright-core: click the Collection tab, assert `#grid .card` count > 0, type into #search and assert the grid count shrinks; open the first card and assert the modal contains a PriceCharting link.",
+   "est": "L",
+   "dependsOn": [
+    "local-server-app-shell"
+   ],
+   "demand": "high",
+   "notes": "Core loop matching PriceCharting Premium / Collectr browsing; per-card status tags feed Sell Hub and the ledger."
+  },
+  {
+   "id": "display-case",
+   "title": "Display Case: smart shelves + pinned shelves with price trends",
+   "icon": "🏛",
+   "area": "collection",
+   "status": "shipped",
+   "priority": "P2",
+   "spec": "renderCase() in assets/app.js (line ~1653) renders auto-built 'smart shelves' from smartShelves() plus user-curated manual shelves stored in localStorage key read by caseAll()/caseSet()/caseRemove() (LS_CASE), each frame rendered by caseFrameHTML(). Cards are added via a datalist search (#dc-search, wireCaseAdd()) or the ★ Display Case button in the card modal, opening openCasePicker(c) where the user picks a shelf tier (preset CASE_TIERS or custom name) and a note. Each frame shows a per-card price-trend: recordCardSnaps() snapshots case-card prices daily into localStorage, cardTrend(c) computes tracked %-change and trendSpark(series) draws a mini SVG sparkline, falling back to lifetime P/L or 'tracking starts today'. Every frame links to the card's PriceCharting history page (c.pcUrl). Smart shelves can be toggled off (LS_SMART).",
+   "ux": "🏛 Display Case tab (#view-case); the picker modal opens from any card via ★ Display Case.",
+   "files": [
+    "assets/app.js",
+    "index.html",
+    "assets/styles.css"
+   ],
+   "acceptance": [
+    "Smart shelves render automatically with cards from the collection",
+    "Pinning a card via openCasePicker puts it on a named manual shelf that survives reload",
+    "Each frame shows a trend line or 'tracking starts today' plus a PriceCharting history link",
+    "Remove/Edit buttons on manual frames update the shelf immediately"
+   ],
+   "verify": "Headless playwright-core: switch to the case view, assert `.dc-shelf` exists; call openCasePicker on State.cards[0] via page.evaluate, save, and assert the card appears under 'Your shelves' after renderCase().",
+   "est": "M",
+   "dependsOn": [
+    "collection-browser"
+   ],
+   "demand": "medium",
+   "notes": "Per-card price history is the #4 competitor want in ROADMAP-TO-PUBLISH.md (Dex reviews); the case's daily snapshots are the existing seed of that."
+  },
+  {
+   "id": "arcade-pull-machine",
+   "title": "Arcade: nostalgic card-pull gacha machine",
+   "icon": "🕹",
+   "area": "collection",
+   "status": "shipped",
+   "priority": "P3",
+   "spec": "renderArcade() in assets/app.js (line ~721) draws an SVG gacha machine (machineSVG()) that 'pulls' random cards from the user's own collection weighted by ARC_TIERS price tiers (arcTierOf(), arcadeDraw()). arcadePull() animates the pull and reveals the drawn card with its tier styling; pull history/state persists via arcadeGet()/arcadeSet() in localStorage key pokechest.arcade.v1. The view also shows a 'Next up — Plinko drop (Phase 1b)' teaser panel and the Phase-2 roadmap text (beat the Emerald hack, scan a card, catch it in-game). Purely local and cosmetic — no card data is modified.",
+   "ux": "🕹 Arcade tab (#view-arcade).",
+   "files": [
+    "assets/app.js",
+    "index.html",
+    "assets/styles.css"
+   ],
+   "acceptance": [
+    "The machine SVG renders and a Pull action reveals a card actually present in the collection",
+    "Rarer (higher-priced) cards appear with rarer tier styling per ARC_TIERS",
+    "Pull state persists across reloads via localStorage pokechest.arcade.v1"
+   ],
+   "verify": "Headless playwright-core: click the Arcade tab, assert the machine SVG exists, trigger the pull button, and assert a revealed card name matches one in State.cards.",
+   "est": "M",
+   "dependsOn": [
+    "collection-browser"
+   ],
+   "demand": "low",
+   "notes": "Novelty/retention feature; Phase 1b (Plinko) and Phase 2 (Emerald tie-in) are explicitly teased in-UI but not built."
+  },
+  {
+   "id": "den-3d-room",
+   "title": "The Den: walk-in 3D display room with editable displays & Sold Shelf",
+   "icon": "🏠",
+   "area": "den3d",
+   "status": "shipped",
+   "priority": "P1",
+   "spec": "renderDen() in assets/revamp.js (line ~374) renders a CSS-3D room (denRoomHTML()) inside #den-vp: floor/ceiling/wall faces, a scrolling live value ticker (portfolio total + top movers from State.meta), a 🏆 Trophy Wall (6 cards), 🧊 Slab Shelf (8 slabs with grader tags), 🖼️ side Gallery (6), a 💸 Sold Shelf (up to 5 sold cards with SOLD price tags from saleGet()), a spinning pedestal card, and a THE DEN sign. Drag rotates (yaw/pitch clamped), scroll walks (zoom 40–620), click on any [data-i] card opens openModal(); an Auto-orbit button animates yaw via denLoop()/requestAnimationFrame. Every display's card source is editable via selects bound to RV.den ({theme, wall, shelf, side, featured}) persisted in localStorage key pokechest.den.v1 (rvSaveDen()); sources come from rvPickCards() (top value, newest, graded, ja, vintage, Display Case picks, sold). Three themes: amber, midnight, neon. A 📷 Den Cam button jumps to the Scanner view.",
+   "ux": "🏠 The Den tab (#view-den): control bar of theme/display pickers above the full-width 3D viewport.",
+   "files": [
+    "assets/revamp.js",
+    "assets/revamp.css",
+    "index.html"
+   ],
+   "acceptance": [
+    "The room renders with trophy wall, slab shelf, gallery, ticker and pedestal populated from the collection",
+    "Changing 'Trophy wall' source to 'Vintage' re-renders that wall and persists after reload",
+    "Recording a sale makes the card appear on the Den's 💸 Sold Shelf with a SOLD tag",
+    "Clicking a displayed card opens its detail modal; drag/scroll changes the camera"
+   ],
+   "verify": "Headless playwright-core: switch to den view, assert `.den-trophy .den-card` count > 0 and `.den-ticker` text contains 'PORTFOLIO'; change #den-wall and assert localStorage pokechest.den.v1 updated.",
+   "est": "L",
+   "dependsOn": [
+    "collection-browser",
+    "add-sold-ledger"
+   ],
+   "demand": "medium",
+   "notes": "Signature feature — no competitor (Collectr/Dex/PullVault) has a 3D den; ROADMAP lists shareable 'Den tours' as the future differentiator."
+  },
+  {
+   "id": "studio3d-viewer-stl",
+   "title": "3D Studio: holo card viewer, Showcase mode & 3D-print STL export",
+   "icon": "🧊",
+   "area": "den3d",
+   "status": "shipped",
+   "priority": "P2",
+   "spec": "renderStudio3d() in assets/revamp.js (line ~191) shows any picked card as a CSS-3D two-faced card (#st3-card) with drag-to-rotate (pointer events, ST3.rx/ry), auto-spin toggle, a holo-foil overlay layer (#st3-holo), a fullscreen 'Showcase mode' (class .showcase on #st3-stage, meant for screen-recording Shorts), and double-click to open the card modal. The right panel generates real ASCII STL files client-side (mm, Z-up): st3Stand() builds an easel stand (base + lip + 20°-leaned back rest) and st3Frame() a recessed wall frame, both sized from a format select (#st3-fmt: sleeved 66×91×1, toploader 77×103×3.2, PSA slab 65×108×9.5, or custom W/H/T), triangulated via stlBox()/stlHexa() and serialized by stlText(). st3Download(kind) downloads chest-{stand|frame}-{cardname}-{W}x{H}mm.stl as a Blob. Card picking is by search or a top-14 art strip.",
+   "ux": "🧊 3D Studio tab (#view-studio3d): picker column, center 3D stage, right STL-export panel.",
+   "files": [
+    "assets/revamp.js",
+    "assets/revamp.css",
+    "index.html"
+   ],
+   "acceptance": [
+    "Picking a card updates the 3D stage front face and info panel",
+    "'⬇ Easel stand .stl' downloads a non-empty ASCII STL beginning with 'solid pokechest_stand'",
+    "Format select changes exported dimensions; custom shows W/H/T inputs",
+    "Showcase mode toggles fullscreen-style class and forces auto-spin"
+   ],
+   "verify": "Headless playwright-core: switch to studio3d, page.evaluate `stlText(st3Stand(66,91,1),'t')` and assert it starts with 'solid' and contains 'facet normal'; assert #st3-card element has class 'spin' when auto-spin is checked.",
+   "est": "L",
+   "dependsOn": [
+    "collection-browser"
+   ],
+   "demand": "medium",
+   "notes": "STL output feeds the Brand Lab 'Slab & Stand Bundles' idea and the Admin GradeStage hardware line."
+  },
+  {
+   "id": "scanner-camera-capture",
+   "title": "Scanner: camera capture stored with the card's file",
+   "icon": "📷",
+   "area": "capture",
+   "status": "shipped",
+   "priority": "P1",
+   "spec": "renderScan() in assets/revamp.js (line ~693) provides a two-panel flow: pick a card (live token search over State.cards) and frame/snap it. rvCamStart() opens getUserMedia at ideal 1920px with device picker (Continuity Camera iPhones appear automatically after permission), mirror toggle, and mapped error toasts per DOMException name; scCapture() draws the video to a canvas (max 1600px, JPEG q0.92) with a flash effect. If a card is selected, scSave() POSTs {pcId, slot:'scan-N', dataUrl} to /api/listingphoto on server.py (save_listing_photo(), files under a per-card dir via _listing_card_dir()), auto-incrementing the scan-N slot from GET /api/listingphotos?pcId=. scGallery() lists all photos on file with per-slot delete via POST /api/listingphoto/delete. A file input (accept=image/*, capture=environment) supports take/upload without a camera stream, and a 'Guided Photo Studio' button opens openPhotoStudio when available. In static (file-served, no server) mode the view warns that saving is disabled.",
+   "ux": "📷 Scanner tab (#view-scan): '1 · Pick the card' and '2 · Frame it & snap' panels, with the photo gallery under the selected card.",
+   "files": [
+    "assets/revamp.js",
+    "server.py",
+    "index.html",
+    "assets/revamp.css"
+   ],
+   "acceptance": [
+    "Selecting a card and POSTing a dataUrl to /api/listingphoto returns {ok:true} and the photo appears in the gallery as scan-1",
+    "Subsequent captures auto-increment to scan-2, scan-3…",
+    "Deleting a slot via /api/listingphoto/delete removes it from GET /api/listingphotos",
+    "Without the local server the UI shows the static-mode warning instead of failing silently"
+   ],
+   "verify": "curl -X POST localhost:8787/api/listingphoto -d '{\"pcId\":\"<real id>\",\"slot\":\"scan-1\",\"dataUrl\":\"data:image/jpeg;base64,...\"}' then GET /api/listingphotos?pcId=<id> and assert the slot is listed; camera hardware itself can't be exercised headless.",
+   "est": "L",
+   "dependsOn": [
+    "local-server-app-shell"
+   ],
+   "demand": "high",
+   "notes": "Scanning is the hero feature of PullVault/CollX competitors; photos double as listing photos for the composer."
+  },
+  {
+   "id": "scanner-staged-identify",
+   "title": "Staged shot + AI card identification",
+   "icon": "🔮",
+   "area": "capture",
+   "status": "shipped",
+   "priority": "P2",
+   "spec": "When the user snaps before picking a card, scCapture() stages the shot in RV.scan.staged and scRenderStaged() shows it with a '🔮 Identify card' button (visible only when a BYOK AI key is configured, State.live.ai.enabled). scIdentify() POSTs {dataUrl} to /api/ai/identify; server.py ai_identify() sends the base64 image to Anthropic (default model claude-sonnet-4-6) or OpenAI (gpt-4o) with the AI_IDENTIFY_SYSTEM prompt and returns {ok, guess:{name, number, set, lang, game, graded, confidence}}. The guess line renders with a confidence %, pre-fills the #sc-q card search (falling back to name-only if name+number over-filters), and — if the card isn't owned and a PriceCharting token exists — offers '➕ Add via PriceCharting' which sets RV.lgQuery and jumps to the ledger's catalog search. Picking any card while a shot is staged files the photo immediately (scSelect → scSave).",
+   "ux": "Inside the 📷 Scanner tab: the staged-shot card appears under the camera after a snap with no card selected.",
+   "files": [
+    "assets/revamp.js",
+    "server.py"
+   ],
+   "acceptance": [
+    "A capture with no card selected renders the staged card with Identify/discard controls",
+    "POST /api/ai/identify with a valid data URL and configured key returns {ok:true, guess:{…}}",
+    "A successful guess pre-fills the card search and shows a 'Looks like: …% sure' line",
+    "The PriceCharting add handoff lands in Add & Sold with the query pre-run"
+   ],
+   "verify": "curl -X POST localhost:8787/api/ai/identify -d '{\"dataUrl\":\"data:image/jpeg;base64,<img>\"}' with an anthropic key in settings.local.json and assert JSON has guess.name; without a key assert a clean {ok:false,error} (no 500).",
+   "est": "M",
+   "dependsOn": [
+    "scanner-camera-capture",
+    "byok-live-settings"
+   ],
+   "demand": "high",
+   "notes": "Single-card identify shipped; bulk 9-card binder-page scan (PullVault's killer feature) is #1 on the ROADMAP backlog, extending this same endpoint."
+  },
+  {
+   "id": "phone-lan-mode",
+   "title": "Phone mode: LAN HTTPS + QR to scan from your phone",
+   "icon": "📱",
+   "area": "capture",
+   "status": "shipped",
+   "priority": "P2",
+   "spec": "server.py's LAN section (line ~732) runs an opt-in second ThreadingHTTPServer on 0.0.0.0:PORT+1. lan_start() enumerates private IPv4s (_lan_ips), generates a self-signed cert via the openssl CLI when available (_ensure_lan_cert, SANs for each LAN IP, stored in lan-tls/) and wraps the socket in TLS so phone browsers get a secure context for live camera; plain HTTP still works for the file-input photo flow. GET/POST /api/lan return/toggle lan_status() ({enabled, port, scheme, tls, ips, urls}); the enabled flag persists in settings.local.json (lan_mode). scRenderLan() in assets/revamp.js renders the on/off button, the URLs, and a QR image (api.qrserver.com) encoding the first URL, with copy explaining the one-time self-signed-cert warning. All /api/ routes on the main listener remain local-only via _local_ok().",
+   "ux": "📷 Scanner tab → '📱 Phone mode' panel with the toggle, QR code and clickable LAN URLs.",
+   "files": [
+    "server.py",
+    "assets/revamp.js"
+   ],
+   "acceptance": [
+    "POST /api/lan {enabled:true} starts the second listener and GET /api/lan reports enabled:true with at least one url",
+    "With openssl present the URLs are https:// and tls:true; without it, http fallback still serves the app",
+    "The QR image and URLs render in the Scanner panel when enabled",
+    "POST {enabled:false} stops the listener and persists lan_mode:false"
+   ],
+   "verify": "curl -X POST localhost:8787/api/lan -d '{\"enabled\":true}' ; curl localhost:8787/api/lan and assert enabled+urls; then curl -k the reported LAN url for the app HTML; finally disable.",
+   "est": "M",
+   "dependsOn": [
+    "local-server-app-shell",
+    "scanner-camera-capture"
+   ],
+   "demand": "medium",
+   "notes": "ROADMAP publish gate calls for a LAN-defaults security audit before any public build; currently opt-in and home-network scoped."
+  },
+  {
+   "id": "auto-inventory-import",
+   "title": "Auto inventory import: watches for new PriceCharting exports",
+   "icon": "🔁",
+   "area": "capture",
+   "status": "shipped",
+   "priority": "P1",
+   "spec": "server.py runs _autosync_loop() in a daemon thread: every 20s (when enabled via settings key autosync, default true) _autosync_tick() finds the newest *.xlsx containing 'pricecharting' across the project folder, POKECHEST_HOME and ~/Downloads (_newest_export()), and if it is newer than data/collection.json's mtime calls refresh_data() (which shells scripts/build_data.py and parses its REPORT_JSON= line, then rebuilds the Pocket edition). Status lives in the AUTOSYNC dict {enabled, running, lastCheck, lastImport, lastReport, lastError, source, seq} served by GET /api/autosync; POST /api/autosync {enabled} toggles it. It refuses to run while a PriceCharting bulk sync holds PC_LOCK. Client-side, rvWatchAutosync() in assets/revamp.js polls /api/autosync every few seconds, and when seq increments it re-runs init() to reload collection.json and toasts the import ('N cards pulled in'); the Scanner's PriceCharting-sync panel shows the toggle and last-import line (autoBlock in scRenderPc()).",
+   "ux": "Invisible by default — a toast announces imports anywhere in the app; the on/off toggle and status line live in 📷 Scanner → PriceCharting sync.",
+   "files": [
+    "server.py",
+    "assets/revamp.js",
+    "scripts/build_data.py"
+   ],
+   "acceptance": [
+    "Dropping a newer PriceCharting-*.xlsx into ~/Downloads triggers a rebuild within ~20s with no clicks",
+    "GET /api/autosync reports lastImport, source filename and an incremented seq after an import",
+    "POST /api/autosync {enabled:false} stops the watcher and persists across restart",
+    "The running app reloads its collection and toasts when seq changes"
+   ],
+   "verify": "curl localhost:8787/api/autosync for baseline seq; touch a copy of PriceCharting-collection.xlsx with a newer mtime in the project folder; poll /api/autosync until seq increments and lastImport is set (requires openpyxl for the builder).",
+   "est": "M",
+   "dependsOn": [
+    "local-server-app-shell"
+   ],
+   "demand": "high",
+   "notes": "Removes the biggest friction of the export workflow; complements (and yields to) the token-based bulk price sync."
+  },
+  {
+   "id": "pc-bulk-sync-catalog-add",
+   "title": "PriceCharting bulk price sync + one-click catalog add",
+   "icon": "🔄",
+   "area": "capture",
+   "status": "shipped",
+   "priority": "P1",
+   "spec": "Two token-gated PriceCharting API integrations in server.py. (1) Bulk sync: POST /api/pc/sync starts _pc_sync_worker() in a thread, which calls pricecharting.com/api/product per card id, maps graded tiers onto each card's actual condition (_pc_pick_price), rewrites the live data/collection.json and recomputes meta (_pc_recompute_meta); GET /api/pc/sync/status streams the PC_SYNC dict {running, total, done, updated, errors, startedAt, finishedAt, value, lastError}. scRenderPc() in assets/revamp.js renders the 'Sync all prices now' button, a progress bar polled every 2.5s, an ETA, and reloads via init() when done. (2) Catalog add: GET /api/pc/search?q= proxies pricecharting.com/api/products (pc_search()); lgRenderPcAdd() in the Add & Sold tab renders a debounced (380ms) search box whose results show price/name/set/number, flag cards already owned, and add on click via lgStore() with the real PriceCharting id — no typing card details. Both panels fall back gracefully to '⚙ Add token' buttons that open Settings when no token is configured.",
+   "ux": "Bulk sync lives in 📷 Scanner → '🔄 PriceCharting sync'; catalog add is the search box at the top of ➕ Add & Sold → 'Add a card'.",
+   "files": [
+    "server.py",
+    "assets/revamp.js",
+    "data/collection.json"
+   ],
+   "acceptance": [
+    "With a token, POST /api/pc/sync returns ok and /api/pc/sync/status shows done advancing toward total, then finishedAt with an updated count",
+    "After sync the reloaded collection shows new prices and a recomputed portfolio value",
+    "GET /api/pc/search?q=charizard returns products with id/name/set/price; clicking a result adds the card with that pcId",
+    "Already-owned results are labeled 'already in your chest' and refuse duplicate adds"
+   ],
+   "verify": "With pc_token in settings.local.json: curl 'localhost:8787/api/pc/search?q=pikachu' and assert products[]; curl -X POST /api/pc/sync then poll /api/pc/sync/status until running:false. Without a token assert a clean {ok:false} error.",
+   "est": "L",
+   "dependsOn": [
+    "byok-live-settings",
+    "add-sold-ledger"
+   ],
+   "demand": "high",
+   "notes": "This is the PriceCharting-Premium-equivalent moat; ROADMAP open question #10 is whether to seek official PC partner terms before shipping."
+  },
+  {
+   "id": "add-sold-ledger",
+   "title": "Add & Sold ledger: in-app adds, sale records, Sold Shelf & archive",
+   "icon": "➕",
+   "area": "market",
+   "status": "shipped",
+   "priority": "P0",
+   "spec": "renderLedger() in assets/revamp.js (line ~1031) is the inventory in/out hub. KPIs: realized revenue, net after fees, realized profit (net minus cost), and count of in-app adds. Adding: PriceCharting catalog search (see pc-bulk-sync-catalog-add) plus a manual form (name/set/#/lang/value/cost/qty/graded+grader+grade) creating pcId 'custom-<ts>' entries stored in localStorage key pokechest.customcards.v1 via lgStore(); rvMergeCustom() merges customs into State.cards on every init (export copies win on name|number|set collision) and '📷 Add & scan photo' jumps straight to the Scanner with the new card selected. Selling: lgSaleForm(c) records {price, fees, net, venue, date, note} into localStorage pokechest.sales.v1 (saleSet), marks the card status 'sold' and optionally archived:true so rvRecalcMeta() drops it from portfolio totals while keeping it forever. The 🗃 Sold Shelf grid shows every sale with net/profit math, restore/archive toggles and undo-sale; a '⬇ Sales CSV' button exports all sales as pokemon-chest-sales.csv. Sold cards also feed the Den's 💸 shelf and the 'sold' source in rvPickCards().",
+   "ux": "➕ Add & Sold tab (#view-ledger): add panel left, record-a-sale panel right, Sold Shelf grid below.",
+   "files": [
+    "assets/revamp.js",
+    "index.html",
+    "assets/revamp.css"
+   ],
+   "acceptance": [
+    "A manually added card appears in the Collection grid and portfolio totals immediately and survives reload/refresh",
+    "Recording a sale moves the card to the Sold Shelf with net and profit computed, and (when archive is checked) removes it from totals",
+    "Undo sale restores the card and its value to the collection",
+    "Sales CSV downloads with one row per sale including fees/net/venue/date"
+   ],
+   "verify": "Headless playwright-core: page.evaluate lgStore({pcId:'custom-test',name:'Test',set:'X',price:5,qty:1}) then assert State.cards contains it and #vpValue increased; record a sale via saleSet/uset and assert rvSoldCards() length is 1 and meta.totalValue dropped.",
+   "est": "L",
+   "dependsOn": [
+    "collection-browser"
+   ],
+   "demand": "high",
+   "notes": "Closes the buy→sell loop competitors (Collectr) handle with cloud accounts — here fully local in localStorage."
+  },
+  {
+   "id": "sell-hub",
+   "title": "Sell Hub: ranked sellers, grading candidates, pop watch, for-sale list",
+   "icon": "💵",
+   "area": "market",
+   "status": "shipped",
+   "priority": "P0",
+   "spec": "renderSell() in assets/app.js (line ~1312) renders four sub-tabs. 'Top sellers': top-40 by value with fee-adjusted net (sellNet(), eBay ~13.6% baked in), P/L and a comp-link strip (eBay raw/graded sold, TCGplayer/JP, PriceCharting) plus a gold '📤 List' button opening openListingComposer(). 'Grading candidates': every raw card whose gradeAdvice() verdict isn't 'no', sorted by PSA-10 upside, with per-grade estimate cells from gradeLadder() (PSA 10/9/8 + two alternate services from data/grade-intel.json serviceDeltas), each cell linking to that grade's real eBay sold search (gradeSoldLink()), and a Strong/Maybe verdict with a '9 still beats raw' or '10-or-bust' flag. 'Pop watch': the top-75 raw Pokémon cards ≥$5 with PSA pop / GemRate lookup links and a user-entered PSA-10 population (popSet, localStorage) that drives a popTier() verdict on premium compression. 'My for-sale list': cards flagged status 'forsale' from the card modal. All estimates carry click-through-to-comps disclaimers.",
+   "ux": "💵 Sell Hub tab (#view-sell) with a 4-tab tabbar (Top sellers / Grading candidates / Pop watch / My for-sale list).",
+   "files": [
+    "assets/app.js",
+    "data/grade-intel.json",
+    "data/selling-intel.json",
+    "index.html"
+   ],
+   "acceptance": [
+    "Top sellers table shows value, net est. with fee % and live comp links per row",
+    "Grading candidates rows show PSA 10/9/8 estimates that each link to grade-specific eBay sold searches",
+    "Entering a PSA-10 pop number persists and renders a colored pop verdict",
+    "Cards marked 'For sale' in the modal appear under My for-sale list"
+   ],
+   "verify": "Headless playwright-core: open the sell view, assert `.sell-table tbody tr` > 0 on Top sellers; click the Grading candidates tab and assert a cell href contains 'ebay' and 'PSA'; type a pop value and assert a verdict badge renders after change.",
+   "est": "L",
+   "dependsOn": [
+    "collection-browser"
+   ],
+   "demand": "high",
+   "notes": "The grade-ROI + pop-compression math is the differentiator vs Collectr/Dex; per-grade values are era-ratio estimates, always linked to real comps."
+  },
+  {
+   "id": "best-sellers-board",
+   "title": "Best Sellers: liquidity-scored top-25 board + channel matrix",
+   "icon": "💰",
+   "area": "market",
+   "status": "shipped",
+   "priority": "P1",
+   "spec": "renderBest() in assets/revamp.js (line ~500) loads data/best-sellers.json (rvData) and scores every unsold, unarchived card: score = value × price-band factor (5 bands, bulk→big tickets, with embedded fallbacks) × eraHeat × langFactor × setHeat match × gradedBonus. It renders KPIs (top-25 board value, sweet-spot $25–100 count, $100+ auction anchors, next-60-card weekly live lot value), the ranked Best-Sell Board table (ask, band, 'why it moves', a suggested venue from suggest() — eBay auction/BIN, Whatnot live, live lots, Brand Lab packs — and the fee-adjusted net for that venue from the channel's feePct/feeFlat), a channel matrix card per channel (eBay auction/BIN, Whatnot, YouTube, Facebook, TCGplayer, Mercari: fees, best-for, avoid, tips, payout) and the auctionNight/livePlaybook step-by-step playbooks from the data file. Controls: include-graded toggle and min-$ filter (BEST state). Rows open the card modal.",
+   "ux": "💰 Best Sellers tab (#view-best): KPI row, Best-Sell Board table, channel matrix cards, playbook panels.",
+   "files": [
+    "assets/revamp.js",
+    "data/best-sellers.json",
+    "assets/revamp.css"
+   ],
+   "acceptance": [
+    "The board lists 25 ranked cards with band labels and per-venue net estimates",
+    "Sold/archived cards never appear on the board",
+    "Changing min-$ or the graded toggle re-scores and re-renders",
+    "Channel cards render fees and playbooks from data/best-sellers.json (with fallbacks when absent)"
+   ],
+   "verify": "Headless playwright-core: open the best view, assert `.rv-table tbody tr` count === 25 (or ≤25 for small collections) and that the first row's net cell matches /\\$/; toggle #bs-graded and assert the board re-renders.",
+   "est": "L",
+   "dependsOn": [
+    "collection-browser",
+    "add-sold-ledger"
+   ],
+   "demand": "high",
+   "notes": "Venue-routing (auction vs live vs BIN) advice is content no scanner competitor ships; data pack is editable JSON."
+  },
+  {
+   "id": "listing-composer",
+   "title": "Listing composer: eBay-ready titles, descriptions & photo checklist",
+   "icon": "📤",
+   "area": "market",
+   "status": "shipped",
+   "priority": "P1",
+   "spec": "openListingComposer(c, backTo, venueKey) in assets/app.js (line ~2456) opens a modal that generates a ready-to-paste eBay listing for a card: ebayTitle(c) builds an 80-char-aware title from name/number/set/language/grade, and ebayDescription(c) a structured description (condition, provenance, comps guidance, shipping blurb); both have copy buttons. It pulls the card's saved photos from GET /api/listingphotos?pcId= as the photo checklist (scans taken in the Scanner double as listing photos) and links the card's live comp searches for pricing. localVenueStripHTML(c) (data/local-venues.json) adds local-selling venue chips. The composer is reachable from the card modal and from every Sell Hub row's gold '📤 List' button, and remembers where to return (backTo).",
+   "ux": "Modal opened from Sell Hub rows ('📤 List') or the card detail modal.",
+   "files": [
+    "assets/app.js",
+    "data/local-venues.json",
+    "server.py"
+   ],
+   "acceptance": [
+    "The composer opens from a Sell Hub row with a generated title ≤80 chars containing name and set",
+    "The description includes grade/condition and is copyable",
+    "Photos previously saved for the card appear in the composer",
+    "Local venue chips render from data/local-venues.json"
+   ],
+   "verify": "Headless playwright-core: page.evaluate openListingComposer(State.cards[0]) and assert the modal contains a title input/text matching the card name and a copy control; assert ebayTitle(State.cards[0]).length <= 80.",
+   "est": "M",
+   "dependsOn": [
+    "sell-hub",
+    "scanner-camera-capture"
+   ],
+   "demand": "medium",
+   "notes": "Bridges inventory→sale; no auto-posting to eBay APIs — copy/paste by design (keeps the app account-free)."
+  },
+  {
+   "id": "grade-lab",
+   "title": "Grade Lab: centering calculator & photo pre-grade bench",
+   "icon": "🧪",
+   "area": "market",
+   "status": "shipped",
+   "priority": "P1",
+   "spec": "renderLab() in assets/app.js (line ~1896) renders three sections from State.lab (data/grade-lab.json, with embedded fallbacks). labBenchHTML(): the imaging-bench workflow (raking/even light) guidance. labPregradeHTML()/wirePregrade(): a per-card pre-grade worksheet — enter left/right and top/bottom border measurements and centeringFromBorders() computes the worst-axis percentage, centeringCeiling() caps the achievable grade against labStandards() (PSA 10 needs 55/45 front etc.), and checkboxes for labDowngraders() flaws (print lines, holo scratches, edge whitening, soft corners) each cap the grade via parseDropCap(); the resulting ceiling + notes persist per card in localStorage pokechest.pregrade.v1 (pregradeSet). labStandardsHTML(): the centering standards table per grade. The pre-grade result feeds the same gradeAdvice() economics shown in Sell Hub.",
+   "ux": "🧪 Grade Lab tab (#view-lab): bench guide, pre-grade worksheet (card picker + measurements + flaw checklist), standards table.",
+   "files": [
+    "assets/app.js",
+    "data/grade-lab.json",
+    "index.html"
+   ],
+   "acceptance": [
+    "Entering border measurements yields a centering % and a max-grade ceiling consistent with the standards table",
+    "Ticking a downgrader flaw (e.g. print line) caps the estimated grade at 9 or lower",
+    "A card's pre-grade record persists in localStorage across reloads",
+    "With data/grade-lab.json present the verified standards render instead of fallbacks"
+   ],
+   "verify": "Headless playwright-core: open the lab view, page.evaluate centeringFromBorders(60,40) and assert it returns the worst-axis pct; fill the worksheet inputs and assert the ceiling text updates and pokechest.pregrade.v1 is written.",
+   "est": "L",
+   "dependsOn": [
+    "collection-browser"
+   ],
+   "demand": "medium",
+   "notes": "Manual measurement version shipped; AI photo pre-grade (CollectorVault/PokéVault style) is backlog item #2 and would layer on this plus the GradeStage rig."
+  },
+  {
+   "id": "submit-guide",
+   "title": "Submit: PSA/CGC/TAG/BGS submission walkthrough & live service status",
+   "icon": "📮",
+   "area": "market",
+   "status": "shipped",
+   "priority": "P2",
+   "spec": "renderSubmit() in assets/app.js (line ~2047) renders data/submit-guide.json (State.submit): a linkgrid of official portals (PSA submit/pricing/standards/tracking, CGC, TAG, BGS) via linkBtn(); the PSA step-by-step (S.psaSteps); packaging rules that prevent cards being returned ungraded (S.packagingRules); a 'Service levels — advertised vs actual' table (S.serviceStatus, dated mid-2026); backlog-beating guidance (S.delayGuidance); and per-service 'when to use someone else' alternatives (S.alternatives with cost/turnaround/resale tradeoffs). If the data file is missing it degrades to a stub panel with direct PSA/CGC/TAG links. Static content view — no state is written.",
+   "ux": "📮 Submit tab (#view-submit).",
+   "files": [
+    "assets/app.js",
+    "data/submit-guide.json",
+    "index.html"
+   ],
+   "acceptance": [
+    "Link buttons render with working official-portal URLs from the data file",
+    "The PSA step-by-step and packaging rules lists are populated",
+    "The service-status table shows advertised vs actual turnaround columns",
+    "With submit-guide.json absent the fallback stub renders without errors"
+   ],
+   "verify": "Headless playwright-core: open the submit view and assert `.linkgrid .linkbtn` count >= 4 and the service table has rows; curl data/submit-guide.json to confirm it serves.",
+   "est": "M",
+   "dependsOn": [],
+   "demand": "medium",
+   "notes": "Content freshness lives entirely in data/submit-guide.json — updatable without code changes."
+  },
+  {
+   "id": "sell-grade-guide",
+   "title": "Sell & Grade Guide: fees, tiers, multiples & venue guidance",
+   "icon": "📖",
+   "area": "market",
+   "status": "shipped",
+   "priority": "P2",
+   "spec": "renderGuide() in assets/app.js (line ~1456) renders data/selling-intel.json (State.intel): the break-even rule-of-thumb callout, current grading service tiers and costs, grade-value multiple tables, marketplace fee comparisons, and the best-venue matrix for raw English / graded / Japanese cards, each with cited sources. localPlaybookHTML() adds a local-selling playbook (shows/shops from data/local-venues.json context) and sellerPlaybookHTML() a full seller playbook (photography, pricing, shipping, scaling) sourced from data/seller-biz.json content. State.intel also powers the app-wide fee math (sellNet) and comp URL templates (urlTemplates), so this data file is load-bearing beyond the view. The header carries the not-financial-advice disclaimer from the data file.",
+   "ux": "📖 Sell & Grade Guide tab (#view-guide).",
+   "files": [
+    "assets/app.js",
+    "data/selling-intel.json",
+    "data/seller-biz.json",
+    "data/local-venues.json"
+   ],
+   "acceptance": [
+    "The guide renders grading tiers/costs and fee tables from selling-intel.json",
+    "The break-even callout and disclaimer text render at the top",
+    "Seller and local playbook sections render populated lists",
+    "urlTemplates from the same file drive comp links across the app"
+   ],
+   "verify": "Headless playwright-core: open the guide view and assert it contains 'Break-even' and at least one guide-table; assert State.intel.urlTemplates.ebayRawSold is a template containing '{q}'.",
+   "est": "M",
+   "dependsOn": [],
+   "demand": "medium",
+   "notes": "Sources compiled from public hobby data; README stresses always checking live comps."
+  },
+  {
+   "id": "merch-vault",
+   "title": "Merch Vault: sealed/games/plush tracker with eBay comps",
+   "icon": "🧢",
+   "area": "market",
+   "status": "shipped",
+   "priority": "P3",
+   "spec": "renderMerch() in assets/app.js (line ~1772) is a non-singles inventory tracker persisted in localStorage pokechest.merch.v1 (merchItems()/merchSave()). The add form captures name, category (from data/merch-guide.json merchCategories), condition (MERCH_CONDS: factory sealed → loose), paid $ and est. $. The table shows per-item P/L, live 'eBay sold' and 'Active' comp links built by merchSoldLink()/merchActiveLink() from State.intel.urlTemplates, a 'Sold…' prompt flow that records soldFor/soldDate, and delete. Totals line shows holding est., paid, and realized profit. Below the tracker, sealed ground rules (M.sealedRules) and the curated category value guide (M.merchCategories with example items, value ranges and condition rules) render from the data pack, with a graceful loading panel if the file is missing.",
+   "ux": "🧢 Merch Vault tab (#view-merch): tracker form + table on top, curated market guide panels below.",
+   "files": [
+    "assets/app.js",
+    "data/merch-guide.json",
+    "index.html"
+   ],
+   "acceptance": [
+    "Adding an item persists it across reloads and shows P/L vs paid",
+    "The 'Sold…' flow records the sale amount and styles the row as sold, updating realized profit",
+    "Every item and guide example links to a real eBay sold-comps search",
+    "Category guide panels render from merch-guide.json"
+   ],
+   "verify": "Headless playwright-core: open the merch view, fill #mi-name/#mi-paid/#mi-est, click #mi-add, and assert a .sell-table row appears and localStorage pokechest.merch contains the item.",
+   "est": "M",
+   "dependsOn": [],
+   "demand": "low",
+   "notes": "Covers the Collectr 'everything collectible' angle without leaving the local-first model."
+  },
+  {
+   "id": "byok-live-settings",
+   "title": "BYOK live data & AI: settings, price/comps/AI proxies",
+   "icon": "⚙",
+   "area": "market",
+   "status": "shipped",
+   "priority": "P1",
+   "spec": "openSettings() in assets/app.js (line ~2694, the topbar '⚙ Live' button) lets the user paste their own keys: a PriceCharting token, a comps API key, and a Claude or OpenAI key with provider/model choice (defaults claude-sonnet-4-6 / gpt-4o). POST /api/config in server.py persists them to settings.local.json (owner-only 0600 via _write_settings; gitignored, never bundled); GET /api/config returns booleans only (config_view()) which populate State.live and updateLiveBtn(). The server then proxies: GET /api/price?id= → pricecharting_price() (live raw+graded tiers for one card), POST /api/comps → comps_lookup() (sold comps via pokemonpricetracker/pokemon-api), POST /api/ai → ai_recommend() (a written per-card sell/grade recommendation). liveZoneHTML(c)/wireLiveZone(c) surface these actions inside the card modal when keys exist. Everything works with zero keys — these only add live data.",
+   "ux": "⚙ Live button in the topbar opens the settings modal; live actions appear in each card's detail modal when configured.",
+   "files": [
+    "assets/app.js",
+    "server.py"
+   ],
+   "acceptance": [
+    "GET /api/config returns booleans only — no key material ever reaches the browser",
+    "Saving a key via POST /api/config persists to settings.local.json with 0600 perms and lights up the Live button",
+    "With a PC token, GET /api/price?id=<pcId> returns live price tiers for that card",
+    "With an AI key, POST /api/ai returns a written recommendation for the posted card"
+   ],
+   "verify": "curl localhost:8787/api/config and assert values are true/false only; POST a dummy token via /api/config, re-GET and assert the boolean flipped; confirm settings.local.json mode is 600.",
+   "est": "L",
+   "dependsOn": [
+    "local-server-app-shell"
+   ],
+   "demand": "medium",
+   "notes": "BYOK keeps the shipped build free of paid services (LEGAL.md); server proxies straight to providers, no third party."
+  },
+  {
+   "id": "local-server-app-shell",
+   "title": "Local server, launcher & Tauri app shell",
+   "icon": "🖥",
+   "area": "platform",
+   "status": "shipped",
+   "priority": "P0",
+   "spec": "server.py (Python stdlib only, ThreadingHTTPServer on localhost:8787) serves index.html + assets + data and the full /api/* surface (health, config, refresh, price, comps, ai, ai/identify, lan, pc/sync, pc/search, autosync, listingphoto*, cardart*, saveimg, secrets*, pocket, mobile*, emerald*), guarding every /api route with _local_ok() so only local (or the opt-in LAN listener's) clients reach it. start.command launches it and opens the browser; refresh-data.command is the manual data rebuild; scripts/build_data.py converts the PriceCharting xlsx to data/collection.json with TCGdex image matching. src-tauri/ (plus tauri-shell/) wraps the identical server+UI as a native 'Pokémon Den.app' — package.json scripts tauri:dev/tauri:build. The front end degrades to a read-only 'static mode' when fetch('/api/…') fails (State.live falsy), disabling save/scan features with explanatory notices instead of breaking. Admin additionally builds self-contained phone editions ('Pokémon Den — Pocket.html' via scripts/build_pocket.py and the Deck mobile app via scripts/build_mobile.py, delivered to Desktop/iCloud by deliver_mobile()).",
+   "ux": "Invisible plumbing: start.command / Pokémon Den.app launches; the Admin tab hosts the Pocket/Deck build buttons; static-mode warnings appear inline when the server is absent.",
+   "files": [
+    "server.py",
+    "start.command",
+    "refresh-data.command",
+    "scripts/build_data.py",
+    "scripts/build_pocket.py",
+    "scripts/build_mobile.py",
+    "src-tauri",
+    "tauri-shell",
+    "package.json"
+   ],
+   "acceptance": [
+    "GET /api/health returns {ok:true, version} and the app loads at localhost:8787",
+    "All /api routes reject non-local callers via _local_ok()",
+    "POST /api/refresh rebuilds data/collection.json from the newest export and returns a report",
+    "The Tauri build wraps the same server+UI (npm run tauri:build produces Pokemon Den.app)"
+   ],
+   "verify": "python3 server.py & then curl localhost:8787/api/health and /data/collection.json; assert index.html serves and a playwright-core page load shows the dashboard.",
+   "est": "L",
+   "dependsOn": [],
+   "demand": "high",
+   "notes": "100% local privacy model is the core pitch (README); ROADMAP notes the Python server must move in-process for Mac App Store sandboxing."
+  },
+  {
+   "id": "dmg-ci-pipeline",
+   "title": "CI: macOS DMG build & rolling release",
+   "icon": "📦",
+   "area": "platform",
+   "status": "shipped",
+   "priority": "P1",
+   "spec": ".github/workflows/build-dmg.yml builds 'Pokemon Den.app' + a styled DMG on macos-latest for every push to main / the redesign branch (path-filtered to src-tauri, assets, tauri-shell, index.html, server.py, icon-source.png, the workflow itself) and on workflow_dispatch. Steps: checkout, Node 20, stable Rust with aarch64+x86_64 apple targets, Swatinem rust-cache, regenerate the full icon set from icon-source.png via `npx @tauri-apps/cli icon`, then `tauri build --target universal-apple-darwin` with ad-hoc signing ({\"signingIdentity\":\"-\"} override since CI has no Apple cert — first launch needs right-click→Open). The DMG publishes to a rolling 'dmg-latest' GitHub release via gh (release assets avoid the Actions artifact-storage quota that failed run #1). Locally, build-app.command performs the equivalent build with the Amber Den DMG background and drag-to-Applications layout.",
+   "ux": "Not in-app: downloadable installer on the repo's Releases page (dmg-latest); build-app.command for local builds.",
+   "files": [
+    ".github/workflows/build-dmg.yml",
+    "build-app.command",
+    "src-tauri",
+    "icon-source.png"
+   ],
+   "acceptance": [
+    "A push touching src-tauri/** triggers the workflow and produces a universal (arm64+x86_64) DMG",
+    "The DMG lands as an asset on the dmg-latest release",
+    "The icon set is regenerated from icon-source.png on every run",
+    "The bundle is ad-hoc signed and opens after right-click→Open on a clean Mac"
+   ],
+   "verify": "gh run list --workflow build-dmg.yml for a green run, then gh release view dmg-latest and assert a .dmg asset with a recent timestamp; or trigger via gh workflow run build-dmg.yml.",
+   "est": "M",
+   "dependsOn": [
+    "local-server-app-shell"
+   ],
+   "demand": "medium",
+   "notes": "Real signing + notarization (Apple cert secrets) is an explicit unchecked item on the ROADMAP publish gate."
+  },
+  {
+   "id": "brand-lab",
+   "title": "Brand Lab: brand, packaging lines & bulk-card product roadmap",
+   "icon": "🏷",
+   "area": "publish",
+   "status": "shipped",
+   "priority": "P2",
+   "spec": "renderBrand() in assets/revamp.js (line ~609) renders data/brand-lab.json: KPIs computed live from the collection (bulk cards <$10 to package, $10–25 'pack hits' to seed Mystery Chests, product-line count); an ⚖️ IP-safety rules panel (bl.ipSafety) governing what can legally be sold; the brand table (name candidates with per-name IP-risk badges via risk(), taglines and logo prompts with one-click clipboard copy buttons, voice, and a color system swatch row); an art pipeline with print-cost categories table; the 📦 packaging product lines cards (Era Vault Packs, Mystery Chests, Frame-Ready Sets… each with tier, price point, unit cost, stand-out move); ✨ stand-out moves; and a phased 🗺️ roadmap. Copy buttons use navigator.clipboard with a manual-copy fallback toast. If brand-lab.json is missing it shows a clear 'pull the latest app files' panel.",
+   "ux": "🏷 Brand Lab tab (#view-brand).",
+   "files": [
+    "assets/revamp.js",
+    "data/brand-lab.json",
+    "assets/revamp.css"
+   ],
+   "acceptance": [
+    "KPIs reflect the real count of sub-$10 and $10–25 cards in the loaded collection",
+    "Name candidates render with ✓ safe / ⚠ IP risk badges from the data file",
+    "Copy buttons put taglines/logo prompts on the clipboard (or toast a fallback)",
+    "All packaging lines render with price point, unit cost and stand-out"
+   ],
+   "verify": "Headless playwright-core: open the brand view and assert `.rv-pack` count equals brand-lab.json packagingLines.length and the bulk KPI is a number; curl data/brand-lab.json for validity.",
+   "est": "M",
+   "dependsOn": [
+    "collection-browser"
+   ],
+   "demand": "low",
+   "notes": "Feeds ROADMAP naming (Card Den / Amber Den / DenKeeper candidates) and the Steam 'Amber Den' strategy; content-only, no external calls."
+  },
+  {
+   "id": "legal-credits",
+   "title": "Legal & credits: LEGAL.md + in-footer attribution",
+   "icon": "⚖️",
+   "area": "publish",
+   "status": "partial",
+   "priority": "P0",
+   "spec": "LEGAL.md documents the full legal posture: unofficial fan-made tool, nominative use of Pokémon trademarks (© Nintendo / Creatures / GAME FREAK), card images credited to TCGdex, prices from the user's own PriceCharting export/token, marketplace trademark notices, an explicit 'what this app does NOT do' list (no redistribution, no monetizing Nintendo IP, first-sale doctrine for physical cards, no bundled keys), and public-release conditions (rename without 'Pokémon', drop/license IP visuals, keep credits visible in-app). index.html's footer carries a condensed version of this notice plus TCGdex/PriceCharting attribution and the not-financial-advice line on every view. PARTIAL because the ROADMAP publish gate requires LEGAL.md itself to be surfaced in-app (an About panel), which does not exist yet — only the footer summary ships.",
+   "ux": "Persistent footer at the bottom of every view; full text only in the repo's LEGAL.md.",
+   "files": [
+    "LEGAL.md",
+    "index.html",
+    "ROADMAP-TO-PUBLISH.md"
+   ],
+   "acceptance": [
+    "The footer shows the Nintendo/Pokémon trademark disclaimer and TCGdex/PriceCharting credits on every tab",
+    "LEGAL.md covers trademarks, image sourcing, non-affiliation, and public-release conditions",
+    "The not-financial-advice line renders in the footer"
+   ],
+   "verify": "Headless playwright-core: assert document.querySelector('.footer').textContent includes 'not affiliated' and 'TCGdex'; Read LEGAL.md exists and contains the public-distribution section.",
+   "est": "S",
+   "dependsOn": [],
+   "demand": "medium",
+   "notes": "Gate item 'LEGAL.md surfaced in-app (About panel)' is unchecked in ROADMAP-TO-PUBLISH.md — the remaining work to mark this shipped."
+  },
+  {
+   "id": "bulk-binder-scan",
+   "title": "Bulk binder-page scan (9 cards, one photo)",
+   "icon": "🗂",
+   "area": "capture",
+   "status": "planned",
+   "priority": "P0",
+   "spec": "Extend ai_identify(payload, settings) in server.py (~line 1003): when payload.get('mode') == 'grid', use a new constant AI_IDENTIFY_GRID_SYSTEM (define it right after AI_IDENTIFY_SYSTEM, ~line 1001) that instructs the model to return ONLY a JSON array of up to 9 objects, row-major from the top-left pocket, each {\"slot\":1-9,\"name\",\"number\",\"set\",\"lang\":\"en\"|\"ja\",\"game\",\"graded\":bool,\"confidence\":0-1}, omitting empty pockets; raise max_tokens from 300 to 2000, use prompt text 'Identify every card in this 3x3 binder-page photo.', parse with re.search(r\"\\[.*\\]\", text, re.S) + json.loads, and return {\"ok\":True,\"guesses\":[...],\"provider\":provider,\"model\":model}. The existing single-card path (no mode key) must keep returning {\"ok\":True,\"guess\":{...}} unchanged, and the route stays POST /api/ai/identify in do_POST (server.py ~line 1488) with its existing _guard(s.get('ai_key'),'ai_key') check. In assets/revamp.js renderScan() (~line 694), inside the '2 · Frame it & snap' panel, add (only when State.live && State.live.ai && State.live.ai.enabled) a label-button '🗂 Scan a 9-pocket binder page' wrapping <input id=\"sc-binderfile\" type=\"file\" accept=\"image/*\" capture=\"environment\" style=\"display:none\">, plus an empty <div id=\"sc-binder\"></div> after #sc-staged; onchange read the file with blobToDataUrl (assets/app.js line 370), set RV.scan.binder = {dataUrl, guesses:null, crops:{}, saved:{}} and call new functions scRenderBinder() then scBinderIdentify(). scBinderIdentify() POSTs /api/ai/identify with body {dataUrl, mode:'grid'}, stores j.guesses on RV.scan.binder and re-renders; scRenderBinder() renders a 3-column CSS grid (.sc-bgrid / .sc-bcell in assets/revamp.css: display:grid;grid-template-columns:repeat(3,1fr);gap:8px) of 9 cells where each cell shows the pocket's cropped thumbnail from new helper scBinderCrop(dataUrl, slot) (canvas: drawImage of source region col*w/3,row*h/3,w/3,h/3 → toDataURL('image/jpeg',0.85), cached in RV.scan.binder.crops[slot]), the guess line (name #number · set · confidence%), up to 4 match candidates from State.cards using the same token filter as #sc-q (toks from guess name+number, every token included in (c.name+' '+c.set+' '+(c.number||'')).toLowerCase()), a '➕ Add' button that sets RV.lgQuery = [guess.name, guess.number].filter(Boolean).join(' ') and calls switchView('ledger') (same as the existing #sc-pcadd handler at line 806), and a '✕' to clear RV.scan.binder. Refactor scSave (revamp.js line 915) by extracting async function scSaveTo(card, dataUrl) containing its body (fetch /api/listingphotos?pcId=, compute next free scan-N slot, POST /api/listingphoto {pcId, slot, dataUrl}) so scSave(d) becomes scSaveTo(RV.scan.card, d); clicking a match candidate calls scSaveTo(matchedCard, RV.scan.binder.crops[slot]) and marks the cell '✓ saved to <name>' in RV.scan.binder.saved[slot].",
+   "ux": "Scanner tab (📷), '2 · Frame it & snap' panel: a '🗂 Scan a 9-pocket binder page' button that opens a 3x3 review grid (#sc-binder) below the staged-shot area, one cell per pocket with match/add actions.",
+   "files": [
+    "server.py",
+    "assets/revamp.js",
+    "assets/revamp.css"
+   ],
+   "acceptance": [
+    "curl -s -X POST http://127.0.0.1:8787/api/ai/identify -H 'content-type: application/json' -d '{\"mode\":\"grid\",\"dataUrl\":\"data:image/jpeg;base64,x\"}' with no ai_key configured returns HTTP 200 {\"ok\":false} with an error naming ai_key (guard intact); with a key configured it returns ok:true and a 'guesses' array (not 'guess').",
+    "The single-card path (POST without mode) still returns the exact old shape {ok:true, guess:{...}} — scIdentify() in revamp.js works unchanged.",
+    "With AI enabled, choosing an image file on #sc-binderfile renders #sc-binder containing exactly 9 .sc-bcell elements, each showing a cropped ninth of the source photo.",
+    "Clicking a match candidate in a cell POSTs /api/listingphoto with that cell's cropped dataUrl and the card's next free scan-N slot, and the cell switches to a '✓ saved' state.",
+    "Cells whose guess has no candidate match show the '➕ Add' button, which lands on the Add & Sold tab with the PriceCharting search prefilled via RV.lgQuery."
+   ],
+   "verify": "Run POKECHEST_HOME=<scratch> python3 server.py, then curl the /api/ai/identify grid body above and assert the ai_key guard JSON. Drive http://127.0.0.1:8787 with playwright-core (chromium at /opt/pw-browsers): switchView('scan'), page.evaluate to set RV.scan.binder={dataUrl:<tiny 3x3 test jpeg>,guesses:[{slot:1,name:'Pikachu'}],crops:{},saved:{}} and call scRenderBinder(), assert 9 .sc-bcell nodes and zero pageerrors.",
+   "est": "M",
+   "dependsOn": [],
+   "demand": "high",
+   "notes": "Roadmap backlog #1 — PullVault's killer feature; the #1 complaint about single-card scanners (Collectr/CollX reviews). Server already stores per-card photos via /api/listingphoto."
+  },
+  {
+   "id": "ai-pre-grade",
+   "title": "AI condition pre-grade from a photo",
+   "icon": "📐",
+   "area": "capture",
+   "status": "planned",
+   "priority": "P1",
+   "spec": "In server.py add AI_GRADE_SYSTEM next to AI_IDENTIFY_SYSTEM (~line 997): 'You pre-grade trading cards from a photo like a PSA grader. Respond with ONLY a JSON object, no prose: {\"centering\":{\"lr\":\"55/45\",\"tb\":\"60/40\",\"worstPct\":60},\"corners\":0-10,\"edges\":0-10,\"surface\":0-10,\"flaws\":[short strings],\"estGrade\":1-10,\"confidence\":0-1}. worstPct is the worst-axis border percentage. Use null for anything unreadable.' Add def ai_grade(payload, settings) modeled exactly on ai_identify (same provider branches for anthropic/openai, same data-url regex, max_tokens 500, prompt 'Pre-grade this trading card.'), parsing re.search(r\"\\{.*\\}\", text, re.S) and returning {\"ok\":True,\"grade\":parsed,\"provider\":provider,\"model\":model}. Register route POST /api/ai/grade in do_POST (server.py, next to the /api/ai/identify block at ~line 1488) with the identical _guard(s.get('ai_key'),'ai_key') check and the same HTTPError/Exception handling. In assets/app.js labPregradeHTML() (~line 1937), inside the '2 · Centering calculator' panel add — only when State.live && State.live.ai && State.live.ai.enabled — a row: <label class=\"btn sm\" style=\"cursor:pointer\">📷 AI pre-grade from a photo<input id=\"pg-photo\" type=\"file\" accept=\"image/*\" style=\"display:none\"></label><span id=\"pg-ai\" class=\"reason\"></span>. In wirePregrade() (~line 1969) add a closure variable let aiEst = null and let aiRec = null; the #pg-photo onchange handler reads the file with blobToDataUrl (app.js line 370), POSTs /api/ai/grade with {dataUrl}, and on ok sets aiRec = j.grade, aiEst = +j.grade.estGrade || null, writes a summary into #pg-ai ('AI: centering 60/40 worst · corners 9 · edges 9 · surface 8 → est PSA 8 · 72% sure'), and if j.grade.centering.worstPct is a number and all four #pg-left/right/top/bottom inputs are empty, treats centeringCeiling(worstPct) as the centering ceiling; then calls update(). Modify update() so est = Math.min(centCeil == null ? 10 : centCeil, checkCeil, aiEst == null ? 10 : aiEst); the existing verdict body already runs gradeLadder(current) (line 2001) to compute PSA 10/9/8 dollar values and the net-vs-raw grade-ROI verdict (net = est$ * (1 - 0.136) - allInGradingCost), so the AI estimate flows into that math with no further change. Extend the existing pregradeSet(current.pcId, {...}) call (line 2007) to also persist ai: aiRec under the existing LS_PREGRADE key 'pokechest.pregrade.v1'.",
+   "ux": "Grade Lab tab (🧪) → 'Pre-grade a card' sub-tab: an 'AI pre-grade from a photo' upload button in the centering panel whose result feeds the existing #pg-verdict grade-ROI box.",
+   "files": [
+    "server.py",
+    "assets/app.js"
+   ],
+   "acceptance": [
+    "curl -s -X POST http://127.0.0.1:8787/api/ai/grade -H 'content-type: application/json' -d '{\"dataUrl\":\"data:image/jpeg;base64,x\"}' with no ai_key returns 200 {\"ok\":false} naming ai_key; with a key it returns {\"ok\":true,\"grade\":{...}} containing estGrade and centering.worstPct.",
+    "With AI enabled, the Pre-grade sub-tab shows #pg-photo; after a successful call, #pg-ai shows the centering/corners/edges/surface summary.",
+    "The #pg-verdict estimate equals min(centering ceiling, flaw-checklist ceiling, AI estGrade), and with a card selected the verdict still prints the gradeLadder dollar values and the beats-raw ROI line.",
+    "The saved record in localStorage 'pokechest.pregrade.v1' for the selected card gains an 'ai' object alongside est/centering/flaws/date.",
+    "With AI not configured, the Grade Lab renders exactly as before with no #pg-photo element and zero JS errors."
+   ],
+   "verify": "POKECHEST_HOME=<scratch> python3 server.py; curl the /api/ai/grade guard case and assert the ai_key error. With playwright-core (chromium at /opt/pw-browsers) open http://127.0.0.1:8787, click the Grade Lab tab, click the 'Pre-grade a card' sub-tab button ([data-lt=pregrade]), assert the panel renders and there are zero pageerrors; optionally page.evaluate a stubbed fetch to return a fake grade JSON and assert #pg-verdict updates.",
+   "est": "M",
+   "dependsOn": [],
+   "demand": "high",
+   "notes": "Roadmap backlog #2 — CollectorVault and PokéVault ship photo pre-grading; pairs with the existing Grade Lab break-even math (gradeLadder, app.js line 221) and the GradeStage rig."
+  },
+  {
+   "id": "offline-scan-queue",
+   "title": "Offline scan queue (phone mode)",
+   "icon": "📶",
+   "area": "capture",
+   "status": "planned",
+   "priority": "P2",
+   "spec": "In assets/revamp.js add const LS_SCANQ = 'pokechest.scanqueue.v1' next to LS_DEN/LS_CUSTOM (lines 13-15); the value is a JSON array of {pcId, name, dataUrl, ts}. Add helpers scQueueAll() → loadJSON(LS_SCANQ, []), scQueueWrite(arr) → localStorage.setItem(LS_SCANQ, JSON.stringify(arr)), and scQueuePush(item) which first downscales item.dataUrl with a new helper scShrink(dataUrl) (canvas, longest side max 1280px, toDataURL('image/jpeg', 0.8)) to respect the ~5MB localStorage quota, caps the queue at 25 entries by dropping the oldest (with a toast), and wraps the setItem in try/catch (quota-full → toast and drop). Modify scSave(dataUrl) (revamp.js line 915): wrap both fetches in the existing try so a thrown network error (server unreachable — the common phone-mode case when the Mac sleeps) calls scQueuePush({pcId: c.pcId, name: c.name, dataUrl, ts: Date.now()}), toasts 'Offline — scan queued, uploads when the server is back', and calls scRenderQueue(). Add async function scQueueFlush(): return early if a flush is already running (module flag) or scQueueAll() is empty; probe GET /api/health {cache:'no-store'} and return on failure; then for each item sequentially re-run the scan-N numbering (GET /api/listingphotos?pcId=, max existing scan-(d)+1) and POST /api/listingphoto {pcId, slot:'scan-N', dataUrl}; remove the item from the queue only when r.ok, stop the loop on the first thrown fetch error, finish with toast('Uploaded X queued scan(s)') and scRenderQueue(). Wire flushing once inside the existing hookDataLayer IIFE (line 89): setInterval(scQueueFlush, 20000) and window.addEventListener('online', scQueueFlush). UI: in renderScan() add <div id=\"sc-queue\"></div> at the bottom of the '📱 Phone mode' panel; scRenderQueue() renders nothing when empty, otherwise '📶 N scan(s) waiting to upload' with an 'Upload now' button calling scQueueFlush() and a per-item '✕' that removes that entry; call scRenderQueue() at the end of renderScan(). Expose scQueuePush/scQueueFlush on window (file is a plain script, top-level function declarations already are).",
+   "ux": "Scanner tab (📷), Phone-mode panel: a queued-scans badge with 'Upload now'; queueing itself happens transparently whenever a capture fails to reach the server (typically on the phone via LAN mode).",
+   "files": [
+    "assets/revamp.js"
+   ],
+   "acceptance": [
+    "With the server stopped (or fetch stubbed to reject), capturing/uploading a photo for a selected card adds an entry to localStorage 'pokechest.scanqueue.v1' and shows the queued toast instead of an error.",
+    "With the server reachable, scQueueFlush() drains the queue: each item lands as the card's next free scan-N via POST /api/listingphoto, the localStorage array empties, and a summary toast appears.",
+    "Queued images are stored downscaled (longest side ≤1280px) and the queue never exceeds 25 entries.",
+    "The flush runs automatically (20s interval and window 'online' event) without any Scanner-tab visit.",
+    "The #sc-queue badge shows the pending count and disappears when the queue is empty."
+   ],
+   "verify": "POKECHEST_HOME=<scratch> python3 server.py; with playwright-core (chromium at /opt/pw-browsers) open http://127.0.0.1:8787, page.evaluate(() => { localStorage.setItem('pokechest.scanqueue.v1', JSON.stringify([{pcId:'test-q1', name:'Q', dataUrl:'data:image/jpeg;base64,<tiny 1x1 jpeg>', ts:Date.now()}])); return scQueueFlush(); }), then assert curl http://127.0.0.1:8787/api/listingphotos?pcId=test-q1 lists scan-1 and the localStorage array is empty; zero pageerrors.",
+   "est": "M",
+   "dependsOn": [],
+   "demand": "medium",
+   "notes": "Roadmap backlog #12 — frequent complaint that scanner apps (CollX, Collectr reviews) need a connection; extends the existing phone mode (/api/lan) and staged-scan flow naturally."
+  },
+  {
+   "id": "csv-import",
+   "title": "CSV import with column mapping",
+   "icon": "📄",
+   "area": "capture",
+   "status": "planned",
+   "priority": "P0",
+   "spec": "All client-side in assets/revamp.js, riding the existing custom-cards path (LS_CUSTOM = 'pokechest.customcards.v1', lgStore(), rvMergeCustom(), rvRecalcMeta()). In renderLedger() (~line 1032), in the '➕ Add a card' panel directly after <div id=\"lg-pcadd\"></div>, add: <details id=\"lg-csvwrap\"><summary class=\"reason\">📄 Import a CSV — any other app's export</summary><label class=\"btn sm\" style=\"cursor:pointer\">Choose CSV file<input id=\"lg-csvfile\" type=\"file\" accept=\".csv,text/csv\" style=\"display:none\"></label><div id=\"lg-csvmap\"></div></details>, and wire #lg-csvfile onchange to read the file text (f.text()) then call lgCsvMapUI(lgCsvParse(text)). Add global function lgCsvParse(text): an RFC-4180 parser returning an array of string arrays — handles quoted fields, doubled-quote escapes, commas inside quotes, and \\r\\n or \\n line ends; row 0 is headers; skip fully-empty rows. Add lgCsvGuess(headers): returns {field: colIndex|null} for target fields [name, set, number, lang, price, cost, qty, graded, grader, grade, dateAdded] by testing headers against, in order: name /name|card|title/i, set /set|expansion|series/i, number /(^|[^a-z])(no|num|number|#)([^a-z]|$)/i, lang /lang/i, price /price|value|market|loose/i, cost /cost|paid|purchase/i, qty /qty|quant|count/i, graded /graded|slab/i, grader /grader|grading (co|service)|company/i, grade /^grade$/i, dateAdded /date|added|acquired/i — each column assignable once, first match wins. lgCsvMapUI(rows): render into #lg-csvmap one <select class=\"s-inp\" data-f=\"<field>\"> per target field with '— skip —' plus every header (guess preselected; name is required), a preview table of the first 5 data rows, and a '⬇ Import N rows' button #lg-csvgo that reads the selects into a map and calls lgCsvImport(rows, map). lgCsvImport(rows, map): for each data row build cc = {pcId: 'csv-' + Date.now().toString(36) + '-' + rowIndex, name (trimmed; skip row when blank), set: v || 'CSV import', number: v || null, lang: /^ja|japan/i.test(v) ? 'ja' : 'en', price: +v || 0, cost: +v || 0, qty: Math.max(1, +v || 1), graded: /^(y|yes|true|1|psa|bgs|cgc|tag)/i.test(v), grader: graded ? (v || null) : null, grade: graded ? (v || null) : null, dateAdded: a Date.parse-able value formatted YYYY-MM-DD, else today} — mirroring the addCard() shape at revamp.js line 1120. Dedup with the same key as rvMergeCustom (line 59): [name, number||'', set].join('|').toLowerCase(); skip rows whose key exists in State.cards or earlier in the batch, and count them. Write the batch in ONE localStorage update (loadJSON(LS_CUSTOM, []), push all, setItem) — do not call lgStore per row — then rvMergeCustom(); rvRecalcMeta(); renderLedger(); toast('Imported A cards · skipped B duplicates · C unusable rows').",
+   "ux": "Add & Sold tab (➕), '➕ Add a card' panel: a collapsible 'Import a CSV' section under the PriceCharting search — pick a file, check the auto-guessed column mapping and 5-row preview, click Import.",
+   "files": [
+    "assets/revamp.js",
+    "assets/revamp.css"
+   ],
+   "acceptance": [
+    "lgCsvParse('name,price\\n\"Pikachu, promo\",5') returns [['name','price'],['Pikachu, promo','5']] (quoted commas and doubled quotes survive).",
+    "Choosing a CSV renders one mapping select per target field with lgCsvGuess preselections and a 5-row preview; Import is blocked while name maps to '— skip —'.",
+    "Importing a 3-row CSV adds 3 objects with 'csv-' pcIds to localStorage 'pokechest.customcards.v1', they appear in State.cards/the Collection grid, and the portfolio total (#vpValue) updates via rvRecalcMeta().",
+    "Re-importing the same file skips every row as a duplicate (same name|number|set key) and the toast reports the counts.",
+    "Imported cards survive a reload and an export refresh (rvMergeCustom re-merges them; export copies win on key collision)."
+   ],
+   "verify": "POKECHEST_HOME=<scratch> python3 server.py; with playwright-core (chromium at /opt/pw-browsers) open http://127.0.0.1:8787, switchView('ledger'), then page.evaluate(() => { const rows = lgCsvParse('name,price,set\\nVerify Card,5,Test Set'); lgCsvImport(rows, lgCsvGuess(rows[0]).constructor === Object ? lgCsvGuess(rows[0]) : null); return JSON.parse(localStorage.getItem('pokechest.customcards.v1')); }) and assert an entry named 'Verify Card' with a csv- pcId exists and State.cards contains it; zero pageerrors.",
+   "est": "M",
+   "dependsOn": [],
+   "demand": "high",
+   "notes": "Publish-gate checklist item in ROADMAP-TO-PUBLISH.md ('Onboarding for people with zero PriceCharting history') and the import path for the Steam 'Amber Den' angle; Collectr/Dex both onboard via CSV import."
+  },
+  {
+   "id": "price-alerts",
+   "title": "Price alerts (thresholds + bell panel)",
+   "icon": "🔔",
+   "area": "market",
+   "status": "planned",
+   "priority": "P1",
+   "spec": "In assets/app.js add const LS_ALERTS = 'pokechest.alerts.v1' next to the other LS_ constants (line ~22), storing { thresholds: { [pcId]: { above: number|null, below: number|null, added: 'YYYY-MM-DD' } }, events: [ { pcId, name, dir: 'above'|'below', threshold: number, price: number, at: 'YYYY-MM-DD', ts: ISO-8601 string } ], seenAt: string|null } — 'at' is the calendar-day dedupe key, 'ts' the exact firing time — plus helpers alertsAll(), alertsSave(a), alertGet(c), alertSet(c, {above, below}) where both-null deletes thresholds[pcId]. Add checkPriceAlerts() and call it at the end of init() right after recordCardSnaps() (app.js line ~82); no other hook is needed because init() already re-runs after every /api/pc/sync completion (revamp.js scRenderPc poll calls init()) and every autosync pull (revamp.js rvWatchAutosync calls init()). checkPriceAlerts() iterates thresholds, finds each card by String(c.pcId) in State.cards, fires dir 'above' when c.price >= above and 'below' when c.price <= below, deduped so a given pcId+dir fires at most once per calendar day (skip if events already has an entry with same pcId, dir and at === today); new events (with at = today and ts = new Date().toISOString()) unshift onto events, capped at 100. After the loop show exactly one toast (toast() in app.js only displays one at a time): the single message `🔔 ${name} hit ${money(price)} — alert was ${dir} ${money(threshold)}` when one event fired, else `🔔 ${n} price alerts triggered — check the bell`. In index.html insert `<button class=\"btn ghost sm\" id=\"alertsBtn\" title=\"Price alerts\">🔔<span id=\"alertsBadge\" style=\"display:none\"></span></button>` immediately before #settingsBtn in the header; updateAlertsBadge() sets the span to the count of events whose `(e.ts || e.at)` compares string-greater than seenAt (all events count when seenAt is null; hidden at 0) and is called from init() and after checkPriceAlerts(). Wire #alertsBtn in wireChrome() (app.js line ~122) to a new openAlertsPanel() that renders a modal into #modalRoot (same .modal-bg/.modal + #modalClose pattern as openSettings, app.js line ~2694) listing every threshold row (card name via State.cards lookup, current money(c.price), above/below values, ✕ remove button calling alertSet(c,{above:null,below:null})) and the events log newest-first, then sets seenAt = new Date().toISOString(), saves, and calls updateAlertsBadge(). In openModal() (app.js line ~2620 button row) add `<button class=\"btn ${alertGet(c)?'gold':''} sm\" id=\"mk-alert\">🔔 Alert</button>` after #mk-case that toggles an inline form (number inputs #al-above and #al-below prefilled from alertGet(c), Save button calling alertSet(c,{above,below}) + toast('Alert armed.'), Remove button clearing it). Note: the wishlist item also appends events to this key using the identical event shape (with an extra src:'wishlist' field, ignored here) — the panel must render unknown extra fields gracefully.",
+   "ux": "Bell button with an unread-count badge in the top toolbar next to ⚙ Live opens the alerts panel; thresholds are armed from a 🔔 Alert button inside any card modal; fired alerts surface as toasts right after every sync/refresh.",
+   "files": [
+    "assets/app.js",
+    "index.html",
+    "assets/styles.css"
+   ],
+   "acceptance": [
+    "Saving above/below from the card-modal 🔔 form writes pokechest.alerts.v1.thresholds[pcId] and the values survive a page reload.",
+    "With thresholds[pcId] = { below: 999999 } seeded for any priced card, reloading the app appends one event, shows a toast containing 🔔, and #alertsBadge becomes visible with a non-zero count.",
+    "Re-running init() the same day adds no duplicate event for the same pcId+dir (events length unchanged).",
+    "Opening the bell panel lists the threshold and the event, sets seenAt, and hides the badge; ✕ removes the threshold.",
+    "Zero JS pageerrors across all tabs with the feature active."
+   ],
+   "verify": "Run POKECHEST_HOME=<scratch> python3 server.py, drive http://127.0.0.1:8787 with playwright-core (chromium at /opt/pw-browsers): page.evaluate seeding localStorage 'pokechest.alerts.v1' with a below:999999 threshold for a known pcId from data/collection.json, reload, then assert a .toast containing '🔔' appears, JSON.parse(localStorage['pokechest.alerts.v1']).events.length===1, #alertsBadge is visible, and after clicking #alertsBtn the badge hides. Assert zero pageerrors.",
+   "est": "M",
+   "dependsOn": [],
+   "demand": "high",
+   "notes": "Backlog #3 in ROADMAP-TO-PUBLISH.md — Shiny and PokéVault both ship per-card threshold alerts; local toast/badge now, OS push later. Internal keys stay pokechest.*."
+  },
+  {
+   "id": "per-card-history",
+   "title": "Per-card price history (sparkline + chart in card modal)",
+   "icon": "📈",
+   "area": "market",
+   "status": "planned",
+   "priority": "P1",
+   "spec": "Generalize recordCardSnaps() in assets/app.js (line 1622): instead of iterating Object.keys(caseAll()), iterate every card in State.cards with a numeric price and write snaps[pcId][today] = Math.round(c.price*100)/100 — but only when it differs from that card's most recent recorded value (sort the card's date keys, compare against the last one; skip if equal and at least one entry exists) so the key stays small; after writing, prune each card to its newest 120 dated entries. The storage key and shape are unchanged — LS_CARDSNAP = 'pokechest.cardsnaps.v1', { [pcId]: { 'YYYY-MM-DD': number } } — so existing Display Case history carries straight over, and history for sold/archived cards is left in place (never delete a pcId just because it left the export). recordCardSnaps() is already called from init() (line 82, which re-runs on ↻ Refresh, PC sync completion and autosync) and from caseSet(), so no new hooks are needed. In openModal() (app.js, insert between the 'Sell math' div at line ~2653 and liveZoneHTML(c)) add a `<div class=\"subhead\">Price history</div>` section: call the existing cardTrend(c) (line 1634); when trend.series has >= 2 points render a new function cardHistoryChart(series) — a clone of sparkline() (line 1169: 600×110 viewBox, padded polyline + gradient area polygon + last-point circle) plus a caption `${series.length} points · ${money(first)} → ${money(last)} (${sign}${money(delta)}, ${sign}${pct.toFixed(1)}%)` colored var(--green)/var(--red) by delta sign; with fewer than 2 points render `<div class=\"spark-empty\">Tracking started ${today} at ${money(c.price)} — history builds with every sync and refresh.</div>`. Also reuse the existing compact trendSpark(series) (line 1644) inline next to the Market stat in the modal's stat-grid when a series exists.",
+   "ux": "A 'Price history' section inside every card's modal (between Sell math and the Live zone): a full-width SVG line chart with a change caption, plus a tiny sparkline beside the Market price stat.",
+   "files": [
+    "assets/app.js"
+   ],
+   "acceptance": [
+    "After one init() on a fresh profile, pokechest.cardsnaps.v1 contains an entry for every card with a price (count equals priced cards, not just Display Case picks).",
+    "Opening a card modal with <2 recorded points shows the 'Tracking started' empty state inside a Price history section.",
+    "Seeding two dated points (e.g. {'2026-07-18':100,'2026-07-19':110}) for a card and reopening its modal renders an SVG polyline and the caption '+$10.00, +10.0%' in green; an inverted series renders red with a minus sign.",
+    "Re-running init() the same day with unchanged prices does not grow the stored JSON string (dedupe holds).",
+    "Zero JS pageerrors on all tabs."
+   ],
+   "verify": "Run POKECHEST_HOME=<scratch> python3 server.py and drive http://127.0.0.1:8787 headless with playwright-core (chromium at /opt/pw-browsers): after load, page.evaluate that JSON.parse(localStorage['pokechest.cardsnaps.v1']) has keys ≈ number of priced cards; then seed a two-point series for the top card's pcId, call openModal via evaluate (openModal(State.cards[0])), and assert the modal contains 'Price history', an svg polyline, and the +$10.00 caption. Assert zero pageerrors.",
+   "est": "M",
+   "dependsOn": [],
+   "demand": "high",
+   "notes": "Backlog #4 — Dex app-store reviews get dinged for missing per-card growth charts; Collectr/Shiny both chart per-card history. This only generalizes the existing case-card mechanism (LS_CARDSNAP), no schema change."
+  },
+  {
+   "id": "trade-checker",
+   "title": "Trade checker (two-sided fairness verdict)",
+   "icon": "🤝",
+   "area": "market",
+   "status": "planned",
+   "priority": "P2",
+   "spec": "In assets/revamp.js add module state const TC = { a: [], b: [] } where each entry is { pcId: string|null, name, set, number, price } (pcId null for manually typed cards not in the collection). Column A is labeled 'Your side' (cards YOU give away) and column B 'Their side' (cards you receive). In renderBest() (revamp.js line ~550) add `<button class=\"btn sm\" id=\"bs-trade\">🤝 Trade Checker</button>` to the existing header .rv-row next to the include-graded checkbox, wired to a new openTradeChecker(). openTradeChecker() renders a modal into #modalRoot using the same .modal-bg/.modal/#modalClose pattern as openSettings() in app.js, containing the two columns (.tc-col): each column has a search input filtering State.cards exactly like the #lg-sq handler in renderLedger() (lowercase tokens matched against name+set+number, top 6 results as .sc-res rows), where clicking a result pushes { pcId:String(c.pcId), name:c.name, set:c.set, number:c.number, price:c.price||0 }; below it a manual-add row (text input for name, number input for $, Add button) for off-collection cards; each added entry renders with a ✕ remove button. Extract renderBest()'s inline net() into a top-level function rvFeeNet(price) that reads the 'ebay-bin' channel from data/best-sellers.json via the already-fetched rvData('best-sellers') (fallback { feePct: 13.25, feeFlat: 0.30 }) and returns Math.max(0, price*(1-feePct/100)-feeFlat); each column footer shows Raw total = Σ price and Net total = Σ rvFeeNet(price). tcVerdict(): let A = net total of 'Your side', B = net total of 'Their side'; diff = Math.abs(A-B); pct = diff/Math.max(A,B,1). Favored-side rule (fixed, not implementer's choice): the favored party is the one RECEIVING the more valuable pile — if A > B the trade favors THEIR side (they receive your bigger pile), if B > A it favors YOUR side. Verdict strings: pct <= 0.05 → '⚖️ Even trade'; pct <= 0.15 → `Slightly favors ${favored}` where favored is the literal string 'your side' or 'their side' per the rule above; else `Favors ${favored} — ${favored === 'their side' ? 'they' : 'you'} should add ${money(diff)} to balance` (i.e. the favored party owes the difference). Render the verdict in a .tc-verdict banner between the columns, recomputed on every add/remove. A Reset button empties both sides; TC persists only for the session (no localStorage key). Add .tc-col / .tc-row / .tc-total / .tc-verdict styles to assets/revamp.css (grid two columns, stacking to one column under 720px).",
+   "ux": "A 🤝 Trade Checker button in the Best Sellers header opens a two-column modal — search-add cards (or type name+$) to each side, live raw and fee-adjusted totals per side, fairness verdict banner in the middle.",
+   "files": [
+    "assets/revamp.js",
+    "assets/revamp.css"
+   ],
+   "acceptance": [
+    "Best Sellers header shows 🤝 Trade Checker; clicking opens the two-column modal with zero pageerrors.",
+    "Typing a known card name in a side's search lists collection matches; clicking one adds it and both that side's Raw and Net totals update immediately.",
+    "Manual add of 'Test card' at $100 shows $100.00 raw and $86.45 net (13.25% + $0.30 eBay BIN fees).",
+    "With one side at $100 and the other empty the verdict banner reads 'Favors' and quotes the dollar difference; two equal sides read '⚖️ Even trade'.",
+    "✕ removes an entry and Reset returns both sides to $0.00 with the verdict cleared."
+   ],
+   "verify": "Run POKECHEST_HOME=<scratch> python3 server.py, drive http://127.0.0.1:8787 with playwright-core (chromium at /opt/pw-browsers): evaluate switchView('best'), click #bs-trade, fill the manual name/$ inputs on side A with Test/100 and click Add, assert side A footer text contains $100.00 and $86.45 and the verdict banner contains 'Favors'; add an identical manual card to side B and assert 'Even trade'. Assert zero pageerrors.",
+   "est": "M",
+   "dependsOn": [],
+   "demand": "medium",
+   "notes": "Backlog #6 — PokéVault ships a trade checker; CollX surfaces trade values. Fee-adjusted totals reuse the channel fee data already in data/best-sellers.json; great on-stream feature for the Whatnot/live playbook."
+  },
+  {
+   "id": "movers-report",
+   "title": "Daily movers report on Dashboard",
+   "icon": "📊",
+   "area": "market",
+   "status": "planned",
+   "priority": "P2",
+   "spec": "Add moversReport() to assets/app.js: read loadJSON(LS_CARDSNAP, {}) ('pokechest.cardsnaps.v1'), build a byId map of State.cards keyed by String(pcId), and for each pcId present in both, sort its dated entries ascending and require >= 2; take the last two values [prev, cur] (cardsnaps entries are deduped by per-card-history, so consecutive values always differ), compute d = cur - prev and pct = prev ? d/prev*100 : 0, and keep only entries with Math.abs(d) >= 0.5. Return { gainers, losers }: gainers = entries with d > 0 sorted by d desc, top 6; losers = entries with d < 0 sorted by d asc, top 6; each item { c, prev, cur, d, pct }. In renderDashboard() (app.js line 823) add a '📊 Daily movers' panel as a new .cols side row directly below the existing sparkline/lang row: two stacked minilists titled 'Top gainers' and 'Top losers', rows modeled on miniRow(c) (line 1150) with class=\"mini\" and data-i=\"${c.i}\" so the existing $$('#view-dashboard .mini') click wiring (line 884) opens the card modal unchanged, but with the value cell replaced by `<div class=\"mval\" style=\"color:${d>=0?'var(--green)':'var(--red)'}\">${d>=0?'+':''}${money(d)} <span class=\"hint\">${pct>=0?'+':''}${pct.toFixed(1)}%</span></div>`. When both lists are empty render `<p class=\"muted\">No movers yet — appears once prices change across two tracked days (open the app or run a PriceCharting sync on different days).</p>`. No new storage keys, no server endpoints; purely derived from pokechest.cardsnaps.v1, which requires the per-card-history item to have generalized snapshots beyond Display Case cards.",
+   "ux": "A 'Daily movers' panel on the Dashboard directly under the portfolio sparkline row — top gainers and top losers with green/red $ and % deltas, each row clickable to its card modal.",
+   "files": [
+    "assets/app.js"
+   ],
+   "acceptance": [
+    "Dashboard renders the Daily movers panel with the empty-state message on a fresh profile (single-day history).",
+    "Seeding pokechest.cardsnaps.v1 with two dates for two cards (one +$5, one −$5) and re-rendering shows exactly one gainer row (+$5.00, green, +%) and one loser row (−$5.00, red).",
+    "Clicking a mover row opens that card's modal.",
+    "Cards with |Δ| < $0.50 or fewer than 2 snapshots never appear in either list."
+   ],
+   "verify": "Run POKECHEST_HOME=<scratch> python3 server.py, drive http://127.0.0.1:8787 with playwright-core (chromium at /opt/pw-browsers): page.evaluate seeding localStorage 'pokechest.cardsnaps.v1' with {'<pcId1>':{'2026-07-18':10,'2026-07-19':15},'<pcId2>':{'2026-07-18':10,'2026-07-19':5}} using real pcIds from State.cards, call renderDashboard() via evaluate, then assert '#view-dashboard' contains 'Daily movers', '+$5.00' and '-$5.00', and that clicking the gainer .mini opens #modalBg. Assert zero pageerrors.",
+   "est": "S",
+   "dependsOn": [
+    "per-card-history"
+   ],
+   "demand": "medium",
+   "notes": "Pairs with backlog #3's 'top mover pushes' (Shiny/Collectr both surface daily movers). Later feeds a price-alerts digest; for now display-only, computed client-side from cardsnaps."
+  },
+  {
+   "id": "set-completion",
+   "title": "Set completion tracker",
+   "icon": "🧩",
+   "area": "collection",
+   "status": "planned",
+   "priority": "P1",
+   "spec": "Add a new top-level view: in index.html insert `<button data-view=\"sets\" class=\"tab\">🧩 Sets</button>` after the Collection tab and `<section id=\"view-sets\" class=\"view\"></section>` inside `<main id=\"main\">`; in assets/revamp.js add `renderSets()` and register `sets: () => renderSets()` in the RV_VIEWS map (revamp.js ~line 134). renderSets() groups State.cards where `c.game === 'Pokémon' && c.setId && !uget(c).archived` by key `${c.lang}:${c.setId}`, with owned numbers per group = Set of `String(c.number).replace(/^0+/,'') || '0'` (this matches how scripts/build_data.py set_card_index() strips leading zeros). For each group lazily fetch `https://api.tcgdex.net/v2/${lang}/sets/${setId}` (client-side; TCGdex is already the app's image source) and cache under new const `LS_SETDATA = 'pokechest.setdata.v1'` as `{\"<lang>:<setId>\": {fetched:'YYYY-MM-DD', name, official: cardCount.official, total: cardCount.total, cards:[{localId, name}]}}` with a 30-day TTL via the existing loadJSON() helper. Render one panel per set: name + setYear, a progress bar `ownedCount / official` where ownedCount = number of data.cards whose leading-zero-stripped localId is in the owned Set, a 'master set' toggle switching the denominator to cardCount.total (persist choice in `localStorage 'pokechest.setmode.v1'`), and a collapsible missing-card list (`<details>`) of every uncollected localId + name. Add a per-set '💰 Price the gaps' button shown only when `State.live && State.live.priceCharting`: it sequentially (setTimeout 400 ms apart, to respect PriceCharting rate limits) calls `GET /api/pc/search?q=` + enc(`pokemon ${lang==='ja'?'japanese ':''}${setName} ${cardName} #${localId}`) (server.py pc_search(), returns `{ok, products:[{id,name,number,set,price}]}`), takes `products[0].price` (null when no match), caches results under new const `LS_SETCOST = 'pokechest.setcost.v1'` as `{\"<lang>:<setId>\": {date, prices:{\"<localId>\": number|null}, total}}`, and renders the summed cost-to-complete plus per-card prices in the missing list; without a token show a hint row pointing at the ⚙ Live settings instead. Sets with `setId == null` (e.g. 'Promo') and non-Pokémon games are excluded from panels and listed in one footer line as untrackable. Style new classes (.set-panel, .set-prog, .set-prog-bar, .set-missing) in assets/revamp.css reusing the existing .ps-prog/.ps-prog-bar look.",
+   "ux": "New '🧩 Sets' tab next to Collection: one panel per owned set with a progress bar, expandable missing-card list, and a cost-to-complete total.",
+   "files": [
+    "index.html",
+    "assets/revamp.js",
+    "assets/revamp.css"
+   ],
+   "acceptance": [
+    "Clicking the 🧩 Sets tab renders one panel per owned Pokémon set (setId non-null) with an owned/official progress bar; untrackable sets appear only in the footer note.",
+    "TCGdex set data is cached in localStorage 'pokechest.setdata.v1'; re-entering the tab within the TTL performs zero api.tcgdex.net fetches.",
+    "For every set panel, ownedCount + missing-list length equals the displayed denominator, and the master-set toggle switches the denominator between cardCount.official and cardCount.total and persists across reloads.",
+    "With no PriceCharting token the 'Price the gaps' button is absent (hint shown instead); with a token it fills per-card prices and a summed cost-to-complete persisted in 'pokechest.setcost.v1'.",
+    "Zero JS pageerrors across all tabs after the change."
+   ],
+   "verify": "Run `POKECHEST_HOME=<scratch> python3 server.py`, drive http://127.0.0.1:8787 headless with playwright-core (chromium at /opt/pw-browsers): click the sets tab, wait for '.set-panel', assert panel count > 5 with the bundled collection, assert `localStorage.getItem('pokechest.setdata.v1')` is populated, and assert zero pageerrors. `curl 'http://127.0.0.1:8787/api/pc/search?q=x'` must return the token-guard JSON error when no token is configured.",
+   "est": "L",
+   "dependsOn": [],
+   "demand": "high",
+   "notes": "ROADMAP backlog #5 (Pokellector / pkmn.gg core loop) and part of the top-5 publish gate. TCGdex cardCount.official excludes secret rares — hence the master-set toggle. cards' setId values are the TCGdex ids build_data.py already resolved (e.g. 'cel25', 'swsh10', ja 'SV2a'), so no new mapping work is needed."
+  },
+  {
+   "id": "multi-tcg",
+   "title": "Multi-TCG: first-class game filter + per-game dashboards",
+   "icon": "🃏",
+   "area": "collection",
+   "status": "planned",
+   "priority": "P2",
+   "spec": "The per-card `game` field, `State.filters.game`, the `#f-game` toolbar select (assets/app.js buildToolbar(), ~line 1209, currently rendered only when `games.length > 2`), and `State.meta.byGame` all exist — this item promotes them to first-class UI. (1) In app.js renderDashboard() append a 'By game' panel (id `dash-games`) rendered when `Object.keys(State.meta.byGame).length > 1`: one row per game sorted by value desc showing game name, card count (computed from State.cards, excluding `uget(c).archived`), total value from meta.byGame, and the top card's name; each row is a button whose onclick sets `State.filters.game = g`, calls `buildToolbar()` (so the select reflects the filter), `switchView('collection')`, `renderCollection(true)`. (2) In buildToolbar() change the game-select condition from `games.length > 2` to `games.length > 1` so the select appears whenever any second game exists. (3) In assets/revamp.js renderLedger() manual-add form add `<select id=\"lg-game\" class=\"s-inp\">` with options ['Pokémon','Magic','YuGiOh','Football','Basketball','Baseball','Other'] and pass its value as `game` into the object given to lgStore(); in lgRenderPcAdd() infer game from `p.set` (the PriceCharting console name): /magic/i → 'Magic', /yugioh|yu-gi-oh/i → 'YuGiOh', /football|basketball|baseball|hockey/i → the matched sport capitalized, else 'Pokémon', and include it in the lgStore() payload. (4) In rvMergeCustom() (revamp.js ~line 58) default `cc.game = cc.game || 'Pokémon'` when merging custom cards, and confirm rvRecalcMeta() rebuilds meta.byGame including custom cards (add the aggregation if missing). (5) Pokémon-only surfaces stay gated: the grade ladder is already gated by `c.game === 'Pokémon'` in openModal(); apply the same guard anywhere gradeLadder()/gradeAdvice() output is rendered for a row (renderSell() rows), and the set-completion view filters to Pokémon already. No server or data-build changes: scripts/build_data.py already emits `game` per card and `meta.byGame`.",
+   "ux": "Dashboard gains a clickable 'By game' breakdown panel; the Collection toolbar's game select always appears when a second game exists; Add & Sold manual/catalog adds carry a game.",
+   "files": [
+    "assets/app.js",
+    "assets/revamp.js"
+   ],
+   "acceptance": [
+    "Dashboard shows a 'By game' panel listing every key of meta.byGame with card count and value; clicking a row lands on Collection filtered to that game with the #f-game select showing it.",
+    "With the bundled collection (5 games) the collection grid filtered to 'YuGiOh' shows exactly the 13 YuGiOh entries and the count pill matches.",
+    "A manual ledger add with game 'Magic' appears in Collection under the Magic filter and survives reload (persisted in 'pokechest.customcards.v1').",
+    "Non-Pokémon cards never render a grade ladder in the card modal or Sell Hub rows.",
+    "Zero JS pageerrors across all tabs after the change."
+   ],
+   "verify": "Run `POKECHEST_HOME=<scratch> python3 server.py`, drive http://127.0.0.1:8787 with playwright-core (chromium at /opt/pw-browsers): assert '#dash-games' exists with 5 rows, click the 'YuGiOh' row, assert `document.querySelectorAll('#grid .card').length === 13` and '#f-game' value is 'YuGiOh'; open a Football card's modal and assert no '.ladder' element; zero pageerrors.",
+   "est": "M",
+   "dependsOn": [],
+   "demand": "medium",
+   "notes": "ROADMAP backlog #7 — Collectr's moat; open question #6 for Brandon (multi-TCG now or later). The export already carries Magic/YuGiOh/Football/Dragon rows, so this is pure UI surfacing plus custom-card plumbing; internal ids stay pokechest.* per the compatibility rule."
+  },
+  {
+   "id": "wishlist",
+   "title": "Wishlist with target prices + alert hooks",
+   "icon": "⭐",
+   "area": "collection",
+   "status": "planned",
+   "priority": "P2",
+   "spec": "New store in assets/revamp.js: `const LS_WISH = 'pokechest.wishlist.v1'` holding an array of `{pcId:string, name, number, set, lang, priceAtAdd:number|null, target:number|null, lastPrice:number|null, lastChecked:'YYYY-MM-DD'|null, added:'YYYY-MM-DD', note:string}` with helpers `wishAll()` (loadJSON(LS_WISH, [])) and `wishSave(arr)`. Add the view: in index.html insert `<button data-view=\"wish\" class=\"tab\">⭐ Wishlist</button>` and `<section id=\"view-wish\" class=\"view\"></section>`; in revamp.js add `renderWishlist()` and register `wish: () => renderWishlist()` in RV_VIEWS. Add-from-catalog: copy the debounced search pattern of lgRenderPcAdd() (revamp.js ~line 1178) — input `#wl-q`, 380 ms debounce, `GET /api/pc/search?q=` returning `{ok, products:[{id,name,number,set,price}]}`; each result row gets a '☆ Want' button that pushes an item (`pcId:String(p.id)`, `lang: /japanese/i.test(p.set)?'ja':'en'`, `priceAtAdd:p.price`), disabled with a label when `String(p.id)` is already in wishAll() or in `State.cards` ('already in your chest'); when `State.live.priceCharting` is falsy show the same ⚙-token hint lgRenderPcAdd uses plus a manual-add row (name/set/target inputs). Row UI: name, set, number, priceAtAdd, an `<input type=number>` target that saves on change, lastPrice with a '🔔 under target' badge when `lastPrice != null && target != null && lastPrice <= target`, a note input, ✕ remove. '↻ Check prices' button (token-gated): sequentially (400 ms apart) `GET '/api/price?id=' + enc(it.pcId)` (server.py pricecharting_price(), returns `{ok, tiers:{ungraded, ...}}`), set `lastPrice = j.tiers.ungraded` when present and `lastChecked = today`; for every item newly at-or-under target, unshift `{pcId, name, dir:'below', threshold: target, price: lastPrice, at: today}` onto the `events` array of `localStorage 'pokechest.alerts.v1'` (LS_ALERTS is an object `{thresholds, events, seenAt}` owned by the price-alerts feature — read-modify-write it, creating `{thresholds:{}, events:[], seenAt:null}` if absent and never clobbering thresholds/seenAt) and toast() a summary. '✓ Got it' button per row: reveal an inline 'paid $' input, then call the existing `lgStore({pcId, name, number, set, lang, price: lastPrice ?? priceAtAdd ?? 0, cost:+paid||0, qty:1, graded:false, dateAdded: today})` and remove the item — the card then flows into the Collection via rvMergeCustom()/rvRecalcMeta(). KPI header: wanted count, Σ target, Σ lastPrice.",
+   "ux": "New '⭐ Wishlist' tab: catalog search on top, want-list table below with per-row target price, last checked price, under-target bell, and a '✓ Got it' promotion into the collection.",
+   "files": [
+    "index.html",
+    "assets/revamp.js",
+    "assets/revamp.css"
+   ],
+   "acceptance": [
+    "A card added from /api/pc/search results appears in the wishlist, persists in localStorage 'pokechest.wishlist.v1', and survives reload.",
+    "Setting a target then running '↻ Check prices' updates lastPrice/lastChecked from /api/price tiers.ungraded; a row with lastPrice <= target shows the 🔔 badge and a matching record lands in 'pokechest.alerts.v1'.",
+    "'✓ Got it' with a paid price removes the row, and the card appears in the Collection grid (via 'pokechest.customcards.v1') with cost set to the paid amount.",
+    "A result whose pcId is already owned or already wished renders its add control disabled with an explanatory label.",
+    "Without a PriceCharting token the view still renders (manual add + hint) with zero JS errors."
+   ],
+   "verify": "Run `POKECHEST_HOME=<scratch> python3 server.py`, drive http://127.0.0.1:8787 with playwright-core (chromium at /opt/pw-browsers): click the wish tab, assert the view renders token-less with zero pageerrors; seed `localStorage['pokechest.wishlist.v1']` with one item (target 999, lastPrice 5) via page.evaluate, reload, assert the 🔔 badge renders; click its '✓ Got it', enter 5, assert 'pokechest.customcards.v1' gained the pcId and the wishlist array is empty.",
+   "est": "M",
+   "dependsOn": [],
+   "demand": "medium",
+   "notes": "ROADMAP backlog #10 (pkmn.gg / Dex table stakes). Alerts tie-in is a shared-key contract: this item only writes 'pokechest.alerts.v1'; the market-area price-alerts feature owns surfacing/badging that queue, so the wishlist ships standalone even if alerts land later."
+  },
+  {
+   "id": "slab-vault",
+   "title": "Slab Vault — graded-cards-only view",
+   "icon": "🏦",
+   "area": "collection",
+   "status": "planned",
+   "priority": "P2",
+   "spec": "New graded-only view: in index.html insert `<button data-view=\"vault\" class=\"tab\">🏦 Slab Vault</button>` and `<section id=\"view-vault\" class=\"view\"></section>`; in assets/revamp.js add `renderVault()` and register `vault: () => renderVault()` in RV_VIEWS. Rows = `State.cards.filter(c => c.graded && !uget(c).archived)` sorted by value desc. Add helper `slabEstimate(c)` in revamp.js using the existing gradeLadder(c) from app.js: `const lad = gradeLadder(c), g = parseFloat(c.grade) || 0, grader = (c.grader||'').toUpperCase()`; base = `g >= 10 ? lad.psa10 : g >= 9 ? lad.psa9 : lad.psa8`; if grader is a key of lad.services multiply base by that service's ratio (`lad.services[grader].v / lad.psa10`); if grader === 'BGS' && g >= 10 return lad.premium.bgs10.v; return base. Each row shows: thumb (imgHTML), name/set/#number, grader+grade chip, your price `c.price` (PC sync already prices graded cards by tier via _pc_pick_price in server.py), slabEstimate(c) as 'ladder est', lad.psa10 as ceiling, and an eBay comps link via `gradeSoldLink(c, `${c.grader} ${c.grade}`)`. Cert number: an inline input prefilled with `c.certId || uget(c).certId || ''`, onchange → `uset(c, {certId: value.trim()})` (persists in 'pokechest.userdata.v1'); when set, render a cert-lookup link — PSA: `https://www.psacard.com/cert/<certId>`, CGC: `https://www.cgccards.com/certlookup/<certId>/`, other graders: fall back to the gradeSoldLink comps link. Pop report: an inline number input prefilled with `popGet(c)?.pop`, onchange → `popSet(c, value)` (app.js, key 'pokechest.pop.v1', shape `{pcId:{pop,date}}`), rendering `popTier(pop).label` with `popTier(pop).advice` as title tooltip next to it. KPI header via the existing kpi() pattern: slab count, Σ slab value, per-grader counts (e.g. 'PSA 12 · CGC 3'), and gem rate (share with numeric grade >= 10). Clicking a row thumb opens openModal(c). Style .vault-row/.vault-cert in assets/revamp.css.",
+   "ux": "New '🏦 Slab Vault' tab listing only graded cards: cert-number entry with PSA/CGC lookup links, manual pop entry with tier verdicts, and per-grade ladder values beside the live price.",
+   "files": [
+    "index.html",
+    "assets/revamp.js",
+    "assets/revamp.css"
+   ],
+   "acceptance": [
+    "The vault lists exactly the cards with c.graded true and not archived; the KPI count matches the Collection 'Graded only' filter count.",
+    "Typing a cert number persists it in 'pokechest.userdata.v1' under the card's pcId, survives reload, and renders a https://www.psacard.com/cert/<id> link for a PSA slab (CGC gets the cgccards certlookup URL).",
+    "Entering a pop value stores {pop,date} in 'pokechest.pop.v1' and immediately shows the popTier() label; clearing the input removes the record.",
+    "Every row shows c.price plus slabEstimate(c) and the PSA-10 ceiling from gradeLadder(c), with the eBay graded-solds link opening the correct '<grader> <grade>' query.",
+    "Zero JS pageerrors across all tabs after the change."
+   ],
+   "verify": "Run `POKECHEST_HOME=<scratch> python3 server.py`, drive http://127.0.0.1:8787 with playwright-core (chromium at /opt/pw-browsers): click the vault tab, assert row count equals `State.cards.filter(c=>c.graded && !(State.user[c.pcId]||{}).archived).length` via page.evaluate; fill the first row's cert input with '12345678', reload, assert the value and the psacard.com href persist; fill pop with 50, assert 'pokechest.pop.v1' contains it and a 'Low pop' label renders; zero pageerrors.",
+   "est": "M",
+   "dependsOn": [],
+   "demand": "medium",
+   "notes": "ROADMAP backlog #11 (Slabfy angle) — the repo already has every ingredient: certId/grader/grade fields in collection.json, gradeLadder()/PREMIUM_GRADES/serviceDeltas, popGet/popSet/popTier and LS_POP in app.js. Auto pop-report fetch stays out of scope (BYOK later, per the 'manual entry; BYOK auto-fill later' comment at app.js line 244)."
+  },
+  {
+   "id": "summon-card-spirit",
+   "title": "Summon: local Card Spirit figure on the Den pedestal",
+   "icon": "🧬",
+   "area": "den3d",
+   "status": "planned",
+   "priority": "P1",
+   "spec": "Add a '🧬 Summon' button to the card modal button row in assets/app.js openModal() (the div at ~line 2620 holding #mk-list/#mk-photos) with id mk-summon, wired to window.summonCard(c) (guard with `if (window.summonCard)`). In assets/revamp.js add const LS_SUMMON = 'pokechest.summons.v1' storing { [pcId]: { slices:[6 PNG dataURLs], headband:dataURL, mode:'mint'|'damaged'|'psa10', palette:[hex...], created:'YYYY-MM-DD' } }, and async function spiritBuild(c): load c.img into an Image whose src is '/api/imgproxy?url='+encodeURIComponent(c.img) when c.img starts with 'http' (else c.img as-is), draw to a 96x128 canvas, getImageData; compute a 6-color palette by 4-bit RGB bucket counts (skip near-white avg>240); build a foreground mask (pixels farther than RGB distance 40 from the most common corner color), downsample the mask to a 24x32 cell grid (a cell is 'on' when more than half of its 4x4 source pixels are masked foreground). For layers l=0..5: erode the on-cell grid l times (a cell survives one erosion pass only if all 4-neighbors are on). Paint each surviving cell onto that layer's own 96x128 canvas as a filled 4x4-px rect at (cellX*4, cellY*4). Cell color, exactly: base = the per-channel arithmetic mean RGB of the foreground-masked source pixels inside the cell's 4x4 region (if none, use the palette's most frequent color); lightened for layer l as each channel ch → Math.round(ch + (255 - ch) * 0.06 * l) (i.e. moved 6%·l of the way to white). Export each layer canvas via toDataURL('image/png'). Add spiritHeadband(c): 256x40 canvas, '#b3122f' fill, 10px gold end stripes, centered white bold 11px text `${(c.set||'').toUpperCase()} · ${c.setYear||''}${c.number?' · #'+c.number:''}`, return dataURL — this is the IP-safe metadata headband per LEGAL.md (own data only, no logos). Add spiritMode(c): c.graded && parseFloat(c.grade)===10 → 'psa10'; !c.graded && /damag|played|poor|heavy/i.test((c.condition||'')+' '+(c.wear||'')) → 'damaged'; else 'mint'. async summonCard(c) builds+caches the record, sets RV.den.summonPcId = String(c.pcId), rvSaveDen(), toast('Summoned!'), switchView('den'). In denRoomHTML(), when RV.den.summonPcId has a LS_SUMMON record, replace the .den-feat-spin card faces with a spirit stack: wrapper div.den-spirit.mode-<mode> (transform-style:preserve-3d, reuse the denfeat spin keyframes at 12s) containing the 6 slice <img>s absolutely positioned with transform:translateZ(${l*7}px), the headband <img> at top:16%/width:70%/rotate(-4deg), plus mode extras — mint: div.spirit-aura (animated radial sparkle via CSS ::after twinkle keyframes); damaged: filter:saturate(.55) sepia(.25) on slices plus div.spirit-bandage (two crossed tan strips) and div.spirit-shiner (dark radial circle at 62%/38%); psa10: add class den-ped-gold to .den-pedestal (gold gradient) and div.spirit-trophy containing 🏆. The .den-feat-label shows `${c.name} · Spirit` plus a button.den-spirit-dismiss ('✖ Dismiss') handled in renderDen's vp.onclick via e.target.closest('.den-spirit-dismiss') → RV.den.summonPcId=null; rvSaveDen(); renderDen(). In server.py do_GET add route '/api/imgproxy' (next to '/api/cardart' at ~line 1408): read `url` from the query string, require https scheme, fetch with urllib.request (10s timeout, browser User-Agent), require response Content-Type starting 'image/', stream bytes back with that Content-Type and Cache-Control: max-age=86400, JSON {ok:false,error} on failure — this makes remote TCGdex art same-origin so canvas getImageData is not tainted.",
+   "ux": "A '🧬 Summon' button in every card modal; the summoned spirit spins on the existing Den pedestal (replacing the featured card) with headband and condition styling, dismissible from its label.",
+   "files": [
+    "assets/app.js",
+    "assets/revamp.js",
+    "assets/revamp.css",
+    "server.py"
+   ],
+   "acceptance": [
+    "Clicking 🧬 Summon in a card modal switches to the Den and a 6-layer slice stack (not the flat card) spins on the pedestal within 3s, with a headband image whose texture contains the set name and number.",
+    "localStorage 'pokechest.summons.v1' contains the card's pcId with 6 slice dataURLs; re-summoning the same card skips rebuild (cached record reused).",
+    "A raw card whose condition/wear matches 'damaged' renders .spirit-bandage and .spirit-shiner overlays; a graded 10 renders .den-ped-gold on the pedestal; any other card renders .spirit-aura.",
+    "curl 'http://127.0.0.1:8787/api/imgproxy?url=<https image url>' returns image bytes with an image/* Content-Type; a non-https or non-image URL returns JSON {ok:false}.",
+    "Dismiss restores the normal featured-card pedestal and clears summonPcId from 'pokechest.den.v1'; zero JS pageerrors throughout."
+   ],
+   "verify": "Run POKECHEST_HOME=<scratch> python3 server.py, drive http://127.0.0.1:8787 with playwright-core (chromium at /opt/pw-browsers): open a card modal, click #mk-summon, wait for .den-spirit, assert 6 .den-spirit img slices + headband, evaluate localStorage['pokechest.summons.v1'], click .den-spirit-dismiss, assert zero pageerrors. Curl /api/imgproxy separately.",
+   "est": "L",
+   "dependsOn": [],
+   "demand": "medium",
+   "notes": "ROADMAP-TO-PUBLISH.md §3 Stage 1 'Card Spirit' — abstraction is the public-safe default per LEGAL.md (no Nintendo model files; generated locally from the user's own card art). Open question 9 to Brandon confirms abstract-only for public builds. No competitor (Collectr, Dex, PullVault) has anything like it."
+  },
+  {
+   "id": "den-tours",
+   "title": "Den Tours: 20s WebM camera tour + shareable read-only HTML snapshot",
+   "icon": "🎬",
+   "area": "den3d",
+   "status": "planned",
+   "priority": "P2",
+   "spec": "In assets/revamp.js renderDen() add two buttons to the .rv-row header: id den-tour ('🎬 20s Tour') and id den-share ('🔗 Share snapshot'). Add const DEN_TOUR = [{t:0,yaw:-50,pitch:8,zoom:120},{t:5,yaw:-15,pitch:4,zoom:300},{t:10,yaw:15,pitch:6,zoom:430},{t:15,yaw:45,pitch:10,zoom:260},{t:20,yaw:0,pitch:4,zoom:260}] and function denTourPlay(onDone): cancel via rvDenStopLoop(), then a requestAnimationFrame loop (store handle in DEN.raf) that lerps yaw/pitch/zoom between keyframes with ease t*t*(3-2*t), calls denApply() each frame, and calls onDone() after 20s. async function denTourRecord(): try navigator.mediaDevices.getDisplayMedia({video:{frameRate:30},audio:false}); build new MediaRecorder(stream,{mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm'}); collect chunks in ondataavailable, start(), run denTourPlay(), on completion stop() the recorder and all stream tracks, then download new Blob(chunks,{type:'video/webm'}) as 'den-tour.webm' via a temporary <a download>; if getDisplayMedia throws (denied/unsupported) toast('Recording unavailable — playing tour only') and run denTourPlay() alone. For the snapshot: new file scripts/build_tour.py modeled directly on scripts/build_pocket.py — reads data/collection.json, takes the top 20 active cards by value, and writes TOUR_NAME = 'Pokémon Den — Tour.html' into HOME: a single self-contained read-only page that inlines the den room CSS (copy the .den-face/.den-display/.den-viewport/.den-world/theme-* rules from assets/revamp.css), rebuilds the trophy-wall/shelf/gallery markup with <img> tags pointing at each card's existing art URL, runs a pure-CSS auto-orbit animation on .den-world, has no click handlers, and omits prices unless the build payload sets includePrices true. In server.py: add TOUR_NAME = 'Pokémon Den — Tour.html' beside POCKET_NAME (~line 40), a build_tour(payload) function that invokes scripts/build_tour.py the same way build_pocket() works, a do_POST route '/api/dentour' (beside '/api/pocket' at ~line 1499) returning {ok:true,file:'/'+urllib.parse.quote(TOUR_NAME)}, and a do_GET branch serving '/'+TOUR_NAME exactly like the POCKET_NAME branch (~line 1439). Frontend den-share handler: POST /api/dentour with {includePrices:false}, then window.open the returned file URL.",
+   "ux": "Two buttons in the Den header: '🎬 20s Tour' plays (and offers to record) a cinematic camera sweep; '🔗 Share snapshot' generates and opens a standalone read-only HTML Den page to send to anyone.",
+   "files": [
+    "assets/revamp.js",
+    "assets/revamp.css",
+    "scripts/build_tour.py",
+    "server.py"
+   ],
+   "acceptance": [
+    "Clicking #den-tour animates DEN.yaw/pitch/zoom through the 5 keyframes over ~20s and returns to rest without JS errors; denying screen-capture still plays the tour with a toast.",
+    "When getDisplayMedia is granted, a den-tour.webm download is produced whose blob size is > 0.",
+    "curl -X POST http://127.0.0.1:8787/api/dentour returns {ok:true,file:...} and writes 'Pokémon Den — Tour.html' into POKECHEST_HOME.",
+    "GET the returned file URL: 200, contains 'den-world', contains no <script> price-editing UI and no dollar amounts when includePrices was false.",
+    "The snapshot renders standalone (open the file directly in chromium with the server stopped) with the orbit animation running."
+   ],
+   "verify": "POKECHEST_HOME=<scratch> python3 server.py; curl -X POST /api/dentour and GET the quoted TOUR_NAME path asserting 200 + 'den-world'. Then playwright-core (chromium at /opt/pw-browsers): open the Den tab, click #den-tour, sample #den-world's transform at t=1s and t=6s asserting it changed, assert zero pageerrors.",
+   "est": "M",
+   "dependsOn": [],
+   "demand": "high",
+   "notes": "ROADMAP-TO-PUBLISH.md backlog item 9 — 'Public showcase pages / Den tours (nobody has this)'; differentiator vs Collectr/Dex/Shiny which only share flat lists. Snapshot reuses the proven pocket-build pattern (scripts/build_pocket.py + /api/pocket). Headless CI cannot grant getDisplayMedia, so the recording path is verified by the graceful-fallback branch."
+  },
+  {
+   "id": "den-vr-controls",
+   "title": "Den walk controls (WASD) + optional WebXR session",
+   "icon": "🥽",
+   "area": "den3d",
+   "status": "planned",
+   "priority": "P3",
+   "spec": "In assets/revamp.js extend the DEN state object (line ~373) with posX:0, and change denApply() to set `translate3d(${DEN.posX}px, 0, ${DEN.zoom}px) rotateX(${DEN.pitch}deg) rotateY(${DEN.yaw}deg)` on #den-world. Add denKeyHandler(e): return early if e.target.matches('input,textarea,select') or State.view!=='den'; W/ArrowUp → DEN.zoom=Math.min(620,DEN.zoom+25); S/ArrowDown → DEN.zoom=Math.max(40,DEN.zoom-25); A → DEN.posX=Math.min(240,DEN.posX+20); D → DEN.posX=Math.max(-240,DEN.posX-20); Q/ArrowLeft and E/ArrowRight → DEN.yaw ∓4 clamped to ±70; then e.preventDefault() and denApply(). Bind with document.addEventListener('keydown',denKeyHandler) inside renderDen() guarded by a DEN.keysBound flag, and add denKeysUnbind() (removeEventListener + flag reset) called from the hookSwitchView wrapper (line ~143) when prev==='den' — same place rvDenStopLoop() belongs on view exit. Update the .den-hud spans to read 'WASD — walk · drag — look · click card — details'. WebXR (optional layer): add async denXRInit() called at the end of renderDen(): if navigator.xr && await navigator.xr.isSessionSupported('immersive-vr') then inject a '🥽 VR' button (id den-vr) into the .rv-row, else inject nothing. den-vr onclick → denXRStart(): navigator.xr.requestSession('immersive-vr'), create an XRWebGLLayer on a raw WebGL context (no libraries), and each XRFrame draw a minimal scene — a floor grid of GL lines plus up to 12 textured quads (textures loaded from each card's art via '/api/imgproxy?url=' as in summon-card-spirit, falling back to a solid palette quad on texture error) arranged in a 4m-radius arc at eye height using the shipped view/projection matrices; on session 'end' or any thrown error, toast and return to the CSS3D view untouched. Every XR failure path must be caught — non-XR browsers must never see the button, and errors must never break the CSS Den.",
+   "ux": "The existing Den viewport gains keyboard walking (WASD/arrows, hinted in the HUD overlay); a '🥽 VR' button appears in the Den header only on WebXR-capable browsers/headsets.",
+   "files": [
+    "assets/revamp.js",
+    "assets/revamp.css"
+   ],
+   "acceptance": [
+    "With the Den tab focused, pressing W then A measurably changes #den-world's computed transform (zoom + posX components) and stays clamped at the limits after 50 repeats.",
+    "Keys do nothing while typing in any input/select (e.g. the den-theme select) and after switching to another tab (handler unbound — no listener leak on repeated tab switches).",
+    "In headless chromium (no WebXR) the #den-vr button is absent and no pageerror is thrown by denXRInit.",
+    "On a WebXR-capable device, entering and exiting the VR session returns to the normal CSS3D Den with prior yaw/pitch/zoom intact."
+   ],
+   "verify": "POKECHEST_HOME=<scratch> python3 server.py; playwright-core (chromium at /opt/pw-browsers): open Den, page.keyboard.press('w'/'a'), assert #den-world transform changed and contains translate3d; focus #den-theme, press 'w', assert unchanged; switch tabs twice, assert zero pageerrors and no #den-vr button.",
+   "est": "M",
+   "dependsOn": [],
+   "demand": "low",
+   "notes": "Extends the existing drag/scroll camera (renderDen pointer + wheel handlers). WebXR is progressive enhancement only — headless CI and most desktops exercise just the WASD + graceful-degrade paths. No competitor app offers a first-person collection room; Steam 'Amber Den' angle (ROADMAP §4) is the long-term payoff."
+  },
+  {
+   "id": "summon-genai",
+   "title": "Summon Stage 2: BYOK image-to-3D upgrade (personal build only)",
+   "icon": "✨",
+   "area": "den3d",
+   "status": "planned",
+   "priority": "P3",
+   "spec": "Personal-build-only, bring-your-own-key upgrade of a summoned Card Spirit to a richer generated figure, cached locally forever. Gating: the UI appears only when localStorage 'pokechest.flags.v1' parses to {summonGenAI:true} AND GET /api/secrets lists a secret labeled 'meshy' (reuse the existing secrets store in server.py backed by settings.local.json, same pattern as the Settings BYOK panel in assets/app.js ~line 2341). In server.py add do_POST route '/api/ai/summon3d' with payload {pcId, img}: read the 'meshy' key server-side, call Meshy's image-to-3D REST API (POST https://api.meshy.ai/openapi/v1/image-to-3d with image_url=img, then poll GET .../image-to-3d/{id} every 5s up to 180s until status SUCCEEDED), download model_urls['glb'] to HOME/summons/<pcId>.glb and thumbnail_url to HOME/summons/<pcId>.png (os.makedirs the summons dir), and return {ok:true, glb:'/api/summon3d/file?pcId=<pcId>&kind=glb', preview:'/api/summon3d/file?pcId=<pcId>&kind=png'}; if both files already exist return them immediately with cached:true and make no network call. Add do_GET routes '/api/summon3d?pcId=' returning {cached:bool, glb, preview} based on file existence, and '/api/summon3d/file' streaming the requested file with model/gltf-binary or image/png Content-Type (404 JSON {ok:false} when absent; reject pcId containing path separators). In assets/revamp.js, inside the summon-card-spirit pedestal label row, render an '✨ Upgrade' button (id den-spirit-upgrade) only when the gate passes; onclick → async summonGenAI(c): toast('Generating figure — this can take ~2 min'), POST /api/ai/summon3d, on ok set RV.den.summonGenPcId=String(c.pcId), rvSaveDen(), renderDen(). denRoomHTML(): when summonGenPcId matches the active summon and GET /api/summon3d reports cached, show the preview PNG as the spinning pedestal billboard (inside .den-feat-spin, replacing the slice stack) with a small '⬇ GLB' anchor (href = glb url, download attribute) in the label. Never enable the flag by default, never bundle a key, and never expose generated figures in the tour/snapshot or any export — scripts/build_tour.py must skip them (LEGAL.md: closer-to-real-Pokémon renders stay personal-build only and are never sellable assets).",
+   "ux": "An '✨ Upgrade' button on the summoned spirit's pedestal label (only visible with the personal flag + a stored Meshy key); the pedestal then shows the generated figure's spinning preview with a GLB download link.",
+   "files": [
+    "server.py",
+    "assets/revamp.js",
+    "scripts/build_tour.py",
+    "LEGAL.md"
+   ],
+   "acceptance": [
+    "With no 'pokechest.flags.v1' flag or no 'meshy' secret, #den-spirit-upgrade is absent and GET /api/summon3d?pcId=x returns {cached:false} without error.",
+    "POST /api/ai/summon3d for a pcId whose .glb and .png already exist in POKECHEST_HOME/summons returns {ok:true,cached:true} instantly with zero outbound network calls.",
+    "/api/summon3d/file streams the cached png with Content-Type image/png and rejects pcId values containing '/' or '..'.",
+    "With flag+key set and cached files present, the Den pedestal shows the preview billboard plus a working '⬇ GLB' download link; the /api/dentour snapshot contains no reference to /api/summon3d.",
+    "All UI paths produce zero JS pageerrors when the server returns {ok:false} (bad key, timeout)."
+   ],
+   "verify": "POKECHEST_HOME=<scratch> python3 server.py; pre-place scratch/summons/<pcId>.glb and .png, then curl POST /api/ai/summon3d (assert cached:true), GET /api/summon3d and /api/summon3d/file (assert types). Playwright-core (chromium at /opt/pw-browsers): seed localStorage flag, stub the secret, summon the card, assert the preview billboard and zero pageerrors; without the flag assert the button is absent.",
+   "est": "M",
+   "dependsOn": [
+    "summon-card-spirit"
+   ],
+   "demand": "low",
+   "notes": "ROADMAP-TO-PUBLISH.md §3 Stage 2 (BYOK) and open question 9; LEGAL.md governs the personal-build-only line — public builds ship Card Spirit abstractions exclusively. Meshy is the reference provider (documented image-to-3D REST with GLB + thumbnail output); the endpoint shape keeps the provider swappable behind /api/ai/summon3d. Follows the app's existing BYOK stance: keys in settings.local.json, sent only to that provider (Settings panel copy, app.js ~2705)."
+  },
+  {
+   "id": "about-legal-panel",
+   "title": "In-app About & Legal panel",
+   "icon": "⚖️",
+   "area": "publish",
+   "status": "planned",
+   "priority": "P0",
+   "spec": "Add an 'About & Legal' modal that surfaces LEGAL.md inside the app. In index.html's <footer class=\"footer\"> (lines 99-108), add <button class=\"linklike\" id=\"aboutBtn\">About &amp; Legal</button> after the #footMeta span. In assets/app.js add function openAbout(): it fetches 'LEGAL.md' (same-origin; server.py's SimpleHTTPRequestHandler already serves repo-root files), converts it to HTML with a new tiny helper mdToHtml(md) handling only #/## headings, **bold**, [text](url) links, and '- ' bullets, and renders it into $('#modalRoot') using the existing modal-bg/modal markup pattern (see openWalkthrough at app.js:632 for the pattern; close via existing closeModal()). Above the legal text show a header block with the app name, 'Version ' + APP_VERSION (const at app.js:4), a link to APP_REPO (app.js:5), and a credits line: card images TCGdex (tcgdex.dev), prices PriceCharting export, built by DarkHearts. If the fetch fails (file:// mode or missing file), fall back to a const LEGAL_FALLBACK string in app.js containing the same disclaimer text as LEGAL.md's first paragraph plus the Nintendo trademark notice. Wire $('#aboutBtn').onclick = openAbout inside wireChrome() (app.js:122). Add '../LEGAL.md': 'app/LEGAL.md' to bundle.resources in src-tauri/tauri.conf.json so the packaged app ships the file. Add a .linklike style (underlined, muted, cursor:pointer, inherits footer font) to assets/revamp.css.",
+   "ux": "An 'About & Legal' text link in the persistent footer of every view; clicking opens a scrollable modal over #modalRoot with version, credits, and the full LEGAL.md text.",
+   "files": [
+    "index.html",
+    "assets/app.js",
+    "assets/revamp.css",
+    "src-tauri/tauri.conf.json",
+    "LEGAL.md"
+   ],
+   "acceptance": [
+    "Footer shows an 'About & Legal' link on every tab; clicking it opens a modal without any JS pageerror",
+    "Modal displays 'Version 2.1.0' (APP_VERSION) and the phrase 'not affiliated' from LEGAL.md",
+    "Modal renders LEGAL.md headings as <h1>/<h2> and links as <a>, and closes via the × button and background click",
+    "With fetch blocked (offline/file mode) the modal still opens showing the LEGAL_FALLBACK disclaimer",
+    "src-tauri/tauri.conf.json bundle.resources includes LEGAL.md"
+   ],
+   "verify": "Run POKECHEST_HOME=<scratch> python3 server.py, drive http://127.0.0.1:8787 with playwright-core (chromium at /opt/pw-browsers): click #aboutBtn, assert the modal's innerText contains 'Version 2.1.0' and 'not affiliated', assert zero pageerrors. curl -s http://127.0.0.1:8787/LEGAL.md | head -1 returns '# Legal & Credits'.",
+   "est": "S",
+   "dependsOn": [],
+   "demand": "low",
+   "notes": "Publish-gate item: 'LEGAL.md surfaced in-app (About panel)' in ROADMAP-TO-PUBLISH.md §4. LEGAL.md itself requires the credits file stay visible in-app for any public distribution."
+  },
+  {
+   "id": "ship-rename-switch",
+   "title": "One-command display-name rename script",
+   "icon": "🏷️",
+   "area": "publish",
+   "status": "planned",
+   "priority": "P0",
+   "spec": "Create scripts/rename.sh taking one argument, the new display name (e.g. bash scripts/rename.sh \"Card Den\"). It swaps DISPLAY STRINGS ONLY: run sed -i replacements of the exact strings 'Pokémon Den' and 'Pokemon Den' with \"$1\" in: index.html, tauri-shell/index.html, assets/app.js, assets/revamp.js, assets/mobile.html, server.py (POCKET_NAME at line 40 becomes \"$1 — Pocket.html\" automatically via the same substitution), package.json, src-tauri/tauri.conf.json (productName and windows[0].title), .github/workflows/build-dmg.yml, build-app.command, start.command, refresh-data.command, README.md, LEGAL.md, scripts/build_mobile.py, scripts/build_pocket.py. Special-case the split-markup header in index.html line 34: replace the whole element '<h1>Pokémon <span>Den</span></h1>' with '<h1>FIRST <span>REST</span></h1>' where REST is the last word of \"$1\" and FIRST is everything before it (single-word names put the entire name inside the span). The script MUST NOT touch: the bundle identifier com.darkhearts.pokemonchest, any 'pokechest.*' localStorage key, POKECHEST_HOME/POKECHEST_PORT env names, anything under data/, or ROADMAP-TO-PUBLISH.md. Finish by printing a grep -rn count of remaining 'Pokémon Den|Pokemon Den' occurrences (expected: only ROADMAP-TO-PUBLISH.md) and a reminder that internal ids intentionally stay pokechest.* for data compatibility. Use LC_ALL=en_US.UTF-8 (or perl -pi -e) so the é multibyte replacement works on both macOS and Linux sed.",
+   "ux": "No UI of its own; after running, the topbar h1, window title, DMG release title, and Pocket/mobile page titles all show the new name.",
+   "files": [
+    "scripts/rename.sh",
+    "index.html",
+    "tauri-shell/index.html",
+    "assets/app.js",
+    "assets/revamp.js",
+    "assets/mobile.html",
+    "server.py",
+    "package.json",
+    "src-tauri/tauri.conf.json",
+    ".github/workflows/build-dmg.yml",
+    "build-app.command",
+    "start.command",
+    "refresh-data.command",
+    "README.md",
+    "LEGAL.md",
+    "scripts/build_mobile.py",
+    "scripts/build_pocket.py"
+   ],
+   "acceptance": [
+    "bash scripts/rename.sh \"Card Den\" leaves zero 'Pokémon Den'/'Pokemon Den' occurrences outside ROADMAP-TO-PUBLISH.md (git grep confirms)",
+    "index.html h1 renders 'Card <span>Den</span>' and tauri.conf.json productName is 'Card Den'",
+    "git diff shows NO change to identifier com.darkhearts.pokemonchest, any pokechest.* string, or POKECHEST_* env names",
+    "App boots and all 17 tabs render with zero JS pageerrors after the rename",
+    "Running the script twice is idempotent (second run changes nothing)"
+   ],
+   "verify": "In a scratch git worktree run bash scripts/rename.sh \"Card Den\"; git grep -c 'Pokemon Den\\|Pokémon Den' must hit only ROADMAP-TO-PUBLISH.md; then POKECHEST_HOME=<scratch> python3 server.py and drive http://127.0.0.1:8787 headless with playwright-core asserting document.title === 'Card Den — Collection & Price Tracker' and zero pageerrors; git checkout -- . to revert.",
+   "est": "S",
+   "dependsOn": [],
+   "demand": "low",
+   "notes": "Publish-gate item 'Ship-name chosen + swapped (one commit)'. Safe-name candidates from ROADMAP-TO-PUBLISH.md §1: Card Den (⭐ recommended — short, ownable, multi-TCG future), The Amber Den (own DarkHearts world, zero IP risk), DenKeeper, Collector's Den, Vaulted, Chestbound. 'Pokémon' in a public name would be refused by Apple/Google review and invites a Nintendo C&D; internal ids stay pokechest.* forever."
+  },
+  {
+   "id": "public-art-mode",
+   "title": "Public-build art mode (user photos only)",
+   "icon": "🖼️",
+   "area": "publish",
+   "status": "planned",
+   "priority": "P0",
+   "spec": "Add a build flag that suppresses catalog (TCGdex/external) card art so store builds default to user-scanned photos only. Create data/build-flags.json with {\"publicArt\": false} (personal-build default). In assets/app.js's boot sequence (the async init around lines 71-84), fetch('data/build-flags.json') into a new State.flags object ({} on failure) BEFORE applyImgOverrides() runs. Add function applyPublicArtMode(): if State.flags.publicArt is true, for each card in State.cards set c.img = null whenever c.img matches /^https?:\\/\\//, so the memoized c._catalogImg captured in applyImgOverrides() (app.js:339) becomes null and cards fall back to phHTML placeholders unless the user saved art. User art still works untouched: imgOverride values in LS_USER ('pokechest.userdata.v1'), server files served from /card-art/<pcId> via hydrateServerArt() (app.js:346), and data: URLs are all non-https-external and survive the filter. In public mode also hide the '🔍 Google Images' button inside openImageEditor (app.js:405, googleImgUrl at :397) behind if (!State.flags.publicArt). In .github/workflows/build-dmg.yml add a workflow_dispatch input public_art (boolean, default false) and a step before the build: if true, run: echo '{\"publicArt\": true}' > data/build-flags.json. Do not change server.py; the flag file rides along in the existing data/ bundle resource.",
+   "ux": "Invisible in personal builds; in a store build the Collection/Case/Sell grids show the styled name+set placeholder (phHTML) instead of TCGdex art until the user scans or saves their own photo per card.",
+   "files": [
+    "data/build-flags.json",
+    "assets/app.js",
+    ".github/workflows/build-dmg.yml"
+   ],
+   "acceptance": [
+    "With publicArt:false the app renders exactly as today (TCGdex art loads)",
+    "With publicArt:true no <img> in #grid has a src starting with http:// or https:// pointing off-origin; placeholders render instead",
+    "With publicArt:true a card with a saved /card-art/<pcId> file or imgOverride still shows that image",
+    "openImageEditor hides the Google Images button when publicArt is true",
+    "Zero JS pageerrors across all tabs in both flag states"
+   ],
+   "verify": "Write {\"publicArt\": true} to data/build-flags.json, run POKECHEST_HOME=<scratch> python3 server.py, drive http://127.0.0.1:8787 with playwright-core: on the Collection tab assert document.querySelectorAll('#grid img[src^=\"http\"]').length === 0 and .ph placeholders exist; restore the file to false and assert catalog art returns. Zero pageerrors both runs.",
+   "est": "S",
+   "dependsOn": [],
+   "demand": "low",
+   "notes": "Publish-gate item 'Replace scraped/linked card art default with user-scanned images... in the public build'; LEGAL.md clause (b) requires dropping Pokémon-IP visuals by default in any public release. Catalog URLs are baked into data/collection.json by scripts/build_data.py — filtering at load time avoids touching the data pipeline."
+  },
+  {
+   "id": "signing-notarization-ci",
+   "title": "Real signing + notarization in the DMG CI",
+   "icon": "🔏",
+   "area": "publish",
+   "status": "blocked",
+   "priority": "P1",
+   "spec": "Upgrade .github/workflows/build-dmg.yml from ad-hoc signing to real Developer ID signing + notarization using Tauri v2's native env-var support. Required GitHub Actions secrets: APPLE_CERTIFICATE (base64 of the Developer ID Application .p12), APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY (e.g. 'Developer ID Application: Brandon Barkey (WYUV6QMULK)'), APPLE_ID, APPLE_PASSWORD (an app-specific password), APPLE_TEAM_ID (WYUV6QMULK, already in tauri.conf.json as iOS developmentTeam). Replace the single 'Build app + dmg' step (lines 46-50) with two mutually exclusive steps: (a) 'Build signed + notarized' with if: ${{ secrets.APPLE_CERTIFICATE != '' }}, env block passing all six secrets, running npx --yes \"@tauri-apps/cli@^2\" build --target universal-apple-darwin WITHOUT the signingIdentity:'-' config override — the Tauri CLI imports the cert into a temp keychain, signs, and submits to notarytool automatically when APPLE_ID/APPLE_PASSWORD/APPLE_TEAM_ID are set; (b) the existing ad-hoc step with if: ${{ secrets.APPLE_CERTIFICATE == '' }} as fallback. Update the release-notes string in the gh release create step to say 'Signed & notarized' when path (a) ran (expose it via a step output, e.g. echo \"signed=true\" >> $GITHUB_OUTPUT). Also change src-tauri/tauri.conf.json bundle.macOS.signingIdentity from the hardcoded 'Apple Development: Brandon Barkey (LFQPLFRKD2)' to null so the env var wins in CI and local builds fall back gracefully.",
+   "ux": "No in-app UI; downloaded DMGs open without the right-click-Open Gatekeeper dance.",
+   "files": [
+    ".github/workflows/build-dmg.yml",
+    "src-tauri/tauri.conf.json"
+   ],
+   "acceptance": [
+    "With all six secrets set, the workflow produces a DMG whose app passes 'spctl -a -t exec -vv' (source=Notarized Developer ID)",
+    "With no secrets set, the workflow still succeeds via the ad-hoc path (current behavior preserved)",
+    "No secret value is ever echoed in workflow logs",
+    "dmg-latest release notes state whether the build is notarized or ad-hoc"
+   ],
+   "verify": "Trigger the workflow with gh workflow run build-dmg.yml and confirm the correct conditional step ran via gh run view --log; on a Mac, download the DMG and run spctl -a -t exec -vv on the .app. Without a Mac, verify YAML validity (python3 -c \"import yaml,sys;yaml.safe_load(open('.github/workflows/build-dmg.yml'))\") and that the ad-hoc fallback path still completes in CI.",
+   "est": "M",
+   "dependsOn": [],
+   "demand": "medium",
+   "notes": "BLOCKED: needs a paid Apple Developer Program membership ($99/yr) and a 'Developer ID Application' certificate — the existing 'Apple Development: Brandon Barkey (LFQPLFRKD2)' cert cannot notarize (ROADMAP-TO-PUBLISH.md §4 store table + open question 4 to Brandon). Publish-gate item 'Real signing + notarization in CI (needs Apple cert secrets in repo)'."
+  },
+  {
+   "id": "cloud-backup",
+   "title": "Encrypted backup export/import (then iCloud autosave)",
+   "icon": "☁️",
+   "area": "platform",
+   "status": "planned",
+   "priority": "P2",
+   "spec": "Phase 1, all in assets/app.js Admin tab (renderAdmin, app.js:2102): add a 'Backup & Restore' panel. backupCollect() returns {app:'pokechest', version:APP_VERSION, exported:ISO-8601, ls:{...}} where ls holds every localStorage key starting with 'pokechest.' (snapshots, userdata, den, sales, customcards, case, pregrade, arcade, etc.) with raw string values. Add async backupEncrypt(passphrase) → Uint8Array: derive an AES-GCM-256 key via PBKDF2-SHA256 (250000 iterations, random 16-byte salt) using crypto.subtle, encrypt the UTF-8 JSON of backupCollect() with a random 12-byte IV, and return the concatenation ASCII magic 'PKDEN1' + salt + iv + ciphertext. backupExport(passphrase): download await backupEncrypt(passphrase) as a Blob, filename den-backup-<YYYY-MM-DD>.pkdenbak. backupImport(file, passphrase): parse the same layout, decrypt, validate payload.app==='pokechest', show a confirm listing key count and export date, then write every ls entry back via localStorage.setItem and location.reload(). Wrong passphrase (AES-GCM auth failure) must toast a clear error and change nothing. Phase 2 (autosave): new LS key `'pokechest.backupauto.v1'` = `{enabled:boolean, pass:string, lastRun:'YYYY-MM-DD'|null}` — the passphrase is stored locally in plaintext by design (documented in the panel copy: 'the passphrase protects the backup file if it leaves this computer; it is stored on this computer'). Admin panel UI for it: an autosave checkbox, a passphrase input (writes .pass), and a folder-path input that POSTs {backup_dir:'<path>'} to the existing /api/config endpoint. Server side: add 'backup_dir' to server.py save_settings' known-keys tuple (line ~52); add POST /api/backup/save to do_POST accepting {filename, dataB64}, decoding and atomically writing to settings backup_dir if set else HOME/backups/ (os.makedirs, reject filenames containing '/' or '..'), returning {ok, path}. Client: add async backupAutosave(): read the LS record; return unless enabled && pass && State.live && (lastRun == null || (Date.now() - Date.parse(lastRun)) >= 7*86400000); const bytes = await backupEncrypt(rec.pass); base64-encode via btoa(String.fromCharCode(...)) applied in 0x8000-byte chunks; POST /api/backup/save with {filename:'den-autobackup-<YYYY-MM-DD>.pkdenbak', dataB64}; on {ok:true} set lastRun = today and save the LS record; all failures silent except a single toast on HTTP error. Call backupAutosave() once at the end of init() in app.js (after updateLiveBtn()). Pointing backup_dir at ~/Library/Mobile Documents/com~apple~CloudDocs/<AppName>/ gives iCloud sync with no backend.",
+   "ux": "Admin tab → 'Backup & Restore' panel: passphrase field, '⬇ Export encrypted backup' and '⬆ Restore from backup' buttons, plus an autosave toggle with folder path field once Phase 2 lands.",
+   "files": [
+    "assets/app.js",
+    "assets/revamp.css",
+    "server.py"
+   ],
+   "acceptance": [
+    "Export downloads a .pkdenbak file that starts with bytes 'PKDEN1' and is not plaintext (no 'pokechest' substring visible)",
+    "Importing that file with the right passphrase into a cleared-localStorage session restores Den layout, sales, custom cards, and case picks, then reloads",
+    "Importing with the wrong passphrase toasts an error and localStorage is unchanged",
+    "POST /api/backup/save with {filename:'t.pkdenbak', dataB64} writes the file under POKECHEST_HOME/backups and rejects filename '../x'",
+    "Zero JS pageerrors on the Admin tab"
+   ],
+   "verify": "Playwright-core against http://127.0.0.1:8787: seed localStorage.setItem('pokechest.den.v1','{\"theme\":\"amber\"}'), export via page.waitForEvent('download'), clear storage, re-import the file with the same passphrase, assert the key is restored. curl -s -X POST http://127.0.0.1:8787/api/backup/save -d '{\"filename\":\"t.bak\",\"dataB64\":\"QUJD\"}' returns ok:true and the file exists in $POKECHEST_HOME/backups.",
+   "est": "M",
+   "dependsOn": [],
+   "demand": "high",
+   "notes": "Backlog item #8 in ROADMAP-TO-PUBLISH.md §2 — 'Cloud backup / multi-device sync' is the top complaint category across Collectr, Dex, Shiny, PullVault app reviews. Roadmap direction: 'export/import encrypted snapshot → then real sync'; open question 7 (backend vs iCloud-file sync) means Phase 2 stays file-based."
+  },
+  {
+   "id": "error-reporting-optin",
+   "title": "Opt-in error log & diagnostics report",
+   "icon": "🩺",
+   "area": "publish",
+   "status": "planned",
+   "priority": "P2",
+   "spec": "Local-only, consent-gated error capture — nothing is ever transmitted automatically. In assets/app.js define LS_ERRLOG = 'pokechest.errlog.v1' (JSON array, newest first, capped at 100) and LS_ERRCONSENT = 'pokechest.errconsent.v1' ('on'/'off', default off). At script top (after the State const at app.js:38) register window.addEventListener('error', ...) and window.addEventListener('unhandledrejection', ...) which, only when consent is 'on', push {ts:ISO-8601, msg, stack:(first 800 chars), view:State.view, version:APP_VERSION, ua:navigator.userAgent} via a new logError(entry) helper that trims the array to 100 and saves with loadJSON/localStorage.setItem. In openSettings (app.js:2694) add a checkbox 'Keep a local error log to help fix bugs (stays on this computer)' that toggles LS_ERRCONSENT. In renderAdmin (app.js:2102) add an 'Error log' panel listing entries (time, view, message) with three buttons: '📋 Copy report' — copies the existing diagnostics() output (app.js:1117) plus the log as markdown to the clipboard; '✉ Send' — opens the existing feedback mailto/GitHub-issue flow (feedbackBody at app.js:1126) with the log appended; '🗑 Clear' — deletes LS_ERRLOG. The panel header states 'Off by default. Never sent automatically.' Also wire logError into the catch of the boot sequence so startup failures are captured when consent is on.",
+   "ux": "Settings (⚙ Live) modal gains the consent checkbox; Admin tab gains an 'Error log' panel with copy/send/clear.",
+   "files": [
+    "assets/app.js",
+    "assets/revamp.css"
+   ],
+   "acceptance": [
+    "With consent off (default), throwing a test error adds nothing to localStorage",
+    "With consent on, window.dispatchEvent of an error event produces an entry in pokechest.errlog.v1 containing msg, view, and version '2.1.0'",
+    "Log never exceeds 100 entries (oldest dropped)",
+    "'Copy report' puts diagnostics + log entries on the clipboard; 'Clear' empties the key",
+    "No fetch/XHR to any host fires from the error handlers (network log stays empty)"
+   ],
+   "verify": "Playwright-core: with consent off run page.evaluate(() => window.dispatchEvent(new ErrorEvent('error',{message:'t1'}))) and assert localStorage key absent; set pokechest.errconsent.v1='on', repeat, assert JSON.parse(localStorage.getItem('pokechest.errlog.v1'))[0].msg==='t1'; record page.on('request') to assert zero outbound requests from the handler.",
+   "est": "S",
+   "dependsOn": [],
+   "demand": "low",
+   "notes": "Publish-gate item 'Crash/error reporting opt-in, privacy policy page'. Deliberately local-only (matches LEGAL.md 'everything is local to your computer'); the privacy-policy text itself lands in the About panel (about-legal-panel)."
+  },
+  {
+   "id": "onboarding-first-run",
+   "title": "Zero-data first-run welcome flow",
+   "icon": "👋",
+   "area": "publish",
+   "status": "planned",
+   "priority": "P1",
+   "spec": "Give a user with no PriceCharting history a working first five minutes. In assets/app.js, at the top of renderDashboard (app.js:823), if State.cards.length === 0 render renderFirstRun() into #view-dashboard and return: a hero panel ('Let's fill your Den') with three path cards. Path A 'Import your PriceCharting export': a file <input accept=\".csv,.xlsx\"> that reads the file as base64 and POSTs {name, dataB64} to a NEW server.py route '/api/import' in do_POST — the handler validates the extension, writes the bytes atomically to HOME under the sanitized original filename (reject names with '/' or '..'), then reuses the existing /api/refresh rebuild path (scripts/build_data.py with env POKECHEST_HOME=HOME, same as the autosync flow around server.py:531) and returns {ok, cards:<count>}; on ok the client re-runs the boot data load and toasts the card count. Path B 'Connect PriceCharting live': button calling the existing openSettings() (app.js:2694) where the pricecharting_token is entered. Path C 'Add cards by hand': button calling switchView('ledger') — the Add & Sold tab's addCard() form (assets/revamp.js:1133) already persists to LS_CUSTOM 'pokechest.customcards.v1'. Also guard maybeOnboard() (app.js:660) so the 6-step walkthrough does NOT auto-fire while State.cards.length === 0 (the welcome panel replaces it; the walkthrough fires on the first load that has cards). Hide the panel automatically once State.cards.length > 0. When the backend is absent (State.live falsy) grey out Path A/B with a 'requires the desktop app' note so the static build degrades gracefully.",
+   "ux": "Replaces the empty Dashboard on first launch with three big choice cards; disappears forever once the collection has at least one card.",
+   "files": [
+    "assets/app.js",
+    "assets/revamp.css",
+    "server.py"
+   ],
+   "acceptance": [
+    "With an empty collection.json the Dashboard shows the three-path welcome panel and the walkthrough modal does not auto-open",
+    "Uploading a valid PriceCharting CSV via the panel returns ok with a card count and the grid populates without a manual restart",
+    "POST /api/import rejects {name:'../evil.csv'} and non-csv/xlsx extensions with ok:false",
+    "'Add cards by hand' lands on the Add & Sold tab with the add form focused",
+    "With cards present the Dashboard renders exactly as today"
+   ],
+   "verify": "Run POKECHEST_HOME=<empty scratch dir> python3 server.py (no export present), drive http://127.0.0.1:8787 with playwright-core: assert the welcome panel text is visible and no .wt-card walkthrough modal exists; curl -s -X POST http://127.0.0.1:8787/api/import -d '{\"name\":\"../x.csv\",\"dataB64\":\"QQ==\"}' returns ok:false. Zero pageerrors.",
+   "est": "M",
+   "dependsOn": [],
+   "demand": "high",
+   "notes": "Publish-gate item 'Onboarding for people with zero PriceCharting history (CSV/manual import)'. Today's WALK_STEPS walkthrough (app.js:618) assumes an export already exists; competitors (Collectr, CollX) onboard via scan/manual-add first — Path C plus the Scanner tab covers that."
+  },
+  {
+   "id": "steam-amber-den-build",
+   "title": "Steam 'The Amber Den' IP-clean variant",
+   "icon": "🎮",
+   "area": "publish",
+   "status": "blocked",
+   "priority": "P3",
+   "spec": "A separate, IP-clean build profile shipping the cozy 3D collection-den experience for any TCG, as 'The Amber Den', targeted at Steam. Create scripts/build-amber.sh which: (1) runs bash scripts/rename.sh \"The Amber Den\"; (2) writes data/build-flags.json as {\"publicArt\": true, \"amber\": true}; (3) prints next-step build commands. In assets/app.js honor State.flags.amber by hiding Pokémon-specific surfaces: remove the tabs with data-view 'arcade' and 'merch' from #tabs at boot (querySelector('[data-view=\"arcade\"]').remove() etc.), hide the Emerald Lab panel inside renderAdmin (app.js:2102), and skip WALK_STEPS entries whose body mentions Emerald. Keep The Den, 3D Studio, Collection, Ledger, Scanner, Sell/Grade tools — the product is the den + any-CSV collection (the export pipeline's 'game' field already carries Magic/sports rows per ROADMAP §2 item 7). Add .github/workflows/build-steam.yml (workflow_dispatch only) with two jobs reusing the build-dmg.yml pattern: windows-latest producing the NSIS .exe and ubuntu-latest producing an AppImage via npx @tauri-apps/cli@^2 build, each preceded by the build-amber.sh step, uploading artifacts. Steam Direct itself (appid, depots, steamcmd upload) is documented as manual steps in a comment block at the top of the workflow — no steamworks SDK integration in v1. The Summon feature, if present by then, must ship only the abstract 'Card Spirit' style (ROADMAP §3 IP line).",
+   "ux": "A separate distributable app: same tabs minus Arcade/Merch/Emerald, 'The Amber Den' branding, placeholder art until users scan their own cards.",
+   "files": [
+    "scripts/build-amber.sh",
+    "scripts/rename.sh",
+    "data/build-flags.json",
+    "assets/app.js",
+    ".github/workflows/build-steam.yml"
+   ],
+   "acceptance": [
+    "After scripts/build-amber.sh, git grep finds no 'Pokémon Den'/'Pokemon Den' outside ROADMAP-TO-PUBLISH.md and build-flags has amber:true + publicArt:true",
+    "With amber:true the tab bar has no Arcade or Merch Vault tab and Admin shows no Emerald Lab panel",
+    "No external card-art URLs load anywhere (publicArt behavior)",
+    "build-steam.yml lints as valid YAML and its jobs produce .exe and AppImage artifacts on dispatch",
+    "All remaining tabs render with zero JS pageerrors"
+   ],
+   "verify": "In a scratch worktree run bash scripts/build-amber.sh, then POKECHEST_HOME=<scratch> python3 server.py and drive http://127.0.0.1:8787 with playwright-core: assert document.title starts with 'The Amber Den', document.querySelector('[data-view=\"arcade\"]') === null, zero pageerrors across tabs.",
+   "est": "L",
+   "dependsOn": [
+    "ship-rename-switch",
+    "public-art-mode",
+    "about-legal-panel"
+   ],
+   "demand": "low",
+   "notes": "BLOCKED on Brandon's green-light (ROADMAP open question 8) and the $100 Steam Direct fee. ROADMAP §4: Steam is 'plausible as The Amber Den — a cozy 3D collection-den app (any TCG, no Pokémon branding)' and the only realistic TV/console path (Switch is a hard no)."
+  },
+  {
+   "id": "tauri-mobile-builds",
+   "title": "iOS/Android Tauri targets in CI",
+   "icon": "📱",
+   "area": "platform",
+   "status": "planned",
+   "priority": "P2",
+   "spec": "Stand up Tauri 2 mobile targets using the existing iOS developmentTeam WYUV6QMULK in src-tauri/tauri.conf.json. One-time scaffolding (commit the results): npx --yes @tauri-apps/cli@^2 ios init and android init, generating src-tauri/gen/apple and src-tauri/gen/android. Because mobile cannot run the Python sidecar (server.py), add scripts/build_static.py (stdlib only) that copies index.html, assets/, and data/ into dist-static/ — assets/app.js already degrades to static mode when /api/health fails (State.live stays null and live features hide) — and add src-tauri/tauri.mobile.conf.json containing {\"build\": {\"frontendDist\": \"../dist-static\"}} to be merged via --config. New workflow .github/workflows/build-mobile.yml (workflow_dispatch + push on src-tauri/** to the same branches as build-dmg.yml): job 'android' on ubuntu-latest — setup-node 20, setup-java 17, android-actions/setup-android with NDK, rust targets aarch64-linux-android/armv7-linux-androideabi/i686-linux-android/x86_64-linux-android, run python3 scripts/build_static.py then npx @tauri-apps/cli@^2 android build --apk --config src-tauri/tauri.mobile.conf.json, upload the unsigned .apk artifact; job 'ios' on macos-latest — same static build then npx @tauri-apps/cli@^2 ios build --config src-tauri/tauri.mobile.conf.json, gated with if: ${{ secrets.APPLE_CERTIFICATE != '' }} because a signed .ipa needs the signing-notarization-ci secrets (continue-on-error: true so android artifacts still publish). The Scanner tab's camera capture (assets/revamp.js RV.cam) is the mobile hero feature and works fully client-side; PC sync/AI panels hide themselves in static mode.",
+   "ux": "No new in-app UI; produces installable .apk (sideload/Play internal testing) and .ipa (TestFlight once signed) with the same tabs in static mode.",
+   "files": [
+    "src-tauri/tauri.conf.json",
+    "src-tauri/tauri.mobile.conf.json",
+    "src-tauri/gen/apple",
+    "src-tauri/gen/android",
+    "scripts/build_static.py",
+    ".github/workflows/build-mobile.yml",
+    "assets/app.js"
+   ],
+   "acceptance": [
+    "python3 scripts/build_static.py produces dist-static/ containing index.html, assets/, data/ and nothing else",
+    "Serving dist-static/ statically (python3 -m http.server) renders all tabs with zero pageerrors and no visible dependency on /api/* (live panels hidden)",
+    "The android CI job uploads an .apk artifact on dispatch",
+    "The ios job is skipped (not failed) when APPLE_CERTIFICATE is unset",
+    "src-tauri/gen/ scaffolding is committed and tauri android build runs without re-running init"
+   ],
+   "verify": "Run python3 scripts/build_static.py; cd dist-static && python3 -m http.server 8899; drive http://127.0.0.1:8899 with playwright-core asserting zero pageerrors across all tabs and that the ⚙ Live settings modal shows its no-backend state. Validate build-mobile.yml with a YAML parse, then gh workflow run build-mobile.yml and check artifacts.",
+   "est": "L",
+   "dependsOn": [
+    "signing-notarization-ci"
+   ],
+   "demand": "high",
+   "notes": "ROADMAP §4: iOS possible ('Tauri 2 supports iOS; your tauri.conf.json already has a developmentTeam') with camera scanning as the hero feature; Google Play possible via the Android target. Also feeds backlog #12 (offline-first mobile scanning with sync queue — frequent complaint about scanner apps like CollX/PullVault needing connection). App Store submission additionally requires ship-rename-switch per review rules."
+  }
+ ],
+ "matrix": {
+  "competitors": [
+   {
+    "key": "collectr",
+    "name": "Collectr",
+    "note": "Market-leading multi-TCG + sports portfolio tracker: scanning, live prices, portfolio charts, and social features."
+   },
+   {
+    "key": "dex",
+    "name": "Dex",
+    "note": "Polished Pokémon-first collection tracker with set completion, deck building, and wishlist as core loops."
+   },
+   {
+    "key": "shiny",
+    "name": "Shiny",
+    "note": "Speed-focused Pokémon scanner whose pitch is rapid bulk/binder scanning straight into a priced collection (est.)."
+   },
+   {
+    "key": "pullvault",
+    "name": "PullVault",
+    "note": "Pokémon collection and pull-tracking app with scanning, portfolio value, and community/trade features (est.)."
+   },
+   {
+    "key": "collx",
+    "name": "CollX",
+    "note": "Scan-to-price app with marketplace and selling rails; strongest in sports cards, expanding into TCG (est.)."
+   },
+   {
+    "key": "pkmn-gg",
+    "name": "pkmn.gg",
+    "note": "Web-first Pokémon platform centered on set completion, collection browsing, and deck building."
+   },
+   {
+    "key": "pokellector",
+    "name": "Pokellector",
+    "note": "Long-running set-checklist site/app for tracking Pokémon set completion; light on pricing and portfolio depth."
+   },
+   {
+    "key": "pricecharting",
+    "name": "PriceCharting",
+    "note": "Price-guide authority: per-grade values, deep per-card price history, sold data, and collection import/lot tools."
+   }
+  ],
+  "rows": [
+   {
+    "featureId": "card-scanning",
+    "label": "Card scanning & identification",
+    "us": "shipped",
+    "have": [
+     "collectr",
+     "dex",
+     "shiny",
+     "pullvault",
+     "collx",
+     "pricecharting"
+    ]
+   },
+   {
+    "featureId": "bulk-binder-scan",
+    "label": "Bulk / binder page scanning",
+    "us": "planned",
+    "have": [
+     "shiny",
+     "collectr",
+     "collx"
+    ]
+   },
+   {
+    "featureId": "price-tracking",
+    "label": "Market price tracking (raw cards)",
+    "us": "shipped",
+    "have": [
+     "collectr",
+     "dex",
+     "shiny",
+     "pullvault",
+     "collx",
+     "pkmn-gg",
+     "pricecharting"
+    ]
+   },
+   {
+    "featureId": "price-alerts",
+    "label": "Price alerts / mover notifications",
+    "us": "planned",
+    "have": [
+     "collectr"
+    ]
+   },
+   {
+    "featureId": "per-card-history",
+    "label": "Price history charts (portfolio & per-card)",
+    "us": "partial",
+    "have": [
+     "collectr",
+     "collx",
+     "pricecharting"
+    ]
+   },
+   {
+    "featureId": "graded-values",
+    "label": "Graded values per grade (PSA/CGC/BGS ladder)",
+    "us": "shipped",
+    "have": [
+     "pricecharting",
+     "collectr",
+     "collx"
+    ]
+   },
+   {
+    "featureId": "ai-pre-grade",
+    "label": "AI condition pre-grading from photos",
+    "us": "planned",
+    "have": [
+     "collx"
+    ]
+   },
+   {
+    "featureId": "set-completion",
+    "label": "Set completion tracking / checklists",
+    "us": "planned",
+    "have": [
+     "dex",
+     "pkmn-gg",
+     "pokellector",
+     "collectr",
+     "shiny"
+    ]
+   },
+   {
+    "featureId": "trade-checker",
+    "label": "Trade checker / trade balancing",
+    "us": "planned",
+    "have": [
+     "collx",
+     "pullvault",
+     "pkmn-gg"
+    ]
+   },
+   {
+    "featureId": "multi-tcg",
+    "label": "Multi-TCG support (Magic, Yu-Gi-Oh!, sports)",
+    "us": "planned",
+    "have": [
+     "collectr",
+     "collx",
+     "pricecharting"
+    ]
+   },
+   {
+    "featureId": "cloud-backup",
+    "label": "Cloud sync & backup across devices",
+    "us": "planned",
+    "have": [
+     "collectr",
+     "dex",
+     "shiny",
+     "pullvault",
+     "collx",
+     "pkmn-gg",
+     "pokellector",
+     "pricecharting"
+    ]
+   },
+   {
+    "featureId": "wishlist",
+    "label": "Deck builder & wishlist",
+    "us": "planned",
+    "have": [
+     "dex",
+     "pkmn-gg",
+     "collectr",
+     "pokellector"
+    ]
+   },
+   {
+    "featureId": "sell-intelligence",
+    "label": "Sell / fee intelligence (where to sell, net-after-fees)",
+    "us": "shipped",
+    "have": [
+     "collx",
+     "pricecharting"
+    ]
+   },
+   {
+    "featureId": "live-playbooks",
+    "label": "Live-selling playbooks (Whatnot-style show prep)",
+    "us": "shipped",
+    "have": []
+   },
+   {
+    "featureId": "3d-room",
+    "label": "3D collection room / virtual display",
+    "us": "shipped",
+    "have": []
+   },
+   {
+    "featureId": "stl-exports",
+    "label": "3D print exports (STL display hardware)",
+    "us": "shipped",
+    "have": []
+   },
+   {
+    "featureId": "sold-ledger",
+    "label": "Sold ledger / realized P&L",
+    "us": "shipped",
+    "have": [
+     "collectr",
+     "collx"
+    ]
+   },
+   {
+    "featureId": "local-first",
+    "label": "Local-first data & privacy (no forced account)",
+    "us": "shipped",
+    "have": []
+   },
+   {
+    "featureId": "phone-mode",
+    "label": "Phone scanning / mobile companion mode",
+    "us": "shipped",
+    "have": [
+     "collectr",
+     "dex",
+     "shiny",
+     "pullvault",
+     "collx",
+     "pokellector",
+     "pricecharting"
+    ]
+   },
+   {
+    "featureId": "auto-import",
+    "label": "Auto inventory import (CSV/XLSX collection sync)",
+    "us": "shipped",
+    "have": [
+     "collectr",
+     "collx",
+     "pricecharting"
+    ]
+   }
+  ]
+ }
+}
