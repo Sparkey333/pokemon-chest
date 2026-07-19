@@ -213,6 +213,21 @@
 .den-soldshelf{width:430px;left:230px;top:-30px;transform:rotateY(90deg) translateZ(-796px)}
 .den-soldshelf .den-card{width:110px}
 
+/* ================= ABOUT & LEGAL ================= */
+.linklike{font:inherit;color:var(--muted);text-decoration:underline;cursor:pointer;background:none;border:none;padding:0}
+.linklike:hover{color:var(--text)}
+.about-head{border-bottom:1px solid var(--border);padding-bottom:14px;margin-bottom:14px}
+.about-title{font-size:22px;font-weight:800}
+.about-title span{color:var(--gold)}
+.about-meta{font-size:13px;color:var(--muted);margin-top:4px}
+.about-credits{font-size:12px;color:var(--muted2);margin-top:6px}
+.about-legal{max-height:56vh;overflow-y:auto;font-size:13.5px;line-height:1.55;color:var(--muted)}
+.about-legal h1{font-size:16px;color:var(--text);margin:14px 0 6px}
+.about-legal h2{font-size:14px;color:var(--text);margin:14px 0 5px}
+.about-legal p{margin:7px 0}
+.about-legal ul{margin:7px 0 7px 18px;display:grid;gap:4px}
+.about-legal a{color:var(--accent)}
+
 /* ================= 📋 FEATURE PARITY ================= */
 .pr-filters{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:14px 0 12px}
 .pr-chip{font-family:inherit;font-size:12px;padding:5px 11px;border-radius:99px;cursor:pointer;

@@ -100,7 +100,7 @@ pkmn.gg, Eyevo, PriceCharting app reviews, and app-store/blog comparisons
 
 **Gate to "objectively acceptable to publish" (the routine works this list):**
 - [ ] Ship-name chosen + swapped (one commit)
-- [ ] LEGAL.md surfaced in-app (About panel)
+- [x] LEGAL.md surfaced in-app (About panel) ✅ 2026-07-19
 - [ ] Replace scraped/linked card art default with user-scanned images or a
       licensed/open source in the public build
 - [ ] Server hardening pass (already local-only; audit LAN mode defaults)

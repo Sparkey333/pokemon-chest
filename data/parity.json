@@ -1111,7 +1111,7 @@
    "title": "In-app About & Legal panel",
    "icon": "⚖️",
    "area": "publish",
-   "status": "planned",
+   "status": "shipped",
    "priority": "P0",
    "spec": "Add an 'About & Legal' modal that surfaces LEGAL.md inside the app. In index.html's <footer class=\"footer\"> (lines 99-108), add <button class=\"linklike\" id=\"aboutBtn\">About &amp; Legal</button> after the #footMeta span. In assets/app.js add function openAbout(): it fetches 'LEGAL.md' (same-origin; server.py's SimpleHTTPRequestHandler already serves repo-root files), converts it to HTML with a new tiny helper mdToHtml(md) handling only #/## headings, **bold**, [text](url) links, and '- ' bullets, and renders it into $('#modalRoot') using the existing modal-bg/modal markup pattern (see openWalkthrough at app.js:632 for the pattern; close via existing closeModal()). Above the legal text show a header block with the app name, 'Version ' + APP_VERSION (const at app.js:4), a link to APP_REPO (app.js:5), and a credits line: card images TCGdex (tcgdex.dev), prices PriceCharting export, built by DarkHearts. If the fetch fails (file:// mode or missing file), fall back to a const LEGAL_FALLBACK string in app.js containing the same disclaimer text as LEGAL.md's first paragraph plus the Nintendo trademark notice. Wire $('#aboutBtn').onclick = openAbout inside wireChrome() (app.js:122). Add '../LEGAL.md': 'app/LEGAL.md' to bundle.resources in src-tauri/tauri.conf.json so the packaged app ships the file. Add a .linklike style (underlined, muted, cursor:pointer, inherits footer font) to assets/revamp.css.",
    "ux": "An 'About & Legal' text link in the persistent footer of every view; clicking opens a scrollable modal over #modalRoot with version, credits, and the full LEGAL.md text.",
@@ -1133,7 +1133,7 @@
    "est": "S",
    "dependsOn": [],
    "demand": "low",
-   "notes": "Publish-gate item: 'LEGAL.md surfaced in-app (About panel)' in ROADMAP-TO-PUBLISH.md §4. LEGAL.md itself requires the credits file stay visible in-app for any public distribution."
+   "notes": "Publish-gate item: 'LEGAL.md surfaced in-app (About panel)' in ROADMAP-TO-PUBLISH.md §4. LEGAL.md itself requires the credits file stay visible in-app for any public distribution. ✅ 2026-07-19 — implemented: footer About & Legal link, mdToHtml() modal with version/credits + full LEGAL.md, LEGAL_FALLBACK for offline, bundled in tauri resources. Verified headless."
   },
   {
    "id": "ship-rename-switch",

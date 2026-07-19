@@ -132,6 +132,7 @@ function wireChrome() {
   $('#refreshBtn').onclick = refreshData;
   if ($('#helpBtn')) $('#helpBtn').onclick = () => openWalkthrough(0);
   $('#settingsBtn').onclick = openSettings;
+  if ($('#aboutBtn')) $('#aboutBtn').onclick = openAbout;
   document.onkeydown = e => {
     if (e.key === 'Escape') closeModal();
     if (e.key === '/' && document.activeElement !== $('#search')) { e.preventDefault(); $('#search').focus(); }
@@ -2672,6 +2673,59 @@ function openModal(c) {
   $('#mk-note').onchange = e => uset(c, { note: e.target.value });
 }
 function closeModal() { $('#modalRoot').innerHTML = ''; }
+
+/* ---------- About & Legal (surfaces LEGAL.md in-app) ---------- */
+const LEGAL_FALLBACK = `# Legal & Credits
+
+Pokémon Den is an unofficial, fan-made tool for cataloging, valuing, and selling
+trading cards **you personally own**. It is **not affiliated** with, endorsed, sponsored, or
+approved by Nintendo, The Pokémon Company, Creatures Inc., GAME FREAK inc., or PriceCharting.
+
+**Pokémon © Nintendo / Creatures Inc. / GAME FREAK inc.** Pokémon and all respective
+character names, card artwork, and logos are trademarks and copyrights of Nintendo /
+The Pokémon Company. Card images are loaded from [TCGdex](https://tcgdex.dev) and belong
+to their respective owners.`;
+
+// Minimal Markdown → HTML: #/## headings, **bold**, [text](url), '- ' bullets.
+function mdToHtml(md) {
+  const lines = String(md).split('\n');
+  const out = [];
+  let inList = false;
+  const fmt = s => esc(s)
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, (_, t, u) => `<a href="${u}" target="_blank" rel="noopener">${t}</a>`);
+  const closeList = () => { if (inList) { out.push('</ul>'); inList = false; } };
+  for (let raw of lines) {
+    const line = raw.replace(/\s+$/, '');
+    if (/^##\s+/.test(line)) { closeList(); out.push('<h2>' + fmt(line.replace(/^##\s+/, '')) + '</h2>'); }
+    else if (/^#\s+/.test(line)) { closeList(); out.push('<h1>' + fmt(line.replace(/^#\s+/, '')) + '</h1>'); }
+    else if (/^-\s+/.test(line)) { if (!inList) { out.push('<ul>'); inList = true; } out.push('<li>' + fmt(line.replace(/^-\s+/, '')) + '</li>'); }
+    else if (line.trim() === '') { closeList(); }
+    else { closeList(); out.push('<p>' + fmt(line) + '</p>'); }
+  }
+  closeList();
+  return out.join('\n');
+}
+
+async function openAbout() {
+  let md = LEGAL_FALLBACK;
+  try {
+    const r = await fetch('LEGAL.md?_=' + Date.now());
+    if (r.ok) { const t = await r.text(); if (t && t.trim()) md = t; }
+  } catch { /* file:// or missing — use the fallback disclaimer */ }
+  $('#modalRoot').innerHTML = `<div class="modal-bg" id="modalBg"><div class="modal accent-gold" style="max-width:640px">
+    <button class="close-x" id="aboutClose">×</button>
+    <div class="modal-body" style="padding:28px 30px 26px">
+      <div class="about-head">
+        <div class="about-title">Pokémon <span>Den</span></div>
+        <div class="about-meta">Version ${esc(APP_VERSION)} · <a href="${esc(APP_REPO)}" target="_blank" rel="noopener">source</a></div>
+        <div class="about-credits">Card images: <a href="https://tcgdex.dev" target="_blank" rel="noopener">TCGdex</a> · Prices: your PriceCharting export · Built by DarkHearts</div>
+      </div>
+      <div class="about-legal">${mdToHtml(md)}</div>
+    </div></div></div>`;
+  $('#aboutClose').onclick = closeModal;
+  $('#modalBg').onclick = e => { if (e.target.id === 'modalBg') closeModal(); };
+}
 function refreshAfterUser() { if (State.view === 'collection') renderCollection(true); if (State.view === 'sell') renderSell(); }
 
 /* ================= LIVE (BYOK backend) ================= */

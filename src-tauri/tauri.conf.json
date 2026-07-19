@@ -41,7 +41,8 @@
       "../index.html": "app/index.html",
       "../assets/": "app/assets/",
       "../data/": "app/data/",
-      "../scripts/": "app/scripts/"
+      "../scripts/": "app/scripts/",
+      "../LEGAL.md": "app/LEGAL.md"
     },
     "icon": [
       "icons/32x32.png",
