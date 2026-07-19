@@ -1,13 +1,13 @@
 #!/bin/bash
 # ─────────────────────────────────────────────────────────────────────────────
-# Pokémon Chest — Mac app builder
+# Pokémon Den — Mac app builder
 # Double-click me on your Mac: regenerates the app icon set from
-# icon-source.png, then builds "Pokemon Chest.app" and the styled .dmg
+# icon-source.png, then builds "Pokemon Den.app" and the styled .dmg
 # (Amber Den background, drag-to-Applications layout) via Tauri.
 # ─────────────────────────────────────────────────────────────────────────────
 set -e
 cd "$(dirname "$0")"
-echo "── Pokémon Chest · Mac app builder ──"
+echo "── Pokémon Den · Mac app builder ──"
 
 if ! command -v cargo >/dev/null 2>&1; then
   echo "✗ Rust isn't installed (needed once). Install it, then re-run me:"

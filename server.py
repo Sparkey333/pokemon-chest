@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Pokémon Chest local backend
+Pokémon Den local backend
 ===========================
 Serves the static app AND proxies the optional BYOK live-data integrations so
 your API keys never touch the browser and never hit CORS. With no keys set, the
@@ -37,7 +37,7 @@ CARD_ART_DIR = os.path.join(HOME, "card-art")           # your live saves (writa
 BUNDLED_ART_DIR = os.path.join(ROOT, "card-art")        # baked-in defaults (ship with the build)
 LISTING_DIR = os.path.join(HOME, "listing-photos")      # YOUR OWN photos of each card, for selling
 PORT = int(os.environ.get("POKECHEST_PORT") or os.environ.get("POKEVAULT_PORT") or "8787")
-POCKET_NAME = "Pokémon Chest — Pocket.html"
+POCKET_NAME = "Pokémon Den — Pocket.html"
 
 # ---------------------------------------------------------------- settings ---
 def load_settings():
@@ -574,13 +574,13 @@ def build_pocket():
                               capture_output=True, text=True, env=env, cwd=HOME, timeout=120)
         if proc.returncode != 0:
             return {"ok": False, "error": (proc.stderr or proc.stdout or "pocket build failed").strip().splitlines()[-1]}
-        out = os.path.join(HOME, "Pokémon Chest — Pocket.html")
+        out = os.path.join(HOME, "Pokémon Den — Pocket.html")
         kb = os.path.getsize(out) // 1024 if os.path.isfile(out) else 0
-        return {"ok": True, "file": "Pokémon Chest — Pocket.html", "kb": kb}
+        return {"ok": True, "file": "Pokémon Den — Pocket.html", "kb": kb}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
-MOBILE_NAME = "Pokémon Chest — Deck.html"
+MOBILE_NAME = "Pokémon Den — Deck.html"
 
 def build_mobile():
     """Build the self-contained MOBILE app (swipe deck + deck builder + 3D battle
@@ -670,7 +670,7 @@ def secret_save(label, value):
     try:
         subprocess.run(
             ["security", "add-generic-password", "-U", "-s", KEYCHAIN_SERVICE,
-             "-a", label, "-j", "Pokémon Chest secure input", "-w", value],
+             "-a", label, "-j", "Pokémon Den secure input", "-w", value],
             check=True, capture_output=True, text=True, timeout=20)
     except FileNotFoundError:
         return {"ok": False, "error": "macOS 'security' tool not found (this feature is macOS-only)."}
@@ -781,7 +781,7 @@ def _ensure_lan_cert(ips):
     os.makedirs(TLS_DIR, exist_ok=True)
     san = ",".join(["DNS:localhost", "IP:127.0.0.1"] + [f"IP:{ip}" for ip in ips])
     base = [openssl, "req", "-x509", "-newkey", "rsa:2048", "-sha256", "-nodes",
-            "-days", "825", "-keyout", key, "-out", cert, "-subj", "/CN=Pokemon Chest LAN"]
+            "-days", "825", "-keyout", key, "-out", cert, "-subj", "/CN=Pokemon Den LAN"]
     try:
         subprocess.run(base + ["-addext", f"subjectAltName={san}"],
                        check=True, capture_output=True, timeout=60)
@@ -1207,7 +1207,7 @@ def _emerald_install_worker():
             _log("macOS will ask for your password ONCE — it goes straight to the")
             _log("system installer and is never seen or stored by this app.")
             inner = f"{DKP_PACMAN} -Sy --noconfirm && {DKP_PACMAN} -S --noconfirm gba-dev devkitarm-rules"
-            prompt = "Pokémon Chest needs your Mac password once to install the Game Boy Advance toolchain (devkitARM)."
+            prompt = "Pokémon Den needs your Mac password once to install the Game Boy Advance toolchain (devkitARM)."
             esc_cmd = inner.replace("\\", "\\\\").replace('"', '\\"')
             esc_prompt = prompt.replace("\\", "\\\\").replace('"', '\\"')
             osa = f'do shell script "{esc_cmd}" with administrator privileges with prompt "{esc_prompt}"'
@@ -1227,7 +1227,7 @@ def _emerald_install_worker():
                 add += "export DEVKITARM=/opt/devkitpro/devkitARM\n"
             if add:
                 with open(zshrc, "a", encoding="utf-8") as f:
-                    f.write("\n# Added by Pokémon Chest — Emerald Lab\n" + add)
+                    f.write("\n# Added by Pokémon Den — Emerald Lab\n" + add)
                 _log("Added DEVKITPRO/DEVKITARM to ~/.zshrc ✓")
         except Exception as e:
             _log(f"(could not update ~/.zshrc: {e})")
@@ -1592,7 +1592,7 @@ if __name__ == "__main__":
         except Exception:
             pass
     print("┌──────────────────────────────────────────────┐")
-    print(f"│  Pokémon Chest running → http://localhost:{PORT} │")
+    print(f"│  Pokémon Den running → http://localhost:{PORT} │")
     print("│  Keep this window open. Close it to stop.    │")
     print("└──────────────────────────────────────────────┘")
     # Phone/LAN mode survives restarts: re-arm it if it was on last time.

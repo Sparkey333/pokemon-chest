@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Build the Pokémon Chest "Pocket Edition" — a single self-contained .html file
+Build the Pokémon Den "Pocket Edition" — a single self-contained .html file
 you can AirDrop to your iPhone, open in Safari, and "Add to Home Screen" so it
 looks and launches like an app. Everything (your collection, game plan, prices,
 comp links) is inlined — no server, no internet needed except the comp links you
 tap. It's a read/glance + list-helper companion to the full Mac app.
 
 Run:  python3 scripts/build_pocket.py      (or it's regenerated on data refresh)
-Output: "Pokémon Chest — Pocket.html" in the project folder.
+Output: "Pokémon Den — Pocket.html" in the project folder.
 """
 import os, json, base64, re, datetime, html
 
@@ -144,13 +144,13 @@ if not os.path.isfile(icon_path):
 if os.path.isfile(icon_path):
     icon_uri = "data:image/png;base64," + base64.b64encode(open(icon_path, "rb").read()).decode()
 
-OUT = os.path.join(HOME, "Pokémon Chest — Pocket.html")
+OUT = os.path.join(HOME, "Pokémon Den — Pocket.html")
 DATA_JSON = json.dumps(DATA, ensure_ascii=False, separators=(",", ":"))
 
 HTML = """<!DOCTYPE html><html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
-<title>Pokémon Chest — Pocket</title>
+<title>Pokémon Den — Pocket</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Chest">

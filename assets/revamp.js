@@ -1,4 +1,4 @@
-/* ============== Pokémon Chest — Revamp views ==============
+/* ============== Pokémon Den — Revamp views ==============
    Adds five tabs on top of app.js (which owns State + helpers):
      🧊 3D Studio   — interactive 3D card viewer + 3D-print STL exports
      🏠 The Den     — a VR-style 3D display room, auto-loaded & editable
@@ -210,7 +210,7 @@ function renderStudio3d() {
           <div class="st3-card" id="st3-card">
             <div class="st3-face st3-front" id="st3-front"></div>
             <div class="st3-face st3-back">
-              <div class="st3-backart"><span>⭐</span><b>POKÉMON CHEST</b><span class="reason">private collection</span></div>
+              <div class="st3-backart"><span>⭐</span><b>POKÉMON DEN</b><span class="reason">private collection</span></div>
             </div>
             <div class="st3-holo" id="st3-holo"></div>
           </div>
@@ -486,7 +486,7 @@ function denRoomHTML() {
     <div class="den-featured">
       <div class="den-feat-spin">
         <div class="den-feat-face">${rvThumb(feat)}</div>
-        <div class="den-feat-face den-feat-backface"><div class="st3-backart"><span>⭐</span><b>POKÉMON CHEST</b></div></div>
+        <div class="den-feat-face den-feat-backface"><div class="st3-backart"><span>⭐</span><b>POKÉMON DEN</b></div></div>
       </div>
       <div class="den-feat-label" data-i="${feat.i}">${esc(feat.name)} · ${money0(feat.price)}</div>
     </div>`;

@@ -1,6 +1,6 @@
 name: Build macOS DMG
 
-# Builds "Pokemon Chest.app" + the styled .dmg on GitHub's macOS machines,
+# Builds "Pokemon Den.app" + the styled .dmg on GitHub's macOS machines,
 # so a fresh installer is downloadable without building on your own Mac.
 # Runs on every push to the redesign branch, or on demand (Run workflow).
 on:
@@ -62,7 +62,7 @@ jobs:
           gh release create dmg-latest "$DMG" \
             --prerelease \
             --target "$GITHUB_SHA" \
-            --title "Pokémon Chest — latest macOS build" \
+            --title "Pokémon Den — latest macOS build" \
             --notes "Universal (Apple Silicon + Intel) build of commit ${GITHUB_SHA:0:7}. Ad-hoc signed — first launch: right-click the app → Open."
 
       # Best-effort secondary copy; skipped gracefully while the artifact

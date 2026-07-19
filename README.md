@@ -1,4 +1,4 @@
-# Pokémon Chest 🔴⚪
+# Pokémon Den 🔴⚪
 
 A premium‑style, **free** database & sell/grade advisor for your Pokémon card
 collection — built from your PriceCharting export. English **and** Japanese, card art,
@@ -13,12 +13,12 @@ every core feature works with **no API keys at all**.
 ## Run it
 
 **Easiest:** double‑click **`start.command`**. It launches a tiny local server
-(`server.py`, Python stdlib only) and opens Pokémon Chest in your browser at
+(`server.py`, Python stdlib only) and opens Pokémon Den in your browser at
 `http://localhost:8787`. Keep the little Terminal window open while you browse; close it
 (or Ctrl‑C) to stop. First time, macOS may ask you to confirm — right‑click → Open, or
 System Settings → Privacy & Security → "Open Anyway".
 
-**Native app:** once built, open **`Pokémon Chest.app`** (or install from the `.dmg`) —
+**Native app:** once built, open **`Pokémon Den.app`** (or install from the `.dmg`) —
 same app, no Terminal or browser needed. The Tauri shell in `src-tauri/` wraps the exact
 same local server and UI.
 
@@ -70,7 +70,7 @@ card's file on your Mac. Home networks only — turn it off when you're done.
 
 The native app wraps this exact server + UI, so every new feature lands in it on the
 next build. On your Mac, just double‑click **`build-app.command`** — it regenerates the
-full icon set from `icon-source.png` and produces `Pokemon Chest.app` + a styled `.dmg`
+full icon set from `icon-source.png` and produces `Pokemon Den.app` + a styled `.dmg`
 (Amber Den background, drag‑to‑Applications layout) in `src-tauri/target/release/bundle`.
 (Equivalent by hand: `cd src-tauri && cargo tauri build`.)
 
@@ -82,7 +82,7 @@ privately in your browser and survive every refresh.
 
 ## Optional live data & AI (BYOK)
 
-Pokémon Chest is fully usable with zero keys. If you want live data, open **Settings**
+Pokémon Den is fully usable with zero keys. If you want live data, open **Settings**
 in‑app and paste your own keys (bring‑your‑own‑key):
 
 | Key | Unlocks |
@@ -108,7 +108,7 @@ requests directly to each provider; nothing passes through any third party.
 ## Files
 
 ```
-Pokemon Chest/
+Pokemon Den/
 ├─ PriceCharting-collection.xlsx   your export (the source of truth)
 ├─ index.html                      the app UI
 ├─ assets/    app.js, styles.css
@@ -116,7 +116,7 @@ Pokemon Chest/
 │             selling-intel.json   grading/fee/venue guidance
 ├─ scripts/   build_data.py        xlsx → collection.json (+ image matching)
 ├─ server.py                       local server + optional BYOK API proxy
-├─ src-tauri/                      native macOS shell ("Pokémon Chest.app")
+├─ src-tauri/                      native macOS shell ("Pokémon Den.app")
 ├─ settings.local.json             your BYOK keys (gitignored — never commit)
 ├─ start.command                   ▶ double‑click to launch in the browser
 ├─ refresh-data.command            ↻ fallback data refresh (the in‑app ↻ does this too)

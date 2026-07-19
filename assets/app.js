@@ -1,4 +1,4 @@
-/* ===================== Pokémon Chest ===================== */
+/* ===================== Pokémon Den ===================== */
 'use strict';
 
 const APP_VERSION = '2.1.0';
@@ -86,7 +86,7 @@ async function init() {
     $('#vpValue').textContent = money0(col.meta.totalValue);
     $('#search').placeholder = `Search ${col.meta.totalEntries.toLocaleString()} cards — name, set, number…`;
     $('#footMeta').textContent =
-      `Pokémon Chest v${APP_VERSION} · ${col.meta.totalEntries.toLocaleString()} entries · ${col.meta.totalCards.toLocaleString()} cards · ${col.meta.imagesMatched.toLocaleString()} with art · generated ${col.generatedAt.slice(0, 10)} from ${col.source}`;
+      `Pokémon Den v${APP_VERSION} · ${col.meta.totalEntries.toLocaleString()} entries · ${col.meta.totalCards.toLocaleString()} cards · ${col.meta.imagesMatched.toLocaleString()} with art · generated ${col.generatedAt.slice(0, 10)} from ${col.source}`;
     wireChrome();
     renderDashboard();
     renderCollection(true);
@@ -1117,7 +1117,7 @@ function wireActionBoard() {
 function diagnostics() {
   const m = State.meta || {};
   return [
-    `Pokémon Chest v${APP_VERSION}`,
+    `Pokémon Den v${APP_VERSION}`,
     `Platform: ${navigator.userAgent}`,
     `Collection: ${m.totalEntries != null ? m.totalEntries.toLocaleString() : '?'} entries · ${m.totalCards != null ? m.totalCards.toLocaleString() : '?'} cards`,
     `Live backend: ${State.live ? 'connected' : 'not running'}`,
@@ -1137,7 +1137,7 @@ function feedbackCardHTML() {
   </div>`;
 }
 function wireFeedback() {
-  const title = `[Bug] Pokémon Chest v${APP_VERSION}`;
+  const title = `[Bug] Pokémon Den v${APP_VERSION}`;
   const gh = $('#fbGithub'), em = $('#fbEmail'), cp = $('#fbCopy');
   if (gh) gh.onclick = () => window.open(`${APP_REPO}/issues/new?title=${enc(title)}&body=${enc(feedbackBody())}`, '_blank', 'noopener');
   if (em) em.onclick = () => { location.href = `mailto:brandonlbarkey@gmail.com?subject=${enc(title)}&body=${enc(feedbackBody())}`; };
@@ -1169,7 +1169,7 @@ function barRows(rows, maxBase) {
 function sparkline() {
   const data = snapshotSeries();
   if (data.length < 2) {
-    return `<div class="spark-empty">Tracking started today (${money(data[0] ? data[0][1] : State.meta.totalValue)}).<br>Open or refresh Pokémon Chest on future days to build your value history.</div>`;
+    return `<div class="spark-empty">Tracking started today (${money(data[0] ? data[0][1] : State.meta.totalValue)}).<br>Open or refresh Pokémon Den on future days to build your value history.</div>`;
   }
   const vals = data.map(d => d[1]);
   const min = Math.min(...vals), max = Math.max(...vals), W = 600, H = 110, pad = 8;
@@ -2151,7 +2151,7 @@ function renderAdmin() {
     </div>
 
     <div class="panel accent-sapphire" style="margin-bottom:16px"><h3>📱 iPhone app — Swipe Deck &amp; 3D Battle</h3>
-      <p class="muted" style="font-size:13.5px;line-height:1.6">A self-contained mobile app — <code>Pokémon Chest — Deck.html</code> — you AirDrop / iCloud / email to your iPhone and <b>Add to Home Screen</b> (full-screen, offline, its own icon). Swipe your deck, build a battle deck, and a 3D swirling-stadium battle buildup. <b>Only cards you’ve caught with a real photo</b> (📸 Photo Studio) are battle-playable — the rest show as “wild, go catch it.” ${liveOn ? '' : '<b style="color:var(--gold)">Launch via the app to build it.</b>'}</p>
+      <p class="muted" style="font-size:13.5px;line-height:1.6">A self-contained mobile app — <code>Pokémon Den — Deck.html</code> — you AirDrop / iCloud / email to your iPhone and <b>Add to Home Screen</b> (full-screen, offline, its own icon). Swipe your deck, build a battle deck, and a 3D swirling-stadium battle buildup. <b>Only cards you’ve caught with a real photo</b> (📸 Photo Studio) are battle-playable — the rest show as “wild, go catch it.” ${liveOn ? '' : '<b style="color:var(--gold)">Launch via the app to build it.</b>'}</p>
       <div id="mob-stat" class="muted" style="font-size:13px;margin:6px 0"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px">
         <button class="btn-lightblue sm" id="mob-build" ${liveOn ? '' : 'disabled'}>📱 Build iPhone app</button>
@@ -2164,9 +2164,9 @@ function renderAdmin() {
     </div>
 
     <div class="panel" style="margin-bottom:16px"><h3>📱 Take it with you — iPhone Pocket Edition</h3>
-      <p class="muted" style="font-size:13.5px;line-height:1.6">A single self-contained file — <code>Pokémon Chest — Pocket.html</code> in your project folder — with your whole collection, the Game Plan, and tap-to-open comp links baked in. Works offline; no app store, no account.</p>
+      <p class="muted" style="font-size:13.5px;line-height:1.6">A single self-contained file — <code>Pokémon Den — Pocket.html</code> in your project folder — with your whole collection, the Game Plan, and tap-to-open comp links baked in. Works offline; no app store, no account.</p>
       <ol class="bullets" style="padding-left:20px">
-        <li><b>AirDrop</b> <code>Pokémon Chest — Pocket.html</code> from the project folder to your iPhone (or email it to yourself).</li>
+        <li><b>AirDrop</b> <code>Pokémon Den — Pocket.html</code> from the project folder to your iPhone (or email it to yourself).</li>
         <li>Open it in <b>Safari</b> → Share → <b>Add to Home Screen</b>. It gets the chest icon and launches full-screen like an app.</li>
         <li>It’s a <b>snapshot</b> — tap <b>Regenerate</b> below (or refresh prices) after you update your collection, then re-AirDrop.</li>
       </ol>
@@ -2181,7 +2181,7 @@ function renderAdmin() {
       <div class="panel"><h3>Product brief</h3>
         <p class="muted" style="font-size:13.5px;line-height:1.6">
         <b style="color:var(--text)">GradeStage</b> is a printable stage that makes card photos <i>repeatable</i>: a recessed bay holds a raw card, penny sleeve, or Card Saver 1 dead-center under engraved crosshairs; snap-in LED bars give <b>20° raking light</b> (the angle that exposes print lines and holo scratches — the stuff that turns a 10 into a 9) and <b>45° even light</b> (true color + centering shots); a stacking tower holds the phone at a fixed height so every card is framed identically — which is exactly what the in-app centering calculator wants.</p>
-        <p class="muted" style="font-size:13.5px;line-height:1.6">Sell as: <b>STL files + BOM + guide</b> (digital, ~$12-19), or <b>printed kit with LEDs + polarizer film</b> (~$49-69). Companion app angle: Pokémon Chest's Grade Lab is the software half.</p>
+        <p class="muted" style="font-size:13.5px;line-height:1.6">Sell as: <b>STL files + BOM + guide</b> (digital, ~$12-19), or <b>printed kit with LEDs + polarizer film</b> (~$49-69). Companion app angle: Pokémon Den's Grade Lab is the software half.</p>
         <div class="subhead">Print files (in repo: hardware/gradestage/)</div>
         <ul class="bullets">
           <li><code>gradestage.scad</code> — parametric source (OpenSCAD, free)</li>
@@ -2694,7 +2694,7 @@ function updateLiveBtn() {
 function openSettings() {
   const L = State.live;
   if (!L) {
-    toast('Open Pokémon Chest via start.command to connect live data.');
+    toast('Open Pokémon Den via start.command to connect live data.');
   }
   const v = (id) => document.getElementById(id)?.value?.trim() || '';
   const enabled = (b) => b ? '<span class="chip gold">connected</span>' : '<span class="chip">not set</span>';
@@ -2702,8 +2702,8 @@ function openSettings() {
     <button class="close-x" id="modalClose">×</button>
     <div class="modal-body" style="padding:26px">
       <h2 style="font-size:20px;margin-bottom:4px">⚡ Connect live data &amp; AI</h2>
-      <p class="muted" style="font-size:13px;margin-bottom:6px">All optional and bring-your-own-key. Keys are stored locally in <code>settings.local.json</code> (gitignored) and sent only to that provider — never bundled, never shared. With nothing set, Pokémon Chest runs on your export + free TCGdex images + deep-links.</p>
-      ${!L ? `<div class="rec-box no" style="margin:10px 0"><div class="rb">⚠️ The live backend isn’t running. Launch Pokémon Chest with <b>start.command</b> (not by opening index.html) to save keys.</div></div>` : ''}
+      <p class="muted" style="font-size:13px;margin-bottom:6px">All optional and bring-your-own-key. Keys are stored locally in <code>settings.local.json</code> (gitignored) and sent only to that provider — never bundled, never shared. With nothing set, Pokémon Den runs on your export + free TCGdex images + deep-links.</p>
+      ${!L ? `<div class="rec-box no" style="margin:10px 0"><div class="rb">⚠️ The live backend isn’t running. Launch Pokémon Den with <b>start.command</b> (not by opening index.html) to save keys.</div></div>` : ''}
 
       <div class="subhead">PriceCharting API — accurate prices (ungraded + graded) ${L ? enabled(L.priceCharting) : ''}</div>
       <input id="s-pc" class="s-inp" type="password" placeholder="40-char API token from your PriceCharting subscription" />

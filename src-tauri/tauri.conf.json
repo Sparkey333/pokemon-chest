@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Pokemon Chest",
+  "productName": "Pokemon Den",
   "version": "2.1.0",
   "identifier": "com.darkhearts.pokemonchest",
   "build": {
@@ -10,7 +10,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "Pokémon Chest",
+        "title": "Pokémon Den",
         "label": "main",
         "width": 1340,
         "height": 880,
@@ -35,7 +35,7 @@
     "category": "Lifestyle",
     "copyright": "© 2026 DarkHearts",
     "shortDescription": "Your Pokémon card collection — live comps, sell & grade intelligence.",
-    "longDescription": "Pokémon Chest turns your PriceCharting collection export into a premium local database: every card with real art (English + Japanese), portfolio value and P/L, one-click live sold comps on eBay/TCGplayer/Mercari, a grading break-even advisor, and optional bring-your-own-key live data and AI recommendations. 100% local and private.",
+    "longDescription": "Pokémon Den turns your PriceCharting collection export into a premium local database: every card with real art (English + Japanese), portfolio value and P/L, one-click live sold comps on eBay/TCGplayer/Mercari, a grading break-even advisor, and optional bring-your-own-key live data and AI recommendations. 100% local and private. Unofficial fan-made tool: Pokémon © Nintendo / Creatures Inc. / GAME FREAK inc.; Pokémon and character names are trademarks of Nintendo. Not affiliated with, endorsed, or sponsored by Nintendo or The Pokémon Company.",
     "resources": {
       "../server.py": "app/server.py",
       "../index.html": "app/index.html",
