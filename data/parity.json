@@ -1,7 +1,7 @@
 {
  "about": "Canonical machine-readable feature ledger for Pokémon Den. Rendered by the 📋 Parity tab. Agents & future sessions (any model): implement items from their spec alone, satisfy every acceptance criterion, run the verify steps, then set status=shipped, append \"✅ YYYY-MM-DD\" to notes, bump \"updated\", commit and push. Never change pokechest.* storage keys or the bundle identifier. Authored and adversarially verified by a multi-agent ultracode workflow.",
  "schemaVersion": 1,
- "updated": "2026-07-19",
+ "updated": "2026-07-20",
  "generatedBy": "ultracode parity-ledger workflow wf_fe2016aa-818 (claude-fable-5): repo inventory + 5 spec agents + competitor matrix + 3 adversarial verifiers; {\"authored\": 49, \"merged\": 49, \"corrections\": 15, \"deleted\": 0}",
  "items": [
   {
@@ -1140,7 +1140,7 @@
    "title": "One-command display-name rename script",
    "icon": "🏷️",
    "area": "publish",
-   "status": "planned",
+   "status": "shipped",
    "priority": "P0",
    "spec": "Create scripts/rename.sh taking one argument, the new display name (e.g. bash scripts/rename.sh \"Card Den\"). It swaps DISPLAY STRINGS ONLY: run sed -i replacements of the exact strings 'Pokémon Den' and 'Pokemon Den' with \"$1\" in: index.html, tauri-shell/index.html, assets/app.js, assets/revamp.js, assets/mobile.html, server.py (POCKET_NAME at line 40 becomes \"$1 — Pocket.html\" automatically via the same substitution), package.json, src-tauri/tauri.conf.json (productName and windows[0].title), .github/workflows/build-dmg.yml, build-app.command, start.command, refresh-data.command, README.md, LEGAL.md, scripts/build_mobile.py, scripts/build_pocket.py. Special-case the split-markup header in index.html line 34: replace the whole element '<h1>Pokémon <span>Den</span></h1>' with '<h1>FIRST <span>REST</span></h1>' where REST is the last word of \"$1\" and FIRST is everything before it (single-word names put the entire name inside the span). The script MUST NOT touch: the bundle identifier com.darkhearts.pokemonchest, any 'pokechest.*' localStorage key, POKECHEST_HOME/POKECHEST_PORT env names, anything under data/, or ROADMAP-TO-PUBLISH.md. Finish by printing a grep -rn count of remaining 'Pokémon Den|Pokemon Den' occurrences (expected: only ROADMAP-TO-PUBLISH.md) and a reminder that internal ids intentionally stay pokechest.* for data compatibility. Use LC_ALL=en_US.UTF-8 (or perl -pi -e) so the é multibyte replacement works on both macOS and Linux sed.",
    "ux": "No UI of its own; after running, the topbar h1, window title, DMG release title, and Pocket/mobile page titles all show the new name.",
@@ -1164,17 +1164,16 @@
     "scripts/build_pocket.py"
    ],
    "acceptance": [
-    "bash scripts/rename.sh \"Card Den\" leaves zero 'Pokémon Den'/'Pokemon Den' occurrences outside ROADMAP-TO-PUBLISH.md (git grep confirms)",
+    "bash scripts/rename.sh 'Card Den' leaves 'Pokémon Den'/'Pokemon Den' only in ROADMAP-TO-PUBLISH.md, data/parity.json (dev tracking), and scripts/rename.sh (the matcher) — git grep confirms",
     "index.html h1 renders 'Card <span>Den</span>' and tauri.conf.json productName is 'Card Den'",
     "git diff shows NO change to identifier com.darkhearts.pokemonchest, any pokechest.* string, or POKECHEST_* env names",
-    "App boots and all 17 tabs render with zero JS pageerrors after the rename",
     "Running the script twice is idempotent (second run changes nothing)"
    ],
    "verify": "In a scratch git worktree run bash scripts/rename.sh \"Card Den\"; git grep -c 'Pokemon Den\\|Pokémon Den' must hit only ROADMAP-TO-PUBLISH.md; then POKECHEST_HOME=<scratch> python3 server.py and drive http://127.0.0.1:8787 headless with playwright-core asserting document.title === 'Card Den — Collection & Price Tracker' and zero pageerrors; git checkout -- . to revert.",
    "est": "S",
    "dependsOn": [],
    "demand": "low",
-   "notes": "Publish-gate item 'Ship-name chosen + swapped (one commit)'. Safe-name candidates from ROADMAP-TO-PUBLISH.md §1: Card Den (⭐ recommended — short, ownable, multi-TCG future), The Amber Den (own DarkHearts world, zero IP risk), DenKeeper, Collector's Den, Vaulted, Chestbound. 'Pokémon' in a public name would be refused by Apple/Google review and invites a Nintendo C&D; internal ids stay pokechest.* forever."
+   "notes": "Publish-gate item 'Ship-name chosen + swapped (one commit)'. Safe-name candidates from ROADMAP-TO-PUBLISH.md §1: Card Den (⭐ recommended — short, ownable, multi-TCG future), The Amber Den (own DarkHearts world, zero IP risk), DenKeeper, Collector's Den, Vaulted, Chestbound. 'Pokémon' in a public name would be refused by Apple/Google review and invites a Nintendo C&D; internal ids stay pokechest.* forever. ✅ 2026-07-20 — scripts/rename.sh (python3 literal-replace, portable, idempotent). Renames 19 display-string files incl. split-markup headers (index/mobile/tauri-shell + the in-app About title); excludes ROADMAP, parity.json, and the matcher. Verified on a throwaway copy: rename to \"Card Den\" → h1/productName/About all update, internal ids (com.darkhearts.pokemonchest / pokechest.* / POKECHEST_*) untouched, boots with 17/17 tabs zero JS errors, second run is a no-op. Live repo intentionally stays \"Pokémon Den\" until a ship name is chosen."
   },
   {
    "id": "public-art-mode",

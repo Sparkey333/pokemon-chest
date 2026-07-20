@@ -99,7 +99,7 @@ pkmn.gg, Eyevo, PriceCharting app reviews, and app-store/blog comparisons
 | **Nintendo Switch** | ❌ Not realistic — closed platform, Nintendo licensing required, and a Pokémon-adjacent fan app would never pass. The Steam build is the way to get it on a TV. | — |
 
 **Gate to "objectively acceptable to publish" (the routine works this list):**
-- [ ] Ship-name chosen + swapped (one commit)
+- [ ] Ship-name chosen + swapped — the swap is now **one command**: `bash scripts/rename.sh "Card Den"` ✅ tool ready 2026-07-20 (still needs Brandon to pick the name)
 - [x] LEGAL.md surfaced in-app (About panel) ✅ 2026-07-19
 - [ ] Replace scraped/linked card art default with user-scanned images or a
       licensed/open source in the public build
