@@ -56,7 +56,7 @@ init();
 async function init() {
   try {
     const grab = (u) => fetch(u + '?_=' + Date.now()).then(r => r.ok ? r.json() : null).catch(() => null);
-    const [col, intel, gintel, merch, lab, submit, sellerbiz, plan, venues] = await Promise.all([
+    const [col, intel, gintel, merch, lab, submit, sellerbiz, plan, venues, flags] = await Promise.all([
       fetch('data/collection.json?_=' + Date.now()).then(r => r.json()),
       fetch('data/selling-intel.json?_=' + Date.now()).then(r => r.json()),
       grab('data/grade-intel.json'),   // grade ratios / pop intel (research-verified)
@@ -66,8 +66,11 @@ async function init() {
       grab('data/seller-biz.json'),    // FB Marketplace setup + LLC/business playbook
       grab('data/game-plan.json'),     // LLC concept + invest picks + big ideas (research-verified)
       grab('data/local-venues.json'),  // Colorado Springs local venues + automation/photo guidance
+      grab('data/build-flags.json'),   // build profile (e.g. publicArt: suppress catalog card art)
     ]);
     State.cards = col.cards;
+    State.flags = flags || {};
+    applyPublicArtMode();         // public/ship builds: drop external catalog art before it's memoized
     applyImgOverrides();          // your saved card-art (localStorage) wins over the catalog art
     State.meta = col.meta;
     State.intel = intel;
@@ -344,6 +347,17 @@ function applyImgOverrides() {
     c.img = (o && o.imgOverride) ? o.imgOverride : (c._catalogImg || null);
   }
 }
+/* Public/ship builds (data/build-flags.json → publicArt:true) must not display
+   external catalog card art (TCGdex etc.) — only art the user scanned/saved.
+   Runs BEFORE applyImgOverrides so the nulled catalog art is what gets memoized
+   into c._catalogImg; user art (imgOverride, /card-art/ files, data: URLs) is
+   non-external and survives. Personal builds (publicArt:false) are unaffected. */
+function applyPublicArtMode() {
+  if (!State.flags || !State.flags.publicArt) return;
+  for (const c of State.cards) {
+    if (/^https?:\/\//i.test(c.img || '')) c.img = null;
+  }
+}
 async function hydrateServerArt() {
   // Fold in any card-art files saved on disk that this browser has no local
   // override for (e.g. a fresh install, or images set from another device),
@@ -418,7 +432,7 @@ function openImageEditor(c, backTo) {
         <div class="reason" style="flex:1;line-height:1.55">
           <b>1.</b> Find the card art →
           <div class="sr-links" style="margin:6px 0">
-            <a class="minilink" href="${googleImgUrl(c)}" target="_blank" rel="noopener">🔍 Google Images</a>
+            ${State.flags && State.flags.publicArt ? '' : `<a class="minilink" href="${googleImgUrl(c)}" target="_blank" rel="noopener">🔍 Google Images</a>`}
             <a class="minilink" href="https://www.bing.com/images/search?q=${enc((c.fullName || c.name) + ' ' + c.set + ' pokemon card')}" target="_blank" rel="noopener">Bing</a>
             <a class="minilink" href="https://www.tcgplayer.com/search/pokemon/product?q=${enc((c.name || '') + ' ' + (c.number || ''))}" target="_blank" rel="noopener">TCGplayer</a>
           </div>

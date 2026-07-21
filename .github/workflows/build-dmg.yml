@@ -5,6 +5,11 @@ name: Build macOS DMG
 # Runs on every push to the redesign branch, or on demand (Run workflow).
 on:
   workflow_dispatch:
+    inputs:
+      public_art:
+        description: "Public build: ship with NO external catalog card art (user-scanned art only)"
+        type: boolean
+        default: false
   push:
     branches: [claude/pokemon-chest-redesign-31io2c, main]
     paths:
@@ -38,6 +43,12 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+
+      - name: Public-art build profile (suppress external catalog art)
+        if: ${{ inputs.public_art == true }}
+        run: |
+          echo '{ "publicArt": true }' > data/build-flags.json
+          echo "Built with publicArt:true — external catalog card art suppressed."
 
       - name: Regenerate the full icon set from icon-source.png
         run: npx --yes "@tauri-apps/cli@^2" icon icon-source.png

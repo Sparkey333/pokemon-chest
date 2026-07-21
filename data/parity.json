@@ -1,7 +1,7 @@
 {
  "about": "Canonical machine-readable feature ledger for Pokémon Den. Rendered by the 📋 Parity tab. Agents & future sessions (any model): implement items from their spec alone, satisfy every acceptance criterion, run the verify steps, then set status=shipped, append \"✅ YYYY-MM-DD\" to notes, bump \"updated\", commit and push. Never change pokechest.* storage keys or the bundle identifier. Authored and adversarially verified by a multi-agent ultracode workflow.",
  "schemaVersion": 1,
- "updated": "2026-07-20",
+ "updated": "2026-07-21",
  "generatedBy": "ultracode parity-ledger workflow wf_fe2016aa-818 (claude-fable-5): repo inventory + 5 spec agents + competitor matrix + 3 adversarial verifiers; {\"authored\": 49, \"merged\": 49, \"corrections\": 15, \"deleted\": 0}",
  "items": [
   {
@@ -660,7 +660,7 @@
    "title": "Legal & credits: LEGAL.md + in-footer attribution",
    "icon": "⚖️",
    "area": "publish",
-   "status": "partial",
+   "status": "shipped",
    "priority": "P0",
    "spec": "LEGAL.md documents the full legal posture: unofficial fan-made tool, nominative use of Pokémon trademarks (© Nintendo / Creatures / GAME FREAK), card images credited to TCGdex, prices from the user's own PriceCharting export/token, marketplace trademark notices, an explicit 'what this app does NOT do' list (no redistribution, no monetizing Nintendo IP, first-sale doctrine for physical cards, no bundled keys), and public-release conditions (rename without 'Pokémon', drop/license IP visuals, keep credits visible in-app). index.html's footer carries a condensed version of this notice plus TCGdex/PriceCharting attribution and the not-financial-advice line on every view. PARTIAL because the ROADMAP publish gate requires LEGAL.md itself to be surfaced in-app (an About panel), which does not exist yet — only the footer summary ships.",
    "ux": "Persistent footer at the bottom of every view; full text only in the repo's LEGAL.md.",
@@ -678,7 +678,7 @@
    "est": "S",
    "dependsOn": [],
    "demand": "medium",
-   "notes": "Gate item 'LEGAL.md surfaced in-app (About panel)' is unchecked in ROADMAP-TO-PUBLISH.md — the remaining work to mark this shipped."
+   "notes": "Gate item 'LEGAL.md surfaced in-app (About panel)' is unchecked in ROADMAP-TO-PUBLISH.md — the remaining work to mark this shipped. ✅ 2026-07-21 — footer carries the Nintendo/Pokémon trademark disclaimer + TCGdex/PriceCharting credits + not-financial-advice on every view; About & Legal panel surfaces full LEGAL.md in-app. Acceptance met."
   },
   {
    "id": "bulk-binder-scan",
@@ -1180,7 +1180,7 @@
    "title": "Public-build art mode (user photos only)",
    "icon": "🖼️",
    "area": "publish",
-   "status": "planned",
+   "status": "shipped",
    "priority": "P0",
    "spec": "Add a build flag that suppresses catalog (TCGdex/external) card art so store builds default to user-scanned photos only. Create data/build-flags.json with {\"publicArt\": false} (personal-build default). In assets/app.js's boot sequence (the async init around lines 71-84), fetch('data/build-flags.json') into a new State.flags object ({} on failure) BEFORE applyImgOverrides() runs. Add function applyPublicArtMode(): if State.flags.publicArt is true, for each card in State.cards set c.img = null whenever c.img matches /^https?:\\/\\//, so the memoized c._catalogImg captured in applyImgOverrides() (app.js:339) becomes null and cards fall back to phHTML placeholders unless the user saved art. User art still works untouched: imgOverride values in LS_USER ('pokechest.userdata.v1'), server files served from /card-art/<pcId> via hydrateServerArt() (app.js:346), and data: URLs are all non-https-external and survive the filter. In public mode also hide the '🔍 Google Images' button inside openImageEditor (app.js:405, googleImgUrl at :397) behind if (!State.flags.publicArt). In .github/workflows/build-dmg.yml add a workflow_dispatch input public_art (boolean, default false) and a step before the build: if true, run: echo '{\"publicArt\": true}' > data/build-flags.json. Do not change server.py; the flag file rides along in the existing data/ bundle resource.",
    "ux": "Invisible in personal builds; in a store build the Collection/Case/Sell grids show the styled name+set placeholder (phHTML) instead of TCGdex art until the user scans or saves their own photo per card.",
@@ -1200,7 +1200,7 @@
    "est": "S",
    "dependsOn": [],
    "demand": "low",
-   "notes": "Publish-gate item 'Replace scraped/linked card art default with user-scanned images... in the public build'; LEGAL.md clause (b) requires dropping Pokémon-IP visuals by default in any public release. Catalog URLs are baked into data/collection.json by scripts/build_data.py — filtering at load time avoids touching the data pipeline."
+   "notes": "Publish-gate item 'Replace scraped/linked card art default with user-scanned images... in the public build'; LEGAL.md clause (b) requires dropping Pokémon-IP visuals by default in any public release. Catalog URLs are baked into data/collection.json by scripts/build_data.py — filtering at load time avoids touching the data pipeline. ✅ 2026-07-21 — data/build-flags.json {publicArt} + applyPublicArtMode() (runs before applyImgOverrides so external catalog art is nulled at source & memoized null); Google Images button hidden in public mode; build-dmg.yml gained a workflow_dispatch public_art input that writes publicArt:true pre-build. Verified headless both states (personal: 990 catalog imgs + Google btn; public: 0 external, placeholders, no Google btn; user /card-art + data: URLs survive), zero JS errors."
   },
   {
    "id": "signing-notarization-ci",

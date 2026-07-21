@@ -101,8 +101,10 @@ pkmn.gg, Eyevo, PriceCharting app reviews, and app-store/blog comparisons
 **Gate to "objectively acceptable to publish" (the routine works this list):**
 - [ ] Ship-name chosen + swapped — the swap is now **one command**: `bash scripts/rename.sh "Card Den"` ✅ tool ready 2026-07-20 (still needs Brandon to pick the name)
 - [x] LEGAL.md surfaced in-app (About panel) ✅ 2026-07-19
-- [ ] Replace scraped/linked card art default with user-scanned images or a
-      licensed/open source in the public build
+- [x] Replace scraped/linked card art default with user-scanned images or a
+      licensed/open source in the public build — `publicArt` build flag
+      (`data/build-flags.json`; CI `public_art` dispatch input) suppresses all
+      external catalog art in ship builds ✅ 2026-07-21
 - [ ] Server hardening pass (already local-only; audit LAN mode defaults)
 - [ ] Crash/error reporting opt-in, privacy policy page
 - [ ] Onboarding for people with zero PriceCharting history (CSV/manual import)
