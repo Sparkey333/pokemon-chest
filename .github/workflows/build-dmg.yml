@@ -64,18 +64,24 @@ jobs:
       # Primary delivery: a rolling "dmg-latest" release — release assets do NOT
       # count against the Actions artifact-storage quota (which is what failed
       # on run #1). Download from the repo's Releases page.
-      - name: Publish the dmg to the dmg-latest release
+      - name: Zip the source tree (tracked files at this commit)
+        run: |
+          git archive --format=zip -o "PokemonDen-source-${GITHUB_SHA:0:7}.zip" "$GITHUB_SHA"
+          ls -lh PokemonDen-source-*.zip
+
+      - name: Publish the dmg + source zip to the dmg-latest release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           DMG=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg)
-          echo "publishing: $DMG"
+          SRC=$(ls PokemonDen-source-*.zip)
+          echo "publishing: $DMG  +  $SRC"
           gh release delete dmg-latest --cleanup-tag --yes || true
-          gh release create dmg-latest "$DMG" \
+          gh release create dmg-latest "$DMG" "$SRC" \
             --prerelease \
             --target "$GITHUB_SHA" \
-            --title "Pokémon Den — latest macOS build" \
-            --notes "Universal (Apple Silicon + Intel) build of commit ${GITHUB_SHA:0:7}. Ad-hoc signed — first launch: right-click the app → Open."
+            --title "Pokémon Den — latest macOS build + source" \
+            --notes "Universal (Apple Silicon + Intel) build of commit ${GITHUB_SHA:0:7}. Ad-hoc signed — first launch: right-click the app → Open (or build locally via build-app.command for a clean double-click). Source zip attached."
 
       # Best-effort secondary copy; skipped gracefully while the artifact
       # storage quota is exhausted.

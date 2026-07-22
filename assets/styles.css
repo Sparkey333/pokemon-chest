@@ -1,12 +1,14 @@
-/* ===== Pokémon Chest — premium dark vault theme ===== */
+/* ===== Pokémon Den — Amber Den premium theme (warm, gold-forward) ===== */
 :root{
-  --bg:#0a0e16; --bg2:#0e131e; --panel:#141c2b; --panel2:#192335; --panel3:#1f2a40;
-  --border:#26334b; --border2:#324360;
-  --text:#e8eef8; --muted:#93a3be; --muted2:#6c7c98;
-  --accent:#4cc2ff; --accent-dim:#2a6f93; --gold:#ffce4d; --gold-dim:#8a6f25;
-  --green:#3ad6a0; --green-dim:#1d6b52; --red:#ff7a7a; --red-dim:#7a3030;
-  --jp:#ff6b8a; --en:#6ba8ff;
-  --shadow:0 10px 30px rgba(0,0,0,.45); --shadow-sm:0 4px 14px rgba(0,0,0,.35);
+  /* warm-neutral vault backgrounds — deeper, richer than the old cool blues */
+  --bg:#0a0a0e; --bg2:#0f0f16; --panel:#16161f; --panel2:#1c1d28; --panel3:#252734;
+  --border:#2b2c3a; --border2:#3c3e50;
+  --text:#f1eef6; --muted:#a7a3b6; --muted2:#736f83;
+  /* amber is the hero interactive color (the Den identity); gold is the brighter highlight */
+  --accent:#e8a95c; --accent-dim:#8a6634; --gold:#ffd36a; --gold-dim:#8a6f25;
+  --green:#42d6a4; --green-dim:#1d6b52; --red:#ff7f7f; --red-dim:#7a3030;
+  --jp:#ff7d9c; --en:#e0b25f;
+  --shadow:0 14px 40px rgba(0,0,0,.5); --shadow-sm:0 5px 16px rgba(0,0,0,.4);
   --radius:16px; --radius-sm:11px;
   --maxw:1320px;
   --font:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
@@ -15,8 +17,9 @@
 html,body{margin:0;padding:0}
 body{
   background:
-    radial-gradient(1100px 540px at 82% -8%, rgba(76,194,255,.10), transparent 60%),
-    radial-gradient(900px 480px at 6% 4%, rgba(255,206,77,.07), transparent 55%),
+    radial-gradient(1150px 560px at 82% -8%, rgba(232,169,92,.13), transparent 60%),
+    radial-gradient(900px 480px at 4% 2%, rgba(255,211,106,.06), transparent 55%),
+    radial-gradient(700px 460px at 96% 96%, rgba(66,214,164,.05), transparent 60%),
     var(--bg);
   color:var(--text); font-family:var(--font); font-size:15px; line-height:1.5;
   -webkit-font-smoothing:antialiased; min-height:100vh;
@@ -31,7 +34,7 @@ h1,h2,h3,h4{margin:0;font-weight:700;letter-spacing:-.01em}
 .topbar{
   position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:18px;
   padding:14px clamp(14px,3vw,30px);
-  background:linear-gradient(180deg,rgba(10,14,22,.96),rgba(10,14,22,.82));
+  background:linear-gradient(180deg,rgba(10,10,14,.96),rgba(10,10,14,.82));
   backdrop-filter:blur(12px);border-bottom:1px solid var(--border);
 }
 .brand{display:flex;align-items:center;gap:12px;flex:0 0 auto}
@@ -50,7 +53,7 @@ h1,h2,h3,h4{margin:0;font-weight:700;letter-spacing:-.01em}
   background:var(--panel);color:var(--text);font-size:14px;font-family:inherit;transition:.15s;
 }
 #search::placeholder{color:var(--muted2)}
-#search:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(76,194,255,.15)}
+#search:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(232,169,92,.18)}
 .topbar-right{display:flex;align-items:center;gap:12px;flex:0 0 auto}
 .value-pill{
   display:flex;flex-direction:column;align-items:flex-end;padding:6px 16px;border-radius:12px;
@@ -66,7 +69,7 @@ h1,h2,h3,h4{margin:0;font-weight:700;letter-spacing:-.01em}
 .btn:hover{border-color:var(--accent);color:#fff}
 .btn:active{transform:translateY(1px)}
 .btn.ghost{background:transparent}
-.btn.primary{background:linear-gradient(135deg,var(--accent),#2f9fe0);border-color:transparent;color:#04121d}
+.btn.primary{background:linear-gradient(135deg,var(--accent),#d68a35);border-color:transparent;color:#04121d}
 .btn.primary:hover{filter:brightness(1.08)}
 .btn.sm{padding:6px 10px;font-size:12px;border-radius:8px}
 .btn.gold{background:linear-gradient(135deg,var(--gold),#e7af2c);border-color:transparent;color:#1e1603}
@@ -74,7 +77,7 @@ h1,h2,h3,h4{margin:0;font-weight:700;letter-spacing:-.01em}
 /* ---------- tabs ---------- */
 .tabs{
   position:sticky;top:62px;z-index:20;display:flex;gap:4px;padding:8px clamp(14px,3vw,30px);
-  background:rgba(10,14,22,.7);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);overflow-x:auto;
+  background:rgba(10,10,14,.72);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);overflow-x:auto;
 }
 .tab{
   font-family:inherit;font-size:14px;font-weight:600;color:var(--muted);background:transparent;border:none;
@@ -101,7 +104,7 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px clamp(14px,3vw,30px) 60px}
   transition:border-color .2s ease, transform .2s ease;
 }
 .kpi:hover{border-color:var(--border2);transform:translateY(-1px)}
-.kpi::after{content:"";position:absolute;inset:0;background:radial-gradient(120px 80px at 90% -20%,rgba(76,194,255,.12),transparent);pointer-events:none}
+.kpi::after{content:"";position:absolute;inset:0;background:radial-gradient(120px 80px at 90% -20%,rgba(232,169,92,.12),transparent);pointer-events:none}
 .kpi .k-label{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted2)}
 .kpi .k-value{font-size:27px;font-weight:800;margin-top:6px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
 .kpi .k-sub{font-size:12px;color:var(--muted);margin-top:3px}
@@ -360,7 +363,7 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px clamp(14px,3vw,30px) 60px}
 .gp-badge{font-size:10px;font-weight:800;letter-spacing:.08em;padding:3px 8px;border-radius:7px}
 .gp-badge.now{background:rgba(58,214,160,.16);color:var(--green)}
 .gp-badge.build{background:rgba(255,206,77,.16);color:var(--gold)}
-.gp-badge.invest{background:rgba(76,194,255,.16);color:var(--accent)}
+.gp-badge.invest{background:rgba(232,169,92,.16);color:var(--accent)}
 .gp-moves{display:flex;flex-direction:column;gap:8px}
 .gp-move{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:10px 11px;cursor:pointer;transition:.13s}
 .gp-move:hover{border-color:var(--accent);transform:translateY(-1px)}
