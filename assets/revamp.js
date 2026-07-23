@@ -146,7 +146,7 @@ const RV_VIEWS = {
     const prev = State.view;
     base(v);
     if (prev === 'scan' && v !== 'scan') rvCamStop();     // release the camera
-    if (prev === 'den' && v !== 'den') rvDenStopLoop();
+    if (prev === 'den' && v !== 'den') { rvDenStopLoop(); denKeysUnbind(); }
     const fn = RV_VIEWS[v];
     if (fn) {
       const el = $('#view-' + v);
@@ -370,7 +370,7 @@ function st3Download(kind) {
 /* ============================================================
    🏠 THE DEN — VR-style display room (CSS 3D), editable displays
    ============================================================ */
-const DEN = { yaw: 0, pitch: 4, zoom: 260, drag: null, orbit: false, raf: null };
+const DEN = { yaw: 0, pitch: 4, zoom: 260, posX: 0, drag: null, orbit: false, raf: null, keysBound: false, gyro: false, gyroBase: null };
 
 function renderDen() {
   const el = $('#view-den');
@@ -379,10 +379,12 @@ function renderDen() {
   const featuredOpts = [['auto', '⭐ Auto (top card)']].concat(rvPickCards('top', 20).map(c => [String(c.pcId), c.name + ' — ' + money0(c.price)]));
   el.innerHTML = `
   <div class="section-head"><div><h2>🏠 The Den</h2>
-    <div class="sub">Your collection as a walk-in display room — drag to look, scroll to walk, click any card. Every display auto-loads and is editable below.</div></div>
-    <div class="rv-row">
-      <button class="btn sm" id="den-cam">📷 Den Cam</button>
+    <div class="sub">Your collection as a walk-in room — <b>WASD/arrows to walk</b>, drag to look, click any card. On a phone, tap 📱 Tilt and move your device to look around. Every display auto-loads and is editable below.</div></div>
+    <div class="rv-row" style="flex-wrap:wrap">
+      <button class="btn sm" id="den-immerse">⛶ Immersive</button>
+      <button class="btn sm" id="den-tilt">📱 Tilt</button>
       <button class="btn sm" id="den-orbit">🎥 Auto-orbit</button>
+      <button class="btn sm" id="den-cam">📷 Den Cam</button>
       <button class="btn ghost sm" id="den-reset">Reset view</button>
     </div></div>
   <div class="den-bar panel">
@@ -394,12 +396,29 @@ function renderDen() {
   </div>
   <div class="den-viewport theme-${esc(d.theme)}" id="den-vp">
     <div class="den-world" id="den-world">${denRoomHTML()}</div>
-    <div class="den-hud"><span>drag — look</span><span>scroll — walk</span><span>click card — details</span></div>
+    <div class="den-hud"><span>WASD — walk</span><span>drag — look</span><span>scroll — zoom</span><span>click card — details</span></div>
+    <button class="den-exit btn sm" id="den-exit" hidden>✕ exit</button>
   </div>`;
 
   $('#den-cam').onclick = () => switchView('scan');
-  $('#den-reset').onclick = () => { DEN.yaw = 0; DEN.pitch = 4; DEN.zoom = 260; denApply(); };
+  $('#den-reset').onclick = () => { DEN.yaw = 0; DEN.pitch = 4; DEN.zoom = 260; DEN.posX = 0; DEN.gyroBase = null; denApply(); };
   $('#den-orbit').onclick = () => { DEN.orbit = !DEN.orbit; $('#den-orbit').classList.toggle('primary', DEN.orbit); denLoop(); };
+  $('#den-tilt').onclick = () => DEN.gyro ? (denGyroStop(), $('#den-tilt').classList.remove('primary'), $('#den-tilt').textContent = '📱 Tilt') : denGyroStart($('#den-tilt'));
+  const vpEl = $('#den-vp');
+  $('#den-immerse').onclick = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else if (vpEl.requestFullscreen) await vpEl.requestFullscreen();
+    } catch (err) { toast('Fullscreen blocked: ' + err.message); }
+  };
+  $('#den-exit').onclick = () => { if (document.fullscreenElement) document.exitFullscreen(); };
+  vpEl.onfullscreenchange = () => {
+    const on = !!document.fullscreenElement;
+    vpEl.classList.toggle('den-fs', on);
+    $('#den-exit').hidden = !on;
+    $('#den-immerse').classList.toggle('primary', on);
+  };
+  if (!DEN.keysBound) { document.addEventListener('keydown', denKeyHandler); DEN.keysBound = true; }
   $('#den-theme').onchange = e => { RV.den.theme = e.target.value; rvSaveDen(); $('#den-vp').className = 'den-viewport theme-' + e.target.value; };
   const rebind = (id, key) => $('#' + id).onchange = e => { RV.den[key] = e.target.value; rvSaveDen(); renderDen(); };
   rebind('den-wall', 'wall'); rebind('den-shelf', 'shelf'); rebind('den-side', 'side'); rebind('den-feat', 'featured');
@@ -425,7 +444,51 @@ function renderDen() {
 }
 function denApply() {
   const w = $('#den-world');
-  if (w) w.style.transform = `translateZ(${DEN.zoom}px) rotateX(${DEN.pitch}deg) rotateY(${DEN.yaw}deg)`;
+  if (w) w.style.transform = `translate3d(${DEN.posX}px, 0, ${DEN.zoom}px) rotateX(${DEN.pitch}deg) rotateY(${DEN.yaw}deg)`;
+}
+/* keyboard walk-through — WASD / arrows move you through the room */
+function denKeyHandler(e) {
+  if (State.view !== 'den') return;
+  if (e.target && e.target.matches && e.target.matches('input,textarea,select')) return;
+  const k = e.key.toLowerCase();
+  if (k === 'w' || k === 'arrowup') DEN.zoom = Math.min(620, DEN.zoom + 25);
+  else if (k === 's' || k === 'arrowdown') DEN.zoom = Math.max(40, DEN.zoom - 25);
+  else if (k === 'a') DEN.posX = Math.min(280, DEN.posX + 22);
+  else if (k === 'd') DEN.posX = Math.max(-280, DEN.posX - 22);
+  else if (k === 'q' || k === 'arrowleft') DEN.yaw = Math.max(-70, DEN.yaw - 4);
+  else if (k === 'e' || k === 'arrowright') DEN.yaw = Math.min(70, DEN.yaw + 4);
+  else return;
+  e.preventDefault();
+  denApply();
+}
+function denKeysUnbind() {
+  if (DEN.keysBound) { document.removeEventListener('keydown', denKeyHandler); DEN.keysBound = false; }
+  denGyroStop();
+}
+/* device-orientation "magic window" — tilt a phone to look around the room */
+function denGyroHandler(e) {
+  if (State.view !== 'den' || e.beta == null) return;
+  if (!DEN.gyroBase) DEN.gyroBase = { beta: e.beta, gamma: e.gamma };
+  DEN.pitch = Math.max(-6, Math.min(26, 4 + (e.beta - DEN.gyroBase.beta) * 0.6));
+  DEN.yaw = Math.max(-70, Math.min(70, (e.gamma - DEN.gyroBase.gamma) * 1.4));
+  denApply();
+}
+async function denGyroStart(btn) {
+  try {
+    const DME = window.DeviceOrientationEvent;
+    if (!DME) return toast('This device has no motion sensors.');
+    if (DME.requestPermission) {            // iOS 13+ needs an explicit grant
+      const ok = await DME.requestPermission();
+      if (ok !== 'granted') return toast('Motion access denied.');
+    }
+    DEN.gyro = true; DEN.gyroBase = null;
+    window.addEventListener('deviceorientation', denGyroHandler);
+    if (btn) { btn.classList.add('primary'); btn.textContent = '📱 Tilt: ON'; }
+    toast('Tilt your phone to look around the Den.');
+  } catch (err) { toast('Motion sensors unavailable: ' + err.message); }
+}
+function denGyroStop() {
+  if (DEN.gyro) { window.removeEventListener('deviceorientation', denGyroHandler); DEN.gyro = false; DEN.gyroBase = null; }
 }
 function denLoop() {
   rvDenStopLoop();

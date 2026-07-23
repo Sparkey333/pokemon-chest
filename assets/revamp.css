@@ -136,6 +136,8 @@
   font-size:14px;font-weight:700;color:var(--den-accent);cursor:pointer;text-shadow:0 0 12px var(--den-glow)}
 .den-hud{position:absolute;left:0;right:0;bottom:0;display:flex;gap:18px;justify-content:center;padding:9px;
   font-size:11.5px;color:var(--muted2);background:linear-gradient(180deg,transparent,rgba(5,8,14,.85));pointer-events:none;z-index:5}
+.den-viewport:fullscreen,.den-viewport.den-fs{width:100vw;height:100vh;border-radius:0;border:none}
+.den-exit{position:absolute;top:16px;right:16px;z-index:6}
 
 /* themes — "Amber Den" matches the DarkHearts Studios Amber Den palette:
    night #0a0e12, amber #e8a95c / #a66a1f, bone #efe6d4, jewel accents */

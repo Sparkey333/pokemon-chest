@@ -1,7 +1,7 @@
 {
  "about": "Canonical machine-readable feature ledger for Pokémon Den. Rendered by the 📋 Parity tab. Agents & future sessions (any model): implement items from their spec alone, satisfy every acceptance criterion, run the verify steps, then set status=shipped, append \"✅ YYYY-MM-DD\" to notes, bump \"updated\", commit and push. Never change pokechest.* storage keys or the bundle identifier. Authored and adversarially verified by a multi-agent ultracode workflow.",
  "schemaVersion": 1,
- "updated": "2026-07-21",
+ "updated": "2026-07-23",
  "generatedBy": "ultracode parity-ledger workflow wf_fe2016aa-818 (claude-fable-5): repo inventory + 5 spec agents + competitor matrix + 3 adversarial verifiers; {\"authored\": 49, \"merged\": 49, \"corrections\": 15, \"deleted\": 0}",
  "items": [
   {
@@ -1056,7 +1056,7 @@
    "title": "Den walk controls (WASD) + optional WebXR session",
    "icon": "🥽",
    "area": "den3d",
-   "status": "planned",
+   "status": "partial",
    "priority": "P3",
    "spec": "In assets/revamp.js extend the DEN state object (line ~373) with posX:0, and change denApply() to set `translate3d(${DEN.posX}px, 0, ${DEN.zoom}px) rotateX(${DEN.pitch}deg) rotateY(${DEN.yaw}deg)` on #den-world. Add denKeyHandler(e): return early if e.target.matches('input,textarea,select') or State.view!=='den'; W/ArrowUp → DEN.zoom=Math.min(620,DEN.zoom+25); S/ArrowDown → DEN.zoom=Math.max(40,DEN.zoom-25); A → DEN.posX=Math.min(240,DEN.posX+20); D → DEN.posX=Math.max(-240,DEN.posX-20); Q/ArrowLeft and E/ArrowRight → DEN.yaw ∓4 clamped to ±70; then e.preventDefault() and denApply(). Bind with document.addEventListener('keydown',denKeyHandler) inside renderDen() guarded by a DEN.keysBound flag, and add denKeysUnbind() (removeEventListener + flag reset) called from the hookSwitchView wrapper (line ~143) when prev==='den' — same place rvDenStopLoop() belongs on view exit. Update the .den-hud spans to read 'WASD — walk · drag — look · click card — details'. WebXR (optional layer): add async denXRInit() called at the end of renderDen(): if navigator.xr && await navigator.xr.isSessionSupported('immersive-vr') then inject a '🥽 VR' button (id den-vr) into the .rv-row, else inject nothing. den-vr onclick → denXRStart(): navigator.xr.requestSession('immersive-vr'), create an XRWebGLLayer on a raw WebGL context (no libraries), and each XRFrame draw a minimal scene — a floor grid of GL lines plus up to 12 textured quads (textures loaded from each card's art via '/api/imgproxy?url=' as in summon-card-spirit, falling back to a solid palette quad on texture error) arranged in a 4m-radius arc at eye height using the shipped view/projection matrices; on session 'end' or any thrown error, toast and return to the CSS3D view untouched. Every XR failure path must be caught — non-XR browsers must never see the button, and errors must never break the CSS Den.",
    "ux": "The existing Den viewport gains keyboard walking (WASD/arrows, hinted in the HUD overlay); a '🥽 VR' button appears in the Den header only on WebXR-capable browsers/headsets.",
@@ -1074,7 +1074,7 @@
    "est": "M",
    "dependsOn": [],
    "demand": "low",
-   "notes": "Extends the existing drag/scroll camera (renderDen pointer + wheel handlers). WebXR is progressive enhancement only — headless CI and most desktops exercise just the WASD + graceful-degrade paths. No competitor app offers a first-person collection room; Steam 'Amber Den' angle (ROADMAP §4) is the long-term payoff."
+   "notes": "Extends the existing drag/scroll camera (renderDen pointer + wheel handlers). WebXR is progressive enhancement only — headless CI and most desktops exercise just the WASD + graceful-degrade paths. No competitor app offers a first-person collection room; Steam 'Amber Den' angle (ROADMAP §4) is the long-term payoff. 🟡 2026-07-23 — shipped the practical VR-like layer: WASD/arrow walk-through (translate3d posX + zoom, keys bound while the Den is open and cleanly unbound on exit), 📱 Tilt device-orientation \"magic-window\" look (iOS permission-gated) for phones, and ⛶ Immersive fullscreen with an exit button. HUD updated. Verified headless: WASD moves the world, keys unbind on view exit, reset zeros pose, zero JS errors. DEFERRED: the raw-WebGL immersive-vr headset session (needs a real headset to build/verify safely) — left unimplemented rather than shipping untested WebGL."
   },
   {
    "id": "summon-genai",
