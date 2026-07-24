@@ -1,5 +1,16 @@
 # Pokémon Den 🔴⚪
 
+## ⬇️ Download
+
+| | |
+|---|---|
+| 📀 **[Pokémon Den for macOS (.dmg)](https://github.com/Sparkey333/pokemon-chest/releases/download/dmg-latest/Pokemon.Den_2.1.0_universal.dmg)** | Universal (Apple Silicon + Intel). Ad‑hoc signed for now — first launch: right‑click the app → **Open** (or strip quarantine: `xattr -dr com.apple.quarantine "/Applications/Pokemon Den.app"`). |
+| 🗜 **[Source code (.zip)](https://github.com/Sparkey333/pokemon-chest/releases/tag/dmg-latest)** | `PokemonDen-source-<commit>.zip` on the same release page. |
+
+Both rebuild **automatically on every push** — the [`dmg-latest` release](https://github.com/Sparkey333/pokemon-chest/releases/tag/dmg-latest) is always the newest build. Prefer a clean double‑click with your own signing? Clone and run `build-app.command`.
+
+---
+
 A premium‑style, **free** database & sell/grade advisor for your Pokémon card
 collection — built from your PriceCharting export. English **and** Japanese, card art,
 one‑click live sold‑comp links, and (optionally, bring‑your‑own‑key) live price data and

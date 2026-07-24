@@ -17,7 +17,7 @@ const LS_SALES = 'pokechest.sales.v1';          // per-card sale records {pcId:{
 const RV = {
   data: {},                          // fetched json data files
   rendered: {},
-  den: loadJSON(LS_DEN, { theme: 'amber', wall: 'top', shelf: 'graded', side: 'case', featured: 'auto' }),
+  den: loadJSON(LS_DEN, { theme: 'amber', wall: 'top', shelf: 'graded', side: 'case', featured: 'auto', auto: true }),
   cam: { stream: null, deviceId: null, mirror: true },
   scan: { card: null },
   pcPoll: null,
@@ -395,9 +395,11 @@ function renderDen() {
     <span class="tlabel">Slab shelf</span>${sel('den-shelf', d.shelf, RV_SOURCES)}
     <span class="tlabel">Side gallery</span>${sel('den-side', d.side, RV_SOURCES)}
     <span class="tlabel">Pedestal</span>${sel('den-feat', d.featured, featuredOpts)}
+    <label class="rv-check" title="Shelves that build themselves from your collection — top set + newest pulls, refreshed automatically"><input type="checkbox" id="den-auto" ${d.auto !== false ? 'checked' : ''}> 🗄 Auto shelves</label>
   </div>
   <div class="den-viewport theme-${esc(d.theme)}" id="den-vp">
     <div class="den-world" id="den-world">${denRoomHTML()}</div>
+    <div class="den-motes">${Array.from({ length: 14 }, (_, i) => `<i style="left:${(i * 37 + 11) % 100}%;animation-delay:-${(i * 1.7) % 18}s;animation-duration:${14 + (i % 5) * 3}s"></i>`).join('')}</div>
     <div class="den-hud"><span>WASD — walk</span><span>drag — look</span><span>scroll — zoom</span><span>click card — details</span></div>
     <button class="den-exit btn sm" id="den-exit" hidden>✕ exit</button>
   </div>`;
@@ -421,12 +423,13 @@ function renderDen() {
     $('#den-immerse').classList.toggle('primary', on);
   };
   if (!DEN.keysBound) { document.addEventListener('keydown', denKeyHandler); DEN.keysBound = true; }
+  $('#den-auto').onchange = e => { RV.den.auto = e.target.checked; rvSaveDen(); renderDen(); };
   $('#den-theme').onchange = e => { RV.den.theme = e.target.value; rvSaveDen(); $('#den-vp').className = 'den-viewport theme-' + e.target.value; };
   const rebind = (id, key) => $('#' + id).onchange = e => { RV.den[key] = e.target.value; rvSaveDen(); renderDen(); };
   rebind('den-wall', 'wall'); rebind('den-shelf', 'shelf'); rebind('den-side', 'side'); rebind('den-feat', 'featured');
 
   const vp = $('#den-vp');
-  vp.onpointerdown = e => { DEN.drag = { x: e.clientX, y: e.clientY, yaw: DEN.yaw, pitch: DEN.pitch, moved: 0 }; vp.setPointerCapture(e.pointerId); };
+  vp.onpointerdown = e => { DEN.drag = { x: e.clientX, y: e.clientY, yaw: DEN.yaw, pitch: DEN.pitch, moved: 0 }; $('#den-world').classList.add('dragging'); vp.setPointerCapture(e.pointerId); };
   vp.onpointermove = e => {
     if (!DEN.drag) return;
     const dx = e.clientX - DEN.drag.x, dy = e.clientY - DEN.drag.y;
@@ -435,7 +438,7 @@ function renderDen() {
     DEN.pitch = Math.max(-6, Math.min(26, DEN.drag.pitch + dy * 0.1));
     denApply();
   };
-  vp.onpointerup = vp.onpointercancel = () => setTimeout(() => DEN.drag = null, 0);
+  vp.onpointerup = vp.onpointercancel = () => { const w = $('#den-world'); if (w) w.classList.remove('dragging'); setTimeout(() => DEN.drag = null, 0); };
   vp.onwheel = e => { e.preventDefault(); DEN.zoom = Math.max(40, Math.min(620, DEN.zoom + (e.deltaY < 0 ? 40 : -40))); denApply(); };
   vp.onclick = e => {
     if (DEN.drag && DEN.drag.moved > 6) return;          // that was a drag, not a click
@@ -505,6 +508,32 @@ function denLoop() {
 }
 function rvDenStopLoop() { if (DEN.raf) cancelAnimationFrame(DEN.raf); DEN.raf = null; }
 
+/* auto shelves: displays that build themselves from the collection — the top
+   set gets its own low shelf on the back wall, the newest pulls a front shelf
+   on the left wall. Zero configuration; they re-derive on every render. */
+function denAutoShelvesHTML(frame) {
+  if (RV.den.auto === false) return '';
+  const out = [];
+  const topSet = (State.meta && State.meta.topSets && State.meta.topSets[0]) ? State.meta.topSets[0].set : null;
+  if (topSet) {
+    const setCards = State.cards
+      .filter(c => c.set === topSet && !uget(c).archived)
+      .sort((a, b) => (b.value || 0) - (a.value || 0)).slice(0, 5);
+    if (setCards.length) out.push(`<div class="den-display den-autoshelf-back">
+      <div class="den-disp-title">🗄 ${esc(topSet)}</div>
+      <div class="den-shelf-row">${setCards.map(c => frame(c, 'slab')).join('')}</div>
+      <div class="den-shelf-plank"></div>
+    </div>`);
+  }
+  const newest = rvPickCards('newest', 3);
+  if (newest.length) out.push(`<div class="den-display den-autoshelf-left">
+    <div class="den-disp-title">🆕 Newest pulls</div>
+    <div class="den-shelf-row">${newest.map(c => frame(c, 'slab')).join('')}</div>
+    <div class="den-shelf-plank"></div>
+  </div>`);
+  return out.join('');
+}
+
 /* shared empty-state for 3D/visual tabs when the collection has zero cards */
 function rvEmptyDenState(el, title) {
   el.innerHTML = `<div class="panel" style="margin-top:20px;text-align:center;padding:30px">
@@ -557,6 +586,9 @@ function denRoomHTML() {
       <div class="den-shelf-row">${soldCards.map(c => frame(c, 'soldcard')).join('')}</div>
       <div class="den-shelf-plank"></div>
     </div>` : ''}
+    ${denAutoShelvesHTML(frame)}
+    <div class="den-sconce den-sconce-l"></div>
+    <div class="den-sconce den-sconce-r"></div>
     <div class="den-sign">THE DEN</div>
     <div class="den-pedestal"><div class="den-ped-top"></div><div class="den-ped-col"></div></div>
     <div class="den-featured">

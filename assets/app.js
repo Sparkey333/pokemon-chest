@@ -51,6 +51,30 @@ function saveUser() { localStorage.setItem(LS_USER, JSON.stringify(State.user));
 function uget(c) { return State.user[c.pcId] || {}; }
 function uset(c, patch) { State.user[c.pcId] = Object.assign({}, uget(c), patch); saveUser(); }
 
+/* ---------- inventory qty adjustments (persist across refreshes) ----------
+   The export is the base truth; a per-card qtyAdj in LS_USER layers your
+   in-app +/- on top, and value/P&L re-derive from the adjusted qty. */
+function baseQty(c) { if (c._baseQty === undefined) c._baseQty = c.qty || 1; return c._baseQty; }
+function applyQtyAdjust(c) {
+  const q = Math.max(0, baseQty(c) + (uget(c).qtyAdj || 0));
+  c.qty = q;
+  c.value = Math.round((c.price || 0) * q * 100) / 100;
+  const cost = (c.cost || 0) * q;
+  c.pl = Math.round((c.value - cost) * 100) / 100;
+  c.plPct = cost ? Math.round(c.pl / cost * 1000) / 10 : null;
+}
+function adjustQty(c, delta) {
+  const adj = (uget(c).qtyAdj || 0) + delta;
+  if (baseQty(c) + adj < 0) return false;
+  if (adj === 0) { const u = uget(c); delete u.qtyAdj; State.user[c.pcId] = u; saveUser(); }
+  else uset(c, { qtyAdj: adj });
+  applyQtyAdjust(c);
+  return true;
+}
+function applyAllQtyAdjusts() {
+  for (const c of State.cards) if (uget(c).qtyAdj) applyQtyAdjust(c);
+}
+
 /* ---------- boot ---------- */
 init();
 async function init() {
@@ -72,6 +96,7 @@ async function init() {
     State.flags = flags || {};
     applyPublicArtMode();         // public/ship builds: drop external catalog art before it's memoized
     applyImgOverrides();          // your saved card-art (localStorage) wins over the catalog art
+    applyAllQtyAdjusts();         // your in-app inventory +/- layers on top of the export
     State.meta = col.meta;
     State.intel = intel;
     State.gintel = gintel;
@@ -1304,8 +1329,12 @@ function applyFilters() {
   const min = f.min === '' ? -Infinity : +f.min, max = f.max === '' ? Infinity : +f.max;
   let arr = State.cards.filter(c => {
     if (f.q) {
-      const hay = (c.name + ' ' + c.set + ' ' + (c.number || '') + ' ' + c.setRaw).toLowerCase();
-      if (!hay.includes(f.q)) return false;
+      // token-AND search: every word must hit somewhere ("charizard 151",
+      // "japanese mewtwo", "psa moonbreon" all just work)
+      const hay = (c.name + ' ' + c.set + ' ' + (c.number || '') + ' ' + c.setRaw + ' '
+        + (c.game || '') + ' ' + (c.lang === 'ja' ? 'japanese jp' : 'english en') + ' '
+        + (c.graded ? (c.grader || '') + ' ' + (c.grade || '') + ' graded slab' : 'raw')).toLowerCase();
+      if (!f.q.split(/\s+/).every(t => hay.includes(t))) return false;
     }
     if (f.lang !== 'all' && c.lang !== f.lang) return false;
     if (f.graded === 'raw' && c.graded) return false;
@@ -2681,7 +2710,11 @@ function openModal(c) {
           <span class="chip ${c.lang}">${c.lang === 'ja' ? '🇯🇵 Japanese' : '🇺🇸 English'}</span>
           ${c.graded ? `<span class="chip gold">${esc(c.grader || 'Graded')} ${c.grade || ''}</span>` : `<span class="chip">Raw · ${esc(c.condition)}</span>`}
           ${c.setYear ? `<span class="chip">${c.setYear} · ${esc(c.era)}</span>` : ''}
-          ${c.qty > 1 ? `<span class="chip">×${c.qty}</span>` : ''}
+          <span class="chip qty-chip" title="Inventory on hand — +/- persists across refreshes (layered on your export)">
+            <button class="qty-btn" id="mk-qminus">−</button>
+            <b id="mk-qval" ${c.qty === 0 ? 'style="color:var(--red)"' : ''}>×${c.qty}</b>
+            <button class="qty-btn" id="mk-qplus">+</button>
+          </span>
         </div>
         <div class="stat-grid">
           ${statBox('Market', money(c.price), 'var(--gold)')}
@@ -2741,6 +2774,16 @@ function openModal(c) {
   $('#mk-sold').onclick = () => { uset(c, { status: uget(c).status === 'sold' ? '' : 'sold' }); openModal(c); refreshAfterUser(); };
   if ($('#mk-clear')) $('#mk-clear').onclick = () => { uset(c, { status: '' }); openModal(c); refreshAfterUser(); };
   $('#mk-note').onchange = e => uset(c, { note: e.target.value });
+  const qtyStep = d => () => {
+    if (!adjustQty(c, d)) return;
+    const v = $('#mk-qval');
+    if (v) { v.textContent = '×' + c.qty; v.style.color = c.qty === 0 ? 'var(--red)' : ''; }
+    if (typeof rvRecalcMeta === 'function') rvRecalcMeta();
+    renderCollection(true);
+    toast(`${c.name}: ×${c.qty} in inventory · ${money(c.value)}`);
+  };
+  $('#mk-qminus').onclick = qtyStep(-1);
+  $('#mk-qplus').onclick = qtyStep(+1);
 }
 function closeModal() { $('#modalRoot').innerHTML = ''; }
 

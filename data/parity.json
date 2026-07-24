@@ -1372,6 +1372,108 @@
    ],
    "demand": "high",
    "notes": "ROADMAP §4: iOS possible ('Tauri 2 supports iOS; your tauri.conf.json already has a developmentTeam') with camera scanning as the hero feature; Google Play possible via the Android target. Also feeds backlog #12 (offline-first mobile scanning with sync queue — frequent complaint about scanner apps like CollX/PullVault needing connection). App Store submission additionally requires ship-rename-switch per review rules."
+  },
+  {
+   "id": "smooth-search",
+   "title": "Token-smart global search",
+   "icon": "🔎",
+   "area": "collection",
+   "status": "shipped",
+   "priority": "P0",
+   "spec": "The topbar #search / Collection filter (applyFilters() in assets/app.js) matches token-AND instead of raw substring: the query is split on whitespace and EVERY token must appear somewhere in a haystack of name + set + number + setRaw + game + language words ('japanese jp' / 'english en') + graded words (grader, grade, 'graded slab' / 'raw'). So 'charizard 151', 'japanese mewtwo', 'psa moonbreon', 'raw pikachu' all work. The Scanner (#sc-q) and binder-scan matchers already used token-AND; this brings the main search to parity. Any future search input must use the same pattern: toks = q.split(/\\s+/), toks.every(t => hay.includes(t)).",
+   "ux": "The topbar search box on every view (jumps to Collection) — multi-word queries now narrow instead of failing.",
+   "files": [
+    "assets/app.js"
+   ],
+   "acceptance": [
+    "State.filters.q='charizard 151' yields only Charizard cards from 151 sets (was 0 results before)",
+    "'japanese mewtwo' returns only ja-language Mewtwo entries",
+    "Single-word queries behave exactly as before",
+    "Zero JS pageerrors across all tabs after searching"
+   ],
+   "verify": "Headless: set the #search input value per case above, dispatch input, assert State.filtered lengths (>0 for multi-word hits, subset-of-name+set checks) and zero pageerrors.",
+   "est": "S",
+   "dependsOn": [],
+   "demand": "high",
+   "notes": "✅ 2026-07-24 — shipped; verified headless with multi-word queries against the live 1291-card collection."
+  },
+  {
+   "id": "inventory-qty-adjust",
+   "title": "Inventory +/- (persistent qty adjustments)",
+   "icon": "🧮",
+   "area": "collection",
+   "status": "shipped",
+   "priority": "P0",
+   "spec": "Add/subtract copies of any card in-app without touching the export. assets/app.js: baseQty(c) memoizes the export quantity into c._baseQty; adjustQty(c, delta) stores a qtyAdj integer in the per-card LS_USER record ('pokechest.userdata.v1', keyed by pcId — NEVER rename this key), deleting it when it returns to 0, and refuses to go below qty 0; applyQtyAdjust(c) re-derives c.qty/value/pl/plPct from baseQty+qtyAdj; applyAllQtyAdjusts() runs in init() right after applyImgOverrides() so adjustments survive every refresh/rebuild (the export is the base truth, the adjustment layers on top). UI: the card modal's meta chips row has a qty-chip stepper ([−] ×N [+], ids mk-qminus/mk-qval/mk-qplus) wired at the end of openModal(); each step updates the chip in place, calls rvRecalcMeta() (portfolio/kpis re-count) and renderCollection(true), and toasts the new qty+value. ×0 renders red (out of inventory but still tracked).",
+   "ux": "Card modal → the ×N chip next to language/grade chips is now a −/+ stepper; totals update everywhere immediately.",
+   "files": [
+    "assets/app.js",
+    "assets/revamp.css"
+   ],
+   "acceptance": [
+    "Clicking + on a qty-1 card shows ×2, portfolio value increases by the card's price, and a reload preserves ×2",
+    "Clicking − at ×0 does nothing (no negative inventory)",
+    "qtyAdj disappears from localStorage when stepped back to the export quantity",
+    "↻ Refresh / rebuild keeps the adjustment (layered, not overwritten)",
+    "Zero JS pageerrors"
+   ],
+   "verify": "Headless: open a card modal, click #mk-qplus, assert State.cards[i].qty incremented and State.meta.totalValue grew by price; reload the page and assert qty persisted; step back down and assert the LS_USER record's qtyAdj is gone.",
+   "est": "M",
+   "dependsOn": [],
+   "demand": "high",
+   "notes": "✅ 2026-07-24 — shipped. Sale/archive flows in the Add & Sold ledger remain the right way to remove a card entirely with its money story; this stepper is for fast count corrections and new pulls of cards you already track."
+  },
+  {
+   "id": "den-auto-shelves",
+   "title": "Den: auto-built shelves",
+   "icon": "🗄",
+   "area": "den3d",
+   "status": "shipped",
+   "priority": "P1",
+   "spec": "Shelves that build themselves from the collection, zero configuration. assets/revamp.js: RV.den.auto (default true, persisted in 'pokechest.den.v1'); a '🗄 Auto shelves' checkbox in the den-bar toggles it (re-renders). denAutoShelvesHTML(frame) — called from denRoomHTML() — emits (a) .den-autoshelf-back: the top set by value (State.meta.topSets[0].set), its 5 most valuable non-archived cards on a low back-wall shelf titled with the set name; (b) .den-autoshelf-left: '🆕 Newest pulls' — rvPickCards('newest', 3) on the upper-front left wall. Both use the existing frame(c,'slab') renderer + .den-shelf-plank, and re-derive on every render so new imports/adds appear automatically. CSS anchors in assets/revamp.css (.den-autoshelf-back at translateZ(-696px) back wall low, .den-autoshelf-left at rotateY(90deg) translateZ(-796px) left wall above the Sold Shelf), 104px cards.",
+   "ux": "The Den grows two self-populating shelves — your #1 set and your newest pulls — with an on/off toggle in the Den bar.",
+   "files": [
+    "assets/revamp.js",
+    "assets/revamp.css"
+   ],
+   "acceptance": [
+    "With auto on (default), the Den shows a shelf titled with the top set's name holding up to 5 of its cards, and a 'Newest pulls' shelf with up to 3",
+    "Unchecking 🗄 Auto shelves removes both and persists across reloads",
+    "Adding a card (ledger) then re-entering the Den updates the shelves with no configuration",
+    "Zero JS pageerrors"
+   ],
+   "verify": "Headless: open the Den, assert .den-autoshelf-back and .den-autoshelf-left exist with .den-card children and the back shelf title equals State.meta.topSets[0].set; uncheck #den-auto, assert both gone; re-check persists via localStorage pokechest.den.v1.",
+   "est": "M",
+   "dependsOn": [],
+   "demand": "medium",
+   "notes": "✅ 2026-07-24 — shipped."
+  },
+  {
+   "id": "den-oasis-premium",
+   "title": "Den: Oasis-grade premium experience (epic)",
+   "icon": "🕶",
+   "area": "den3d",
+   "status": "partial",
+   "priority": "P1",
+   "spec": "The north star: the Den as a proto-Oasis (Ready Player One) — a premium, living 3D space you inhabit, styled on the DarkHearts 'Amber Den' build (night #0a0e12, amber #e8a95c/#a66a1f, bone #efe6d4, jewel accents, film grain). SHIPPED LAYERS: warm palette + grain + lamp glow (theme-amber), WASD/arrow walk-through + drag-look + wheel-zoom with eased camera glides (.den-world transition, .dragging disables during pointer drag), 📱 device-tilt look, ⛶ fullscreen immersive, auto-orbit, wall sconces with flicker (.den-sconce), floating dust motes (.den-motes), card hover glow, auto shelves, Sold Shelf, editable display sources, 3 themes. PLANNED NEXT (each is its own future ledger item when picked up): (1) spatial-audio — soft ambient loop + positional click/hover sounds via WebAudio, volume tied to zoom depth; (2) den-avatars — a simple readable avatar/hand cursor visible in fullscreen; (3) den-multiroom — doorway on the right wall leading to a second room (per-game rooms: Pokémon / Magic / sports) reusing the same face-transform recipe; (4) den-webxr-native — the deferred raw-WebGL immersive-vr headset session from den-vr-controls (needs hardware to verify); (5) den-live-inventory — shelves subscribe to autosync so a new import animates cards onto shelves while you watch. Keep everything dependency-free (no three.js) and IP-safe per LEGAL.md.",
+   "ux": "The 🏠 Den tab: every layer deepens presence — light, motion, atmosphere, and self-building displays.",
+   "files": [
+    "assets/revamp.js",
+    "assets/revamp.css"
+   ],
+   "acceptance": [
+    "Amber theme carries the DarkHearts palette (night/amber/bone) with grain + glow overlays",
+    "Camera moves are eased except during active pointer drag",
+    "Sconces and motes render without measurable jank (no layout thrash; CSS-only animation)",
+    "All Den interactions keep zero JS pageerrors"
+   ],
+   "verify": "Headless: den viewport contains .den-sconce ×2 and .den-motes with 14 <i>; .den-world has a transform transition except when .dragging; WASD still moves; zero pageerrors. Visual pass via screenshot.",
+   "est": "L",
+   "dependsOn": [
+    "den-auto-shelves"
+   ],
+   "demand": "high",
+   "notes": "🟡 2026-07-24 — atmosphere + locomotion + auto-shelves layers shipped; spatial audio, avatars, multi-room, native WebXR, and live-inventory animation remain (spec'd above, ready to split into items)."
   }
  ],
  "matrix": {
