@@ -1030,6 +1030,14 @@ AI_IDENTIFY_SYSTEM = (
     "denominator, \"set\": set name, \"lang\": \"en\" or \"ja\", \"game\": e.g. \"Pokémon\", "
     "\"graded\": true/false (is it in a grading slab), \"confidence\": 0-1}. Use null for anything unreadable.")
 
+AI_IDENTIFY_GRID_SYSTEM = (
+    "You identify trading cards from a photo of a 9-pocket binder page (3x3 grid). Respond with ONLY a "
+    "JSON array, no prose, no code fences: up to 9 objects, one per occupied pocket, row-major starting "
+    "top-left: {\"slot\": 1-9, \"name\": card name, \"number\": collector number without the set-size "
+    "denominator, \"set\": set name, \"lang\": \"en\" or \"ja\", \"game\": e.g. \"Pokémon\", "
+    "\"graded\": true/false, \"confidence\": 0-1}. Omit empty pockets entirely. Use null for anything "
+    "unreadable on a card you can otherwise see.")
+
 def ai_identify(payload, settings):
     provider = settings.get("ai_provider", "anthropic")
     key = settings.get("ai_key")
@@ -1039,12 +1047,15 @@ def ai_identify(payload, settings):
     if not m:
         return {"ok": False, "error": "Send the photo as a data URL."}
     media_type, b64 = m.group(1), m.group(2).strip()
-    prompt = "Identify this trading card."
+    grid = payload.get("mode") == "grid"
+    system = AI_IDENTIFY_GRID_SYSTEM if grid else AI_IDENTIFY_SYSTEM
+    prompt = "Identify every card in this 3x3 binder-page photo." if grid else "Identify this trading card."
+    max_tokens = 2000 if grid else 300
     if provider == "anthropic":
         d = http_json(
             "https://api.anthropic.com/v1/messages", method="POST",
             headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-            body={"model": model, "max_tokens": 300, "system": AI_IDENTIFY_SYSTEM,
+            body={"model": model, "max_tokens": max_tokens, "system": system,
                   "messages": [{"role": "user", "content": [
                       {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": b64}},
                       {"type": "text", "text": prompt}]}]})
@@ -1053,14 +1064,25 @@ def ai_identify(payload, settings):
         d = http_json(
             "https://api.openai.com/v1/chat/completions", method="POST",
             headers={"Authorization": f"Bearer {key}", "content-type": "application/json"},
-            body={"model": model, "max_tokens": 300,
-                  "messages": [{"role": "system", "content": AI_IDENTIFY_SYSTEM},
+            body={"model": model, "max_tokens": max_tokens,
+                  "messages": [{"role": "system", "content": system},
                                {"role": "user", "content": [
                                    {"type": "image_url", "image_url": {"url": data_url}},
                                    {"type": "text", "text": prompt}]}]})
         text = d["choices"][0]["message"]["content"]
     else:
         return {"ok": False, "error": f"Unknown AI provider: {provider}"}
+    if grid:
+        j = re.search(r"\[.*\]", text, re.S)
+        if not j:
+            return {"ok": False, "error": "The model returned no JSON.", "raw": text[:300]}
+        try:
+            guesses = json.loads(j.group(0))
+        except Exception:
+            return {"ok": False, "error": "Could not parse the model's JSON.", "raw": text[:300]}
+        if not isinstance(guesses, list):
+            return {"ok": False, "error": "Model returned JSON, but not an array.", "raw": text[:300]}
+        return {"ok": True, "guesses": guesses, "provider": provider, "model": model}
     j = re.search(r"\{.*\}", text, re.S)
     if not j:
         return {"ok": False, "error": "The model returned no JSON.", "raw": text[:300]}

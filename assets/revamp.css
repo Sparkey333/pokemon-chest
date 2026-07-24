@@ -188,6 +188,17 @@
 .sc-shot figcaption{font-size:11px;color:var(--muted2);display:flex;justify-content:space-between;padding:2px 2px 0}
 .sc-qr{border-radius:10px;border:4px solid #fff;flex:none}
 
+/* bulk binder-page scan */
+.sc-binder-head{display:flex;align-items:center;gap:10px;margin:12px 0 8px}
+.sc-bgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.sc-bcell{border:1px solid var(--border);border-radius:10px;background:var(--panel2);padding:8px;text-align:center}
+.sc-bcell img{width:100%;aspect-ratio:63/88;object-fit:cover;border-radius:6px;display:block;margin:0 auto 6px}
+.sc-bcell-empty{opacity:.5}
+.sc-bcell-pending{opacity:.7}
+.sc-bline{font-size:11.5px;line-height:1.4}
+.sc-bmatches{display:flex;flex-direction:column;gap:3px;margin-top:6px;align-items:center}
+.sc-bsaved{margin-top:6px;font-size:11.5px;color:var(--green);font-weight:700}
+
 /* staged scanner shot + PC catalog add */
 .sc-stagedcard{display:flex;gap:12px;align-items:flex-start;margin-top:10px;padding:10px;
   border:1px solid var(--accent);border-radius:10px;background:rgba(232,169,92,.06)}

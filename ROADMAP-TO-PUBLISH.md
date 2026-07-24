@@ -35,10 +35,9 @@ Sources: Collectr, Dex, Shiny, PullVault, PokéVault, CollectorVault, CollX,
 pkmn.gg, Eyevo, PriceCharting app reviews, and app-store/blog comparisons
 (see links in the PR). The 12 most-agreed-on wants, ranked by demand × fit:
 
-1. **Bulk binder-page scan** — read all 9 cards of a binder page in one photo
-   (PullVault's killer feature; #1 complaint about single-card scanners).
-   *Fit: extend `/api/ai/identify` to return an array from one photo; we already
-   store per-card photos.*
+1. **Bulk binder-page scan** ✅ 2026-07-24 — read all 9 cards of a binder page in
+   one photo (PullVault's killer feature; #1 complaint about single-card
+   scanners). Shipped in Scanner: 🗂 Scan a 9-pocket binder page.
 2. **AI condition pre-grade from photos** — centering/corners/edges/surface
    estimate + grade-ROI verdict (CollectorVault/PokéVault do this; pairs
    perfectly with our Grade Lab break-even math and GradeStage rig).

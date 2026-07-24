@@ -796,11 +796,14 @@ function renderScan() {
       </div>
       <div id="sc-staged"></div>
       <p class="reason" style="margin-top:8px">Snap first, then pick — or pick first and every capture saves straight to the card as its next <code>scan-N</code> photo. Your iPhone appears in the camera list automatically (Continuity Camera).</p>
-      <div class="rv-row" style="margin-top:6px">
+      <div class="rv-row" style="margin-top:6px;flex-wrap:wrap">
         <label class="btn sm" style="cursor:pointer">📱 Or take/upload a photo
           <input id="sc-file" type="file" accept="image/*" capture="environment" style="display:none"></label>
         <button class="btn sm" id="sc-studio" disabled>🎬 Guided Photo Studio</button>
+        ${State.live && State.live.ai && State.live.ai.enabled ? `<label class="btn sm gold" style="cursor:pointer">🗂 Scan a 9-pocket binder page
+          <input id="sc-binderfile" type="file" accept="image/*" capture="environment" style="display:none"></label>` : ''}
       </div>
+      <div id="sc-binder"></div>
     </div>
   </div>
   <div class="rv-2col" style="margin-top:14px">
@@ -848,8 +851,17 @@ function renderScan() {
     e.target.value = '';
   };
   $('#sc-studio').onclick = () => RV.scan.card && window.openPhotoStudio && openPhotoStudio(RV.scan.card);
+  if ($('#sc-binderfile')) $('#sc-binderfile').onchange = async e => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    const dataUrl = await blobToDataUrl(f);
+    RV.scan.binder = { dataUrl, guesses: null, crops: {}, saved: {} };
+    scRenderBinder();
+    scBinderIdentify();
+    e.target.value = '';
+  };
 
   scRenderStaged();
+  scRenderBinder();
   // camera permission already granted? start the preview without another click
   if (live && navigator.permissions && navigator.permissions.query) {
     navigator.permissions.query({ name: 'camera' })
@@ -905,6 +917,90 @@ async function scIdentify() {
     }
     scRenderStaged();
   } catch (e) { if (g) g.textContent = '✕ ' + e.message; }
+}
+
+/* bulk binder scan: one photo of a 9-pocket page -> up to 9 identified cards */
+function scBinderCrop(dataUrl, slot) {
+  const bin = RV.scan.binder;
+  if (bin.crops[slot]) return Promise.resolve(bin.crops[slot]);
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const col = (slot - 1) % 3, row = Math.floor((slot - 1) / 3);
+      const cw = img.naturalWidth / 3, ch = img.naturalHeight / 3;
+      const cv = document.createElement('canvas');
+      cv.width = cw; cv.height = ch;
+      cv.getContext('2d').drawImage(img, col * cw, row * ch, cw, ch, 0, 0, cw, ch);
+      const out = cv.toDataURL('image/jpeg', 0.85);
+      bin.crops[slot] = out;
+      resolve(out);
+    };
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  });
+}
+function scBinderMatches(guess) {
+  const hay = [guess.name, guess.number].filter(Boolean).join(' ').toLowerCase();
+  if (!hay.trim()) return [];
+  const toks = hay.split(/\s+/).filter(Boolean);
+  return State.cards.filter(c => {
+    const h = (c.name + ' ' + c.set + ' ' + (c.number || '')).toLowerCase();
+    return toks.every(t => h.includes(t));
+  }).slice(0, 4);
+}
+async function scRenderBinder() {
+  const box = $('#sc-binder'); if (!box) return;
+  const bin = RV.scan.binder;
+  if (!bin) { box.innerHTML = ''; return; }
+  const loading = bin.guesses === null;
+  const bySlot = {};
+  (bin.guesses || []).forEach(g => { bySlot[g.slot] = g; });
+  const slots = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+  const crops = await Promise.all(slots.map(s => scBinderCrop(bin.dataUrl, s)));
+  box.innerHTML = `<div class="sc-binder-head reason">🗂 Binder page — ${loading ? 'reading the page…' : `${(bin.guesses || []).length} card${(bin.guesses || []).length === 1 ? '' : 's'} found`} <button class="minilink" id="sc-binder-close">✕ close</button></div>
+    <div class="sc-bgrid">${slots.map((s, idx) => {
+    const crop = crops[idx];
+    if (loading) return `<div class="sc-bcell sc-bcell-pending" data-slot="${s}"><img src="${crop || bin.dataUrl}" alt="pocket ${s}"><span class="reason">reading…</span></div>`;
+    const g = bySlot[s];
+    if (!g) return `<div class="sc-bcell sc-bcell-empty" data-slot="${s}"><img src="${crop || bin.dataUrl}" alt="pocket ${s}"><span class="reason">no card seen</span></div>`;
+    const saved = bin.saved[s];
+    const matches = scBinderMatches(g);
+    const line = `${g.name || '?'}${g.number ? ' #' + g.number : ''} · ${g.set || 'set unknown'}${g.confidence != null ? ' · ' + Math.round(g.confidence * 100) + '%' : ''}`;
+    return `<div class="sc-bcell" data-slot="${s}">
+        <img src="${crop || bin.dataUrl}" alt="pocket ${s}">
+        <div class="reason sc-bline">${esc(line)}</div>
+        ${saved ? `<div class="sc-bsaved">✓ saved to ${esc(saved)}</div>` : `
+        <div class="sc-bmatches">
+          ${matches.map(c => `<button class="minilink sc-bmatch" data-slot="${s}" data-i="${c.i}">→ ${esc(c.name)}${c.number ? ' #' + esc(c.number) : ''}</button>`).join('') || ''}
+          <button class="minilink sc-badd" data-slot="${s}">➕ Add</button>
+        </div>`}
+      </div>`;
+  }).join('')}</div>`;
+  $('#sc-binder-close').onclick = () => { RV.scan.binder = null; scRenderBinder(); };
+  $$('.sc-bmatch', box).forEach(b => b.onclick = async () => {
+    const slot = +b.dataset.slot, card = State.cards[+b.dataset.i];
+    const crop = bin.crops[slot];
+    const r = await scSaveTo(card, crop);
+    if (r) { bin.saved[slot] = card.name; scRenderBinder(); }
+  });
+  $$('.sc-badd', box).forEach(b => b.onclick = () => {
+    const slot = +b.dataset.slot;
+    const g = (bin.guesses || []).find(x => x.slot === slot) || {};
+    RV.lgQuery = [g.name, g.number].filter(Boolean).join(' ');
+    switchView('ledger');
+  });
+}
+async function scBinderIdentify() {
+  const bin = RV.scan.binder; if (!bin) return;
+  try {
+    const j = await (await fetch('/api/ai/identify', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ dataUrl: bin.dataUrl, mode: 'grid' })
+    })).json();
+    if (!j.ok) { toast('Binder scan failed: ' + (j.error || 'could not identify')); return; }
+    bin.guesses = j.guesses || [];
+    scRenderBinder();
+  } catch (e) { toast('Binder scan error: ' + e.message); }
 }
 
 function scSelect(c) {
@@ -987,9 +1083,10 @@ function scCapture() {
   RV.scan.staged = { dataUrl };                   // no card yet → stage it for identify/pick
   scRenderStaged();
 }
-async function scSave(dataUrl) {
-  const c = RV.scan.card;
-  if (!State.live) return toast('Static mode — launch via start.command to save photos.');
+function scSave(dataUrl) { return scSaveTo(RV.scan.card, dataUrl); }
+async function scSaveTo(c, dataUrl) {
+  if (!c) return;
+  if (!State.live) { toast('Static mode — launch via start.command to save photos.'); return null; }
   try {
     const j = await (await fetch('/api/listingphotos?pcId=' + enc(c.pcId), { cache: 'no-store' })).json();
     let n = 1;
@@ -1001,9 +1098,9 @@ async function scSave(dataUrl) {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ pcId: c.pcId, slot: 'scan-' + n, dataUrl })
     })).json();
-    if (r.ok) { toast(`Saved to ${c.name} — scan-${n} (${r.kb} KB)`); scGallery(); }
-    else toast('Save failed: ' + (r.error || 'unknown'));
-  } catch (e) { toast('Save error: ' + e.message); }
+    if (r.ok) { toast(`Saved to ${c.name} — scan-${n} (${r.kb} KB)`); if (c === RV.scan.card) scGallery(); return r; }
+    toast('Save failed: ' + (r.error || 'unknown')); return null;
+  } catch (e) { toast('Save error: ' + e.message); return null; }
 }
 
 /* --- phone mode (LAN + QR) --- */
