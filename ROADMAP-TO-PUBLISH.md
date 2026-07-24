@@ -104,7 +104,15 @@ pkmn.gg, Eyevo, PriceCharting app reviews, and app-store/blog comparisons
       licensed/open source in the public build — `publicArt` build flag
       (`data/build-flags.json`; CI `public_art` dispatch input) suppresses all
       external catalog art in ship builds ✅ 2026-07-21
-- [ ] Server hardening pass (already local-only; audit LAN mode defaults)
+- [x] Server hardening pass ✅ 2026-07-24 — static server now refuses
+      `settings.local.json`, `lan-tls/` (TLS private key), the raw `.xlsx`
+      export, and every dot-path (`.git/` was previously servable); security
+      headers (nosniff / frame-deny / no-referrer) on every response; request
+      bodies capped at 48 MB; and admin surfaces (Keychain secrets, Emerald
+      subprocess runners, Finder reveals, key writes, LAN on/off, imports)
+      are loopback-only — a phone on LAN mode can browse & scan but never
+      administer. Verified with a real LAN-peer simulation: 12/12 admin
+      probes 403'd, 6/6 browse/scan paths still 200, keys unwritable.
 - [ ] Crash/error reporting opt-in, privacy policy page
 - [x] Onboarding for people with zero PriceCharting history — the Dashboard now
       shows a 3-path welcome panel (import .xlsx / connect live / add by hand)

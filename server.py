@@ -1360,12 +1360,41 @@ def emerald_log(since):
                 "running": EMERALD["running"], "phase": EMERALD["phase"], "lastOk": EMERALD["ok"]}
 
 # ----------------------------------------------------------------- handler ---
+# Hardening: request bodies are capped (an image-upload xlsx/base64 payload
+# tops out well under this), and endpoints that touch the Keychain, run
+# subprocesses, open Finder, or reconfigure the server itself only answer to
+# connections from this Mac — a phone on the LAN listener gets 403 for those.
+BODY_MAX = 48 * 1024 * 1024
+
+class PayloadTooLarge(Exception):
+    pass
+
+# Paths the static file server must never serve, even to localhost: BYOK keys,
+# the LAN TLS private key, the raw export, and any dot-path (.git, .DS_Store…).
+def _static_blocked(path):
+    parts = [p for p in urllib.parse.unquote(path).split("/") if p]
+    if any(p.startswith(".") for p in parts):
+        return True
+    low = [p.lower() for p in parts]
+    if low and (low[0].startswith("settings.local.json") or low[0] == "lan-tls"):
+        return True
+    if low and low[-1].endswith(".xlsx"):
+        return True
+    return False
+
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *a, **k):
         super().__init__(*a, directory=ROOT, **k)
 
     def log_message(self, *a):  # quieter console
         pass
+
+    def end_headers(self):
+        # On every response, static files included.
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
+        super().end_headers()
 
     def _json(self, obj, code=200):
         body = json.dumps(obj).encode()
@@ -1378,7 +1407,18 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _read_body(self):
         n = int(self.headers.get("Content-Length", 0))
+        if n > BODY_MAX:
+            raise PayloadTooLarge()
         return json.loads(self.rfile.read(n) or b"{}") if n else {}
+
+    def _loopback_only(self):
+        """This-Mac-only controls: Keychain, subprocess runners, Finder reveals,
+        key writes, LAN on/off. The phone (LAN listener) can browse and scan,
+        never administer."""
+        if self.client_address[0] in ("127.0.0.1", "::1", "::ffff:127.0.0.1"):
+            return True
+        self._json({"ok": False, "error": "forbidden: only available on the Mac itself, not over LAN"}, 403)
+        return False
 
     def _guard(self, ok, what):
         if not ok:
@@ -1456,6 +1496,8 @@ class Handler(SimpleHTTPRequestHandler):
             except Exception as e:
                 return self._json({"ok": False, "error": str(e)}, 200)
         if path == "/api/secrets":
+            if not self._loopback_only():
+                return
             return self._json(secret_list())
         if path == "/api/cardart":
             return self._json(card_art_list())
@@ -1508,14 +1550,22 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(pricecharting_price(pid, s["pricecharting_token"]))
             except Exception as e:
                 return self._json({"ok": False, "error": str(e)}, 200)
+        if _static_blocked(path):
+            return self._json({"ok": False, "error": "forbidden"}, 403)
         return super().do_GET()  # static files
 
     def do_POST(self):
         path = urllib.parse.urlparse(self.path).path
         if not self._local_ok():
             return
+        if (path.startswith(("/api/secrets", "/api/emerald")) or path.endswith("/reveal")
+                or path in ("/api/config", "/api/lan", "/api/import", "/api/mobile/deliver")):
+            if not self._loopback_only():
+                return
         try:
             payload = self._read_body()
+        except PayloadTooLarge:
+            return self._json({"ok": False, "error": "payload too large"}, 413)
         except Exception:
             return self._json({"ok": False, "error": "bad JSON body"}, 400)
         if path == "/api/config":
