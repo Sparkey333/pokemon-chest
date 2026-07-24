@@ -22,6 +22,10 @@ System Settings → Privacy & Security → "Open Anyway".
 same app, no Terminal or browser needed. The Tauri shell in `src-tauri/` wraps the exact
 same local server and UI.
 
+**Download (macOS):** the rolling release **[dmg-latest](https://github.com/Sparkey333/pokemon-chest/releases/tag/dmg-latest)**
+on GitHub has the universal DMG + a source zip. Or double‑click **`build-app.command`**
+on a Mac to build locally.
+
 > Don't just double‑click `index.html` — browsers block `file://` pages from reading
 > local data, so the collection won't load. Use the launcher or the app.
 

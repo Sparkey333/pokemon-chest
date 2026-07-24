@@ -1,0 +1,83 @@
+name: Build macOS DMG
+
+# Builds "Pokemon Chest.app" + the .dmg on GitHub's macOS runners, then
+# publishes a rolling dmg-latest release (DMG + source zip) on the Releases page.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - cursor/card-scan-codex-8306
+      - claude/pokemon-chest-redesign-31io2c
+    paths:
+      - "src-tauri/**"
+      - "assets/**"
+      - "data/**"
+      - "tauri-shell/**"
+      - "index.html"
+      - "server.py"
+      - "icon-source.png"
+      - "package.json"
+      - ".github/workflows/build-dmg.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  dmg:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Regenerate the full icon set from icon-source.png
+        run: npx --yes "@tauri-apps/cli@^2" icon icon-source.png
+
+      # CI has no Apple Developer certificate — ad-hoc sign ("-") instead of the
+      # configured identity. First launch needs right-click → Open (Gatekeeper).
+      - name: Build app + dmg (universal, ad-hoc signed)
+        run: >
+          npx --yes "@tauri-apps/cli@^2" build
+          --target universal-apple-darwin
+          --config '{"bundle":{"macOS":{"signingIdentity":"-"}}}'
+
+      - name: Zip the source tree (tracked files at this commit)
+        run: |
+          git archive --format=zip -o "PokemonChest-source-${GITHUB_SHA:0:7}.zip" "$GITHUB_SHA"
+          ls -lh PokemonChest-source-*.zip
+
+      - name: Publish the dmg + source zip to the dmg-latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          DMG=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg | head -1)
+          SRC=$(ls PokemonChest-source-*.zip | head -1)
+          echo "publishing: $DMG  +  $SRC"
+          NOTES="Universal (Apple Silicon + Intel) build of commit ${GITHUB_SHA:0:7} (v1.14.0). Includes Scanner + full TCGdex EN+JA release codex. Ad-hoc signed — first launch: right-click the app → Open (or build locally via build-app.command). Source zip attached."
+          gh release delete dmg-latest --cleanup-tag --yes || true
+          gh release create dmg-latest "$DMG" "$SRC" \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "Pokémon Chest — latest macOS build + source" \
+            --notes "$NOTES"
+
+      - name: Upload the dmg as a workflow artifact
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: Pokemon-Chest-dmg
+          path: src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+          retention-days: 14

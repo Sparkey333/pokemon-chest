@@ -24,8 +24,14 @@ src-tauri/gen/
 # OS cruft
 .DS_Store
 
-# Generated iPhone snapshot (regenerated from data)
+# Generated iPhone snapshots (regenerated from data)
 Pok*mon Chest — Pocket.html
+Pok*mon Chest — Deck.html
+
+# Local download / packaging dumps
+artifacts/
+*.zip
 
 # Generated reference/listing images
 listing-photos/
+card-art/
