@@ -107,7 +107,9 @@ pkmn.gg, Eyevo, PriceCharting app reviews, and app-store/blog comparisons
       external catalog art in ship builds ✅ 2026-07-21
 - [ ] Server hardening pass (already local-only; audit LAN mode defaults)
 - [ ] Crash/error reporting opt-in, privacy policy page
-- [ ] Onboarding for people with zero PriceCharting history (CSV/manual import)
+- [x] Onboarding for people with zero PriceCharting history — the Dashboard now
+      shows a 3-path welcome panel (import .xlsx / connect live / add by hand)
+      when the collection is empty ✅ 2026-07-24
 - [ ] Real signing + notarization in CI (needs Apple cert secrets in repo)
 - [ ] Top-5 backlog features above implemented
 - [ ] Beta round (TestFlight / direct DMG) with 5–10 collectors

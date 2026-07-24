@@ -19,6 +19,7 @@ Keys live in settings.local.json (gitignored, never bundled). Endpoints:
   POST /api/comps             -> live sold comps (eBay/TCGplayer/JP) via a comps API
   POST /api/ai                -> a written sell/grade recommendation (Claude or OpenAI)
   POST /api/refresh           -> rebuild data/collection.json from the newest export
+  POST /api/import            -> save an uploaded .xlsx export + rebuild (first-run onboarding)
   GET  /data/collection.json  -> POKECHEST_HOME copy when present, else bundled file
 
 Env:  POKECHEST_HOME (writable home; default: this script's directory)
@@ -521,6 +522,35 @@ def ai_recommend(payload, settings):
     return {"ok": False, "error": f"Unknown AI provider: {provider}"}
 
 # ----------------------------------------------------------------- refresh ---
+def import_export(payload):
+    """First-run onboarding: accept an uploaded PriceCharting .xlsx export,
+    save it into HOME, and rebuild the collection from it. Returns
+    {ok:true, report:{...}} on success or {ok:false, error} — never raises."""
+    name = (payload.get("name") or "").strip()
+    data_b64 = payload.get("dataB64") or ""
+    if not name or "/" in name or "\\" in name or ".." in name or name.startswith("."):
+        return {"ok": False, "error": "Invalid file name."}
+    if not name.lower().endswith(".xlsx"):
+        return {"ok": False, "error": "Only a PriceCharting .xlsx export is supported here — for a plain CSV, use ➕ Add & Sold to add cards by hand for now."}
+    try:
+        raw = base64.b64decode(data_b64, validate=True)
+    except Exception:
+        return {"ok": False, "error": "Could not decode the uploaded file."}
+    if not raw:
+        return {"ok": False, "error": "The uploaded file is empty."}
+    if len(raw) > 25 * 1024 * 1024:
+        return {"ok": False, "error": "File is too large (max 25 MB)."}
+    try:
+        os.makedirs(HOME, exist_ok=True)
+        dest = os.path.join(HOME, name)
+        tmp = dest + ".tmp"
+        with open(tmp, "wb") as f:
+            f.write(raw)
+        os.replace(tmp, dest)
+    except Exception as e:
+        return {"ok": False, "error": f"Could not save the file: {e}"}
+    return refresh_data()
+
 def refresh_data():
     """Rebuild collection data by running scripts/build_data.py as a subprocess.
     Always returns a JSON-able dict — {ok:true, report:{...}} or {ok:false, error}."""
@@ -1471,6 +1501,11 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/refresh":
             try:
                 return self._json(refresh_data())
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)}, 200)
+        if path == "/api/import":
+            try:
+                return self._json(import_export(payload))
             except Exception as e:
                 return self._json({"ok": False, "error": str(e)}, 200)
         if path == "/api/lan":

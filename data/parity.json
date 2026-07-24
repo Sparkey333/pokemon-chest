@@ -1,7 +1,7 @@
 {
  "about": "Canonical machine-readable feature ledger for Pokémon Den. Rendered by the 📋 Parity tab. Agents & future sessions (any model): implement items from their spec alone, satisfy every acceptance criterion, run the verify steps, then set status=shipped, append \"✅ YYYY-MM-DD\" to notes, bump \"updated\", commit and push. Never change pokechest.* storage keys or the bundle identifier. Authored and adversarially verified by a multi-agent ultracode workflow.",
  "schemaVersion": 1,
- "updated": "2026-07-23",
+ "updated": "2026-07-24",
  "generatedBy": "ultracode parity-ledger workflow wf_fe2016aa-818 (claude-fable-5): repo inventory + 5 spec agents + competitor matrix + 3 adversarial verifiers; {\"authored\": 49, \"merged\": 49, \"corrections\": 15, \"deleted\": 0}",
  "items": [
   {
@@ -1285,7 +1285,7 @@
    "title": "Zero-data first-run welcome flow",
    "icon": "👋",
    "area": "publish",
-   "status": "planned",
+   "status": "shipped",
    "priority": "P1",
    "spec": "Give a user with no PriceCharting history a working first five minutes. In assets/app.js, at the top of renderDashboard (app.js:823), if State.cards.length === 0 render renderFirstRun() into #view-dashboard and return: a hero panel ('Let's fill your Den') with three path cards. Path A 'Import your PriceCharting export': a file <input accept=\".csv,.xlsx\"> that reads the file as base64 and POSTs {name, dataB64} to a NEW server.py route '/api/import' in do_POST — the handler validates the extension, writes the bytes atomically to HOME under the sanitized original filename (reject names with '/' or '..'), then reuses the existing /api/refresh rebuild path (scripts/build_data.py with env POKECHEST_HOME=HOME, same as the autosync flow around server.py:531) and returns {ok, cards:<count>}; on ok the client re-runs the boot data load and toasts the card count. Path B 'Connect PriceCharting live': button calling the existing openSettings() (app.js:2694) where the pricecharting_token is entered. Path C 'Add cards by hand': button calling switchView('ledger') — the Add & Sold tab's addCard() form (assets/revamp.js:1133) already persists to LS_CUSTOM 'pokechest.customcards.v1'. Also guard maybeOnboard() (app.js:660) so the 6-step walkthrough does NOT auto-fire while State.cards.length === 0 (the welcome panel replaces it; the walkthrough fires on the first load that has cards). Hide the panel automatically once State.cards.length > 0. When the backend is absent (State.live falsy) grey out Path A/B with a 'requires the desktop app' note so the static build degrades gracefully.",
    "ux": "Replaces the empty Dashboard on first launch with three big choice cards; disappears forever once the collection has at least one card.",
@@ -1305,7 +1305,7 @@
    "est": "M",
    "dependsOn": [],
    "demand": "high",
-   "notes": "Publish-gate item 'Onboarding for people with zero PriceCharting history (CSV/manual import)'. Today's WALK_STEPS walkthrough (app.js:618) assumes an export already exists; competitors (Collectr, CollX) onboard via scan/manual-add first — Path C plus the Scanner tab covers that."
+   "notes": "Publish-gate item 'Onboarding for people with zero PriceCharting history (CSV/manual import)'. Today's WALK_STEPS walkthrough (app.js:618) assumes an export already exists; competitors (Collectr, CollX) onboard via scan/manual-add first — Path C plus the Scanner tab covers that. ✅ 2026-07-24 — renderFirstRun() (Dashboard, when State.cards.length===0): Path A uploads a .xlsx to new POST /api/import (validates extension + rejects path traversal, atomic-writes into HOME, reuses refresh_data()); Path B opens existing openSettings(); Path C jumps to the Add & Sold ledger with the manual-add form focused. maybeOnboard() now skips the 6-step walkthrough while the collection is empty. BUG FOUND + FIXED while verifying: rvReady() gated every revamp.js tab (Ledger/Scanner/Den/3D Studio/Best Sellers/Brand Lab/Parity) on State.cards.length>0, so a genuinely empty collection would hang forever on \"Loading your collection…\" the moment onboarding sent a user to any of those tabs — changed the signal to State.meta (set once boot actually completes, true even for zero cards) and added a shared rvEmptyDenState() guard to the two spots (3D Studio ST3.card, Den pedestal feat) that indexed into an empty State.cards array. Verified headless: empty-collection dashboard shows the 3-path panel with no walkthrough modal, all 17 tabs render with zero cards (0 crashes), manual path lands on the ledger with the input focused, POST /api/import rejects ../evil.csv and non-xlsx names, a real 1-card xlsx uploaded through the actual file input rebuilds the collection end-to-end (dashboard flips to live KPIs), and the normal 1291-card collection is unaffected (KPIs still show, 17/17 tabs, zero errors) — no regression."
   },
   {
    "id": "steam-amber-den-build",

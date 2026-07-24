@@ -34,7 +34,7 @@ function rvSaveDen() { try { localStorage.setItem(LS_DEN, JSON.stringify(RV.den)
 
 function rvThumb(c, cls) { return imgHTML(c, cls); }  // app.js helper: art or placeholder
 
-function rvReady() { return State.cards && State.cards.length; }
+function rvReady() { return !!State.meta; }   // boot init() reached this point — true even for an empty (first-run) collection
 function rvLoadingPanel(el, fn) {
   el.innerHTML = `<div class="panel" style="margin-top:20px"><p class="muted">Loading your collection…</p></div>`;
   setTimeout(() => { if (rvReady()) fn(); }, 600);
@@ -191,6 +191,7 @@ const ST3 = { card: null, spin: true, holo: true, rx: -8, ry: 22, drag: null };
 
 function renderStudio3d() {
   const el = $('#view-studio3d');
+  if (!State.cards.length) return rvEmptyDenState(el, '🧊 3D Studio');
   if (!ST3.card) ST3.card = rvPickCards('top', 1)[0] || State.cards[0];
   const top = rvPickCards('top', 14);
   el.innerHTML = `
@@ -374,6 +375,7 @@ const DEN = { yaw: 0, pitch: 4, zoom: 260, posX: 0, drag: null, orbit: false, ra
 
 function renderDen() {
   const el = $('#view-den');
+  if (!State.cards.length) return rvEmptyDenState(el, '🏠 The Den');
   const d = RV.den;
   const sel = (id, val, opts, extra) => `<select id="${id}" class="s-inp den-sel" title="${extra || ''}">${opts.map(([v, l]) => `<option value="${v}"${v === String(val) ? ' selected' : ''}>${l}</option>`).join('')}</select>`;
   const featuredOpts = [['auto', '⭐ Auto (top card)']].concat(rvPickCards('top', 20).map(c => [String(c.pcId), c.name + ' — ' + money0(c.price)]));
@@ -503,7 +505,17 @@ function denLoop() {
 }
 function rvDenStopLoop() { if (DEN.raf) cancelAnimationFrame(DEN.raf); DEN.raf = null; }
 
+/* shared empty-state for 3D/visual tabs when the collection has zero cards */
+function rvEmptyDenState(el, title) {
+  el.innerHTML = `<div class="panel" style="margin-top:20px;text-align:center;padding:30px">
+    <p class="muted">${esc(title)} needs at least one card to show. Add your first card to get started.</p>
+    <button class="btn primary sm" id="rv-empty-add" style="margin-top:8px">➕ Add a card</button>
+  </div>`;
+  $('#rv-empty-add').onclick = () => switchView('ledger');
+}
+
 function denRoomHTML() {
+  if (!State.cards.length) return '';
   const wallCards = rvPickCards(RV.den.wall, 6);
   const shelfCards = rvPickCards(RV.den.shelf, 8);
   const sideCards = rvPickCards(RV.den.side, 6);

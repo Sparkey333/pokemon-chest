@@ -673,6 +673,7 @@ function openWalkthrough(step) {
   $$('#modalRoot .wt-dot').forEach(d => d.onclick = () => openWalkthrough(+d.dataset.step));
 }
 function maybeOnboard() {
+  if (!State.cards.length) return;   // the first-run welcome panel replaces the walkthrough
   try { if (localStorage.getItem(LS_ONBOARD)) return; } catch { return; }
   openWalkthrough(0);
 }
@@ -836,6 +837,7 @@ window.renderArcade = renderArcade;
 
 /* ================= DASHBOARD ================= */
 function renderDashboard() {
+  if (!State.cards.length) return renderFirstRun();
   const m = State.meta, c = State.cards;
   const graded = c.filter(x => x.graded), gradedVal = sum(graded.map(x => x.value));
   const rawVal = m.totalValue - gradedVal;
@@ -900,6 +902,60 @@ function renderDashboard() {
   wireGamePlan();
   wireActionBoard();
   wireFeedback();
+}
+
+/* ---------- first-run welcome (empty collection — no export loaded yet) ---------- */
+function renderFirstRun() {
+  const live = !!State.live;
+  const disabledNote = live ? '' : ' <span class="reason" style="color:var(--gold)">requires the desktop app</span>';
+  $('#view-dashboard').innerHTML = `
+    <div class="panel" style="margin-top:10px;text-align:center;padding:34px 24px">
+      <div style="font-size:40px;line-height:1">🏠</div>
+      <h2 style="font-size:22px;margin:10px 0 4px">Let's fill your Den</h2>
+      <p class="muted" style="max-width:520px;margin:0 auto">No cards yet — pick how you'd like to start. You can always add more later from any of these paths.</p>
+    </div>
+    <div class="cols two" style="margin-top:14px">
+      <div class="panel fr-path">
+        <h3>📥 Import your PriceCharting export</h3>
+        <p class="muted" style="font-size:13px">Upload the .xlsx you downloaded from PriceCharting.com → Collection → Download.${disabledNote}</p>
+        <label class="btn primary sm" style="cursor:pointer;${live ? '' : 'opacity:.5;pointer-events:none'}">Choose file…
+          <input id="fr-file" type="file" accept=".xlsx" style="display:none" ${live ? '' : 'disabled'}>
+        </label>
+        <p class="reason" id="fr-status" style="margin-top:8px"></p>
+      </div>
+      <div class="panel fr-path">
+        <h3>⚡ Connect PriceCharting live</h3>
+        <p class="muted" style="font-size:13px">Paste your PriceCharting API token and pull your collection straight from your account.${disabledNote}</p>
+        <button class="btn sm" id="fr-connect" ${live ? '' : 'disabled'} style="${live ? '' : 'opacity:.5'}">⚙ Open Settings</button>
+      </div>
+    </div>
+    <div class="panel fr-path" style="margin-top:14px">
+      <h3>✍️ Add cards by hand</h3>
+      <p class="muted" style="font-size:13px">No export yet? Start with a handful of cards — search-and-add or type them in from the ➕ Add &amp; Sold tab.</p>
+      <button class="btn sm" id="fr-manual">Add a card →</button>
+    </div>`;
+
+  if ($('#fr-file')) $('#fr-file').onchange = async e => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    const status = $('#fr-status');
+    status.textContent = 'Uploading…';
+    try {
+      const dataB64 = (await blobToDataUrl(f)).split(',').pop();
+      const j = await (await fetch('/api/import', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: f.name, dataB64 })
+      })).json();
+      if (j.ok) {
+        const r = j.report || {};
+        toast(`Imported ${(r.cards ?? 0).toLocaleString()} cards · ${money0(r.value)}`);
+        await init();
+      } else {
+        status.textContent = '✕ ' + (j.error || 'Import failed.');
+      }
+    } catch (err) { status.textContent = '✕ ' + err.message; }
+  };
+  if ($('#fr-connect')) $('#fr-connect').onclick = openSettings;
+  if ($('#fr-manual')) $('#fr-manual').onclick = () => { switchView('ledger'); setTimeout(() => { const n = $('#lg-name'); if (n) n.focus(); }, 60); };
 }
 
 /* ================= GAME PLAN (Now / Build / Invest) ================= */

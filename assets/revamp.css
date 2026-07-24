@@ -259,6 +259,11 @@
 .pr-matrix td:first-child{font-size:12.5px}
 @media (max-width:900px){.pr-badges .pr-b:not(.pr-P0):not(.pr-P1){display:none}}
 
+/* ================= FIRST-RUN WELCOME ================= */
+.fr-path h3{margin-bottom:6px}
+.fr-path{transition:transform .18s ease,border-color .18s ease}
+.fr-path:hover{transform:translateY(-2px);border-color:var(--border2)}
+
 /* ================= UI POLISH PASS =================
    Tasteful overrides on top of styles.css — warmer active states,
    gold-gradient headings, lift-on-hover cards, tidy scrollbars. */
