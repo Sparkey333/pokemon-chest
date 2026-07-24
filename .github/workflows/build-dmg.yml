@@ -23,6 +23,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: dmg-latest
+  cancel-in-progress: true
+
 jobs:
   dmg:
     runs-on: macos-latest
