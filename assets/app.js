@@ -1,7 +1,7 @@
 /* ===================== Pokémon Chest ===================== */
 'use strict';
 
-const APP_VERSION = '1.13.0';
+const APP_VERSION = '1.14.0';
 const APP_REPO = 'https://github.com/Sparkey333/pokemon-chest';
 
 /* ---------- tiny helpers ---------- */
@@ -138,10 +138,13 @@ function wireChrome() {
   };
 }
 function switchView(v) {
+  const prev = State.view;
+  if (prev === 'scan' && v !== 'scan' && typeof window.scOnLeave === 'function') window.scOnLeave();
   State.view = v;
   $$('#tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.view === v));
   $$('.view').forEach(s => s.classList.toggle('active', s.id === 'view-' + v));
   if (v === 'arcade') renderArcade();   // refresh daily tokens / shelf on entry
+  if (v === 'scan' && typeof renderScan === 'function') renderScan();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -2705,9 +2708,9 @@ function openSettings() {
       <p class="muted" style="font-size:13px;margin-bottom:6px">All optional and bring-your-own-key. Keys are stored locally in <code>settings.local.json</code> (gitignored) and sent only to that provider — never bundled, never shared. With nothing set, Pokémon Chest runs on your export + free TCGdex images + deep-links.</p>
       ${!L ? `<div class="rec-box no" style="margin:10px 0"><div class="rb">⚠️ The live backend isn’t running. Launch Pokémon Chest with <b>start.command</b> (not by opening index.html) to save keys.</div></div>` : ''}
 
-      <div class="subhead">PriceCharting API — accurate prices (ungraded + graded) ${L ? enabled(L.priceCharting) : ''}</div>
+      <div class="subhead">PriceCharting API — prices + product catalog search ${L ? enabled(L.priceCharting) : ''}</div>
       <input id="s-pc" class="s-inp" type="password" placeholder="40-char API token from your PriceCharting subscription" />
-      <p class="muted" style="font-size:11.5px">Find it on PriceCharting → Subscription → API/Download. Updates values by each card’s exact id.</p>
+      <p class="muted" style="font-size:11.5px">Find it on PriceCharting → Subscription → API/Download. Powers live prices by product id <b>and</b> Scanner’s <code>/api/products</code> catalog search (same connection their site uses).</p>
 
       <div class="subhead">Comps API — live eBay-sold + TCGplayer + images</div>
       <select id="s-comps-provider" class="s-inp">

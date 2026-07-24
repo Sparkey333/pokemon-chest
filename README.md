@@ -32,6 +32,7 @@ same local server and UI.
 | View | What it does |
 |------|--------------|
 | **Dashboard** | Your action board: portfolio value, cost basis, unrealized P/L, EN‑vs‑JP & raw‑vs‑graded splits, top sets, most valuable cards, a value‑over‑time chart, and a **feedback card** for sending suggestions. |
+| **Scanner** | Mac / Continuity Camera / iPhone phone‑mode capture. Search the **full TCGdex EN+JA release codex** (every set + special/secret rares) and — with your PriceCharting token — the same **`/api/products`** catalog PriceCharting uses. Optional AI photo Identify (BYOK). |
 | **Collection** | Every entry with card art. Search + filter by language, set, era, graded/raw, status, and price; sort by value, profit, return %, name, or date added. Click any card for full detail. |
 | **Sell Hub** | Cards ranked for selling with fee‑adjusted **net estimates**, one‑click **sold comps** (eBay raw + graded, TCGplayer, 130point, Mercari, PriceCharting), a **Grading Candidates** list with break‑even math and estimated PSA‑10 value, and your **For‑sale** worklist. |
 | **Sell & Grade Guide** | Current grading tiers & costs, when to grade vs. not, grade‑value multiples, marketplace fees, and the best venue for raw English / graded / Japanese cards — with sources. |
@@ -62,9 +63,19 @@ in‑app and paste your own keys (bring‑your‑own‑key):
 
 | Key | Unlocks |
 |-----|---------|
-| **PriceCharting token** | Live current prices straight from PriceCharting's API. |
+| **PriceCharting token** | Live current prices by product id, plus Scanner catalog search via PriceCharting’s `/api/products` (same connection their site uses). |
 | **Comps API key** | Live sold comps (eBay / TCGplayer / JP marketplaces) without leaving the app. |
-| **Claude or OpenAI key** | AI sell/grade recommendations per card. Default model: `claude-fable-5` (Anthropic) or `gpt-4o` (OpenAI). |
+| **Claude or OpenAI key** | AI sell/grade recommendations per card, plus **photo Identify** in Scanner. Default model: `claude-sonnet-4-6` (Anthropic) or `gpt-4o` (OpenAI). |
+
+### Scanner + release codex (no key required)
+
+The Scanner tab searches a local **card codex** built from [TCGdex](https://tcgdex.dev) — English and Japanese sets, including special/secret rares past the official set count. Rebuild anytime with **↻ Rebuild Codex** in Scanner, or:
+
+```bash
+python3 scripts/build_codex.py
+```
+
+With a PriceCharting token connected, Scanner also queries their product catalog by name/number (unique product ids). On a Mac, Continuity Camera lists your iPhone; or enable **Phone mode** for a same‑Wi‑Fi LAN link.
 
 Keys are stored **only** in `settings.local.json` in this folder — gitignored, never
 uploaded, and **never bundled into a shipped build**. The local server proxies your
@@ -88,8 +99,10 @@ Pokemon Chest/
 ├─ index.html                      the app UI
 ├─ assets/    app.js, styles.css
 ├─ data/      collection.json      built from your xlsx (prices, images, links)
+│             codex.json           full EN+JA Pokémon TCG release index (TCGdex)
 │             selling-intel.json   grading/fee/venue guidance
 ├─ scripts/   build_data.py        xlsx → collection.json (+ image matching)
+│             build_codex.py       TCGdex EN+JA → data/codex.json
 ├─ server.py                       local server + optional BYOK API proxy
 ├─ src-tauri/                      native macOS shell ("Pokémon Chest.app")
 ├─ settings.local.json             your BYOK keys (gitignored — never commit)

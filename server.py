@@ -16,8 +16,14 @@ Keys live in settings.local.json (gitignored, never bundled). Endpoints:
   GET  /api/config            -> which integrations are configured (booleans only)
   POST /api/config            -> save keys / provider choices
   GET  /api/price?id=<pcId>   -> PriceCharting price+graded tiers for one card
+  GET  /api/products?q=…      -> PriceCharting product catalog search (same API they use)
+  GET  /api/codex?q=…         -> search the local TCGdex EN+JA card codex (all sets/rares)
+  GET  /api/codex/meta        -> codex coverage stats
+  POST /api/codex/refresh     -> rebuild data/codex.json from TCGdex
   POST /api/comps             -> live sold comps (eBay/TCGplayer/JP) via a comps API
   POST /api/ai                -> a written sell/grade recommendation (Claude or OpenAI)
+  POST /api/ai/identify       -> identify a card from a photo (vision AI, BYOK)
+  GET|/POST /api/lan          -> phone-mode LAN status / enable (iPhone scan on same Wi-Fi)
   POST /api/refresh           -> rebuild data/collection.json from the newest export
   GET  /data/collection.json  -> POKECHEST_HOME copy when present, else bundled file
 
@@ -26,10 +32,10 @@ Env:  POKECHEST_HOME (writable home; default: this script's directory)
 
 Run:  python3 server.py     (or double-click start.command)
 """
-import os, sys, re, json, html, base64, socket, ipaddress, subprocess, threading, shutil, shlex, urllib.request, urllib.error, urllib.parse
+import os, sys, re, json, html, base64, socket, ipaddress, subprocess, threading, shutil, shlex, ssl, urllib.request, urllib.error, urllib.parse
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "1.13.0"
+VERSION = "1.14.0"
 ROOT = os.path.dirname(os.path.abspath(__file__))
 HOME = os.path.abspath(os.environ.get("POKECHEST_HOME") or ROOT)
 SETTINGS = os.path.join(HOME, "settings.local.json")
@@ -87,6 +93,337 @@ def cents(v):
         return round(int(v) / 100.0, 2)
     except (TypeError, ValueError):
         return None
+
+# --------------------------------------------------------------- card codex ---
+# Full EN+JA Pokémon TCG release index (TCGdex). Powers Scanner search when you
+# don't have a PriceCharting token, and complements /api/products when you do.
+_CODEX = {"data": None, "mtime": None, "path": None}
+_CODEX_LOCK = threading.Lock()
+
+def _codex_paths():
+    """Prefer a rebuilt copy under HOME, else the bundled data/codex.json."""
+    live = os.path.join(HOME, "data", "codex.json")
+    bundled = os.path.join(ROOT, "data", "codex.json")
+    return live if os.path.isfile(live) else bundled
+
+def _load_codex(force=False):
+    path = _codex_paths()
+    if not os.path.isfile(path):
+        return None
+    try:
+        mtime = os.path.getmtime(path)
+    except OSError:
+        return None
+    with _CODEX_LOCK:
+        if (not force and _CODEX["data"] is not None
+                and _CODEX["path"] == path and _CODEX["mtime"] == mtime):
+            return _CODEX["data"]
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            return _CODEX["data"]
+        _CODEX.update(data=data, mtime=mtime, path=path)
+        return data
+
+def codex_meta():
+    d = _load_codex()
+    if not d:
+        return {"ok": False, "error": "Codex not built yet — open Scanner and click Rebuild Codex, or run scripts/build_codex.py."}
+    return {"ok": True, "meta": d.get("meta") or {}, "generatedAt": d.get("generatedAt"),
+            "source": d.get("source"), "path": _CODEX.get("path")}
+
+def codex_search(q, *, lang=None, special=None, limit=24):
+    """Token search over the local TCGdex codex. No keys required.
+
+    Ranking prefers exact collector-number hits and name-prefix matches so
+    queries like "charizard 4" surface Base Set #4 ahead of unrelated #1s.
+    Number tokens may match the card's localId even when other tokens only
+    partially hit (helps special rares and sparse JA name coverage).
+    """
+    d = _load_codex()
+    if not d:
+        return {"ok": False, "error": "Codex missing — run Rebuild Codex first.", "results": []}
+    q = (q or "").strip().lower()
+    if not q:
+        return {"ok": True, "results": [], "meta": d.get("meta")}
+    toks = [t for t in re.split(r"\s+", q) if t]
+    num_toks = [t for t in toks if re.fullmatch(r"[a-z]{0,4}\d+[a-z]?\d*", t) or re.fullmatch(r"\d+[a-z]?", t)]
+    text_toks = [t for t in toks if t not in num_toks]
+
+    def _hay_has_token(hay, t):
+        """Substring match, but bare digits must be whole tokens (avoid '4' ∈ '2024')."""
+        if not t:
+            return False
+        if t.isdigit():
+            return bool(re.search(rf"(?<!\d){re.escape(t)}(?!\d)", hay))
+        return t in hay
+
+    scored = []
+    for c in d.get("cards") or []:
+        if lang and c.get("lang") != lang:
+            continue
+        if special is True and not c.get("special"):
+            continue
+        hay = c.get("q") or ""
+        name = (c.get("name") or "").lower()
+        num = str(c.get("number") or "").lower()
+        num_compact = num.lstrip("0") or num
+        # Number-like tokens must hit the collector number (not set ids like swsh4.5).
+        # Text tokens match the full haystack (name/set/id).
+        ok = True
+        for t in num_toks:
+            tc = t.lstrip("0") or t
+            # Exact collector-number match only (never substring: "4" must not hit "74").
+            if t == num or tc == num_compact:
+                continue
+            ok = False
+            break
+        if not ok:
+            continue
+        for t in text_toks:
+            if not _hay_has_token(hay, t):
+                ok = False
+                break
+        if not ok:
+            continue
+        score = 0
+        if num_toks and any((t == num or (t.lstrip("0") or t) == num_compact) for t in num_toks):
+            score += 50
+        if text_toks and all(t in name for t in text_toks):
+            score += 30
+        if text_toks and name.startswith(text_toks[0]):
+            score += 10
+        if c.get("special"):
+            score += 2
+        if c.get("img"):
+            score += 1
+        scored.append((score, c))
+    scored.sort(key=lambda x: -x[0])
+    out = []
+    for score, c in scored[:limit]:
+        out.append({
+            "id": c.get("id"), "name": c.get("name"), "number": c.get("number"),
+            "set": c.get("set"), "setId": c.get("setId"), "lang": c.get("lang"),
+            "year": c.get("year"), "special": bool(c.get("special")),
+            "img": c.get("img"),
+            "source": "codex",
+        })
+    return {"ok": True, "results": out, "count": len(out), "q": q}
+
+def refresh_codex():
+    """Rebuild data/codex.json from TCGdex (EN+JA)."""
+    script = os.path.join(ROOT, "scripts", "build_codex.py")
+    if not os.path.isfile(script):
+        return {"ok": False, "error": f"builder not found: {script}"}
+    env = dict(os.environ)
+    env["POKECHEST_HOME"] = HOME
+    try:
+        os.makedirs(os.path.join(HOME, "data"), exist_ok=True)
+        proc = subprocess.run(
+            [sys.executable, script],
+            capture_output=True, text=True, env=env, cwd=HOME, timeout=600)
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "codex rebuild timed out after 10 minutes"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    report = None
+    for line in (proc.stdout or "").splitlines():
+        if line.startswith("REPORT_JSON="):
+            try:
+                report = json.loads(line[len("REPORT_JSON="):])
+            except Exception:
+                pass
+    if proc.returncode != 0:
+        err = (proc.stderr or proc.stdout or "codex rebuild failed").strip()[-800:]
+        return {"ok": False, "error": err}
+    _load_codex(force=True)
+    return {"ok": True, "report": report or codex_meta().get("meta")}
+
+def pc_search(q, token):
+    """Search PriceCharting's /api/products — the same catalog their site/app uses."""
+    q = (q or "").strip()
+    if not q:
+        return {"ok": True, "products": []}
+    url = "https://www.pricecharting.com/api/products?" + urllib.parse.urlencode({"t": token, "q": q})
+    d = http_json(url)
+    if d.get("status") == "error":
+        return {"ok": False, "error": d.get("error-message", "PriceCharting error")}
+    out = []
+    for p in (d.get("products") or [])[:20]:
+        name = p.get("product-name") or ""
+        m = re.search(r"#\s*([A-Za-z0-9/\-]+)\s*$", name)
+        pid = p.get("id")
+        out.append({
+            "id": pid,
+            "pcId": pid,
+            "name": re.sub(r"\s*#\s*[A-Za-z0-9/\-]+\s*$", "", name).strip() or name,
+            "number": m.group(1) if m else None,
+            "set": p.get("console-name") or "",
+            "price": cents(p.get("loose-price")),
+            "pcUrl": f"https://www.pricecharting.com/game/{pid}" if pid else None,
+            "source": "pricecharting",
+        })
+    return {"ok": True, "products": out}
+
+AI_IDENTIFY_SYSTEM = (
+    "You identify trading cards from a photo. Look at the card and respond with ONLY a JSON object, "
+    "no prose, no code fences: {\"name\": card name, \"number\": collector number without the set-size "
+    "denominator, \"set\": set name, \"lang\": \"en\" or \"ja\", \"game\": e.g. \"Pokémon\", "
+    "\"graded\": true/false (is it in a grading slab), \"rarity\": rarity if visible or null, "
+    "\"confidence\": 0-1}. Use null for anything unreadable."
+)
+
+def ai_identify(payload, settings):
+    """Vision identify — BYOK Claude/OpenAI. Used by Scanner after a Mac/iPhone snap."""
+    provider = settings.get("ai_provider", "anthropic")
+    key = settings.get("ai_key")
+    model = settings.get("ai_model") or ("claude-sonnet-4-6" if provider == "anthropic" else "gpt-4o")
+    data_url = (payload.get("dataUrl") or "")
+    m = re.match(r"data:(image/[a-z+.-]+);base64,(.+)$", data_url, re.S)
+    if not m:
+        return {"ok": False, "error": "Send the photo as a data URL."}
+    media_type, b64 = m.group(1), m.group(2).strip()
+    if len(b64) > 12 * 1024 * 1024:
+        return {"ok": False, "error": "Photo too large (12 MB max)."}
+    prompt = "Identify this trading card. Prefer Pokémon TCG when ambiguous."
+    if provider == "anthropic":
+        d = http_json(
+            "https://api.anthropic.com/v1/messages", method="POST",
+            headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+            body={"model": model, "max_tokens": 300, "system": AI_IDENTIFY_SYSTEM,
+                  "messages": [{"role": "user", "content": [
+                      {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": b64}},
+                      {"type": "text", "text": prompt}]}]})
+        text = "".join(b.get("text", "") for b in d.get("content", []) if b.get("type") == "text")
+    elif provider == "openai":
+        d = http_json(
+            "https://api.openai.com/v1/chat/completions", method="POST",
+            headers={"Authorization": f"Bearer {key}", "content-type": "application/json"},
+            body={"model": model, "max_tokens": 300,
+                  "messages": [{"role": "system", "content": AI_IDENTIFY_SYSTEM},
+                               {"role": "user", "content": [
+                                   {"type": "image_url", "image_url": {"url": data_url}},
+                                   {"type": "text", "text": prompt}]}]})
+        text = d["choices"][0]["message"]["content"]
+    else:
+        return {"ok": False, "error": f"Unknown AI provider: {provider}"}
+    j = re.search(r"\{.*\}", text, re.S)
+    if not j:
+        return {"ok": False, "error": "The model returned no JSON.", "raw": text[:300]}
+    try:
+        guess = json.loads(j.group(0))
+    except Exception:
+        return {"ok": False, "error": "Could not parse the model's JSON.", "raw": text[:300]}
+    return {"ok": True, "guess": guess, "provider": provider, "model": model}
+
+# ------------------------------------------------------ LAN / phone access ---
+# Opt-in second listener on 0.0.0.0 so your iPhone (same Wi-Fi) can open the app
+# and scan cards. HTTPS via a local self-signed cert when openssl is available
+# (live camera needs a secure context on phones). Home networks only.
+LAN = {"enabled": False, "server": None, "thread": None, "port": PORT + 1,
+       "scheme": "http", "tls": False, "error": None}
+LAN_LOCK = threading.Lock()
+TLS_DIR = os.path.join(HOME, "lan-tls")
+
+def _is_private_ip(ip):
+    try:
+        a = ipaddress.ip_address(ip.strip("[]"))
+        return a.is_private or a.is_loopback or a.is_link_local
+    except ValueError:
+        return False
+
+def _lan_ips():
+    ips = []
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(2)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        if ip and not ip.startswith("127."):
+            ips.append(ip)
+    except Exception:
+        pass
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            ip = info[4][0]
+            if ip not in ips and not ip.startswith("127."):
+                ips.append(ip)
+    except Exception:
+        pass
+    priv = [ip for ip in ips if _is_private_ip(ip)]
+    return priv or ips
+
+def _ensure_lan_cert(ips):
+    cert, key = os.path.join(TLS_DIR, "cert.pem"), os.path.join(TLS_DIR, "key.pem")
+    if os.path.isfile(cert) and os.path.isfile(key):
+        return cert, key
+    openssl = shutil.which("openssl")
+    if not openssl:
+        return None
+    os.makedirs(TLS_DIR, exist_ok=True)
+    san = ",".join(["DNS:localhost", "IP:127.0.0.1"] + [f"IP:{ip}" for ip in ips])
+    base = [openssl, "req", "-x509", "-newkey", "rsa:2048", "-sha256", "-nodes",
+            "-days", "825", "-keyout", key, "-out", cert, "-subj", "/CN=Pokemon Chest LAN"]
+    try:
+        subprocess.run(base + ["-addext", f"subjectAltName={san}"],
+                       check=True, capture_output=True, timeout=60)
+        return cert, key
+    except Exception:
+        try:
+            subprocess.run(base, check=True, capture_output=True, timeout=60)
+            return cert, key
+        except Exception:
+            return None
+
+def lan_start():
+    with LAN_LOCK:
+        if LAN["server"] is not None:
+            LAN["enabled"] = True
+            return lan_status()
+        LAN["error"] = None
+        ips = _lan_ips()
+        try:
+            srv = ThreadingHTTPServer(("0.0.0.0", LAN["port"]), Handler)
+            pair = _ensure_lan_cert(ips)
+            if pair:
+                ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+                ctx.load_cert_chain(pair[0], pair[1])
+                srv.socket = ctx.wrap_socket(srv.socket, server_side=True)
+                LAN["scheme"], LAN["tls"] = "https", True
+            else:
+                LAN["scheme"], LAN["tls"] = "http", False
+            t = threading.Thread(target=srv.serve_forever, daemon=True)
+            t.start()
+            LAN.update(server=srv, thread=t, enabled=True)
+        except Exception as e:
+            LAN.update(server=None, thread=None, enabled=False, error=str(e))
+    s = load_settings()
+    s["lan_mode"] = bool(LAN["enabled"])
+    _write_settings(s)
+    return lan_status()
+
+def lan_stop():
+    with LAN_LOCK:
+        srv = LAN["server"]
+        LAN.update(server=None, thread=None, enabled=False, error=None)
+        if srv is not None:
+            try:
+                threading.Thread(target=srv.shutdown, daemon=True).start()
+            except Exception:
+                pass
+    s = load_settings()
+    s["lan_mode"] = False
+    _write_settings(s)
+    return lan_status()
+
+def lan_status():
+    ips = _lan_ips()
+    urls = [f"{LAN['scheme']}://{ip}:{LAN['port']}" for ip in ips] if LAN["enabled"] else []
+    return {"ok": True, "enabled": LAN["enabled"], "port": LAN["port"],
+            "scheme": LAN["scheme"], "tls": LAN["tls"], "ips": ips, "urls": urls,
+            "error": LAN["error"]}
 
 # ------------------------------------------------------------- integrations ---
 def pricecharting_price(pc_id, token):
@@ -966,20 +1303,24 @@ class Handler(SimpleHTTPRequestHandler):
     def _local_ok(self):
         """Reject API calls that don't come from this machine's own app.
 
-        Host must be localhost (defeats DNS rebinding); if the browser attached
-        an Origin header (it always does on cross-origin requests), it must be
-        a localhost origin too (defeats cross-site requests from web pages).
-        Non-browser local tools (curl) send no Origin and pass.
+        Host must be localhost (defeats DNS rebinding), OR — when phone-mode LAN
+        is enabled — a private LAN IP so the iPhone on the same Wi-Fi can scan.
+        Origin, when present, must match the same rule.
         """
         host = (self.headers.get("Host") or "").split(":")[0].strip("[]").lower()
-        if host not in ("127.0.0.1", "localhost", "::1"):
+        host_ok = host in ("127.0.0.1", "localhost", "::1") \
+            or (LAN["enabled"] and _is_private_ip(host))
+        if not host_ok:
             self._json({"ok": False, "error": "forbidden: non-local request"}, 403)
             return False
         origin = (self.headers.get("Origin") or "").lower()
-        if origin and not (origin.startswith("http://127.0.0.1:") or origin.startswith("http://localhost:")
-                           or origin in ("http://127.0.0.1", "http://localhost")):
-            self._json({"ok": False, "error": "forbidden: cross-site request"}, 403)
-            return False
+        if origin:
+            ohost = (urllib.parse.urlparse(origin).hostname or "").strip("[]")
+            origin_ok = ohost in ("127.0.0.1", "localhost", "::1") \
+                or (LAN["enabled"] and _is_private_ip(ohost))
+            if not origin_ok:
+                self._json({"ok": False, "error": "forbidden: cross-site request"}, 403)
+                return False
         return True
 
     def do_GET(self):
@@ -1048,6 +1389,38 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(pricecharting_price(pid, s["pricecharting_token"]))
             except Exception as e:
                 return self._json({"ok": False, "error": str(e)}, 200)
+        if path == "/api/products":
+            s = load_settings()
+            if not self._guard(s.get("pricecharting_token"), "pricecharting_token"):
+                return
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            q = (qs.get("q") or [""])[0]
+            try:
+                return self._json(pc_search(q, s["pricecharting_token"]))
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)}, 200)
+        if path == "/api/codex/meta":
+            return self._json(codex_meta())
+        if path == "/api/codex":
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            q = (qs.get("q") or [""])[0]
+            lang = (qs.get("lang") or [""])[0] or None
+            if lang == "all":
+                lang = None
+            special = None
+            if (qs.get("special") or [""])[0] in ("1", "true", "yes"):
+                special = True
+            try:
+                limit = min(60, max(1, int((qs.get("limit") or ["24"])[0])))
+            except ValueError:
+                limit = 24
+            return self._json(codex_search(q, lang=lang, special=special, limit=limit))
+        if path == "/api/lan":
+            return self._json(lan_status())
+        if path == "/data/codex.json":
+            live = os.path.join(HOME, "data", "codex.json")
+            if self._serve_file(live, "application/json"):
+                return
         return super().do_GET()  # static files
 
     def do_POST(self):
@@ -1147,6 +1520,27 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json({"ok": False, "error": f"{e.code} {detail}"}, 200)
             except Exception as e:
                 return self._json({"ok": False, "error": str(e)}, 200)
+        if path == "/api/ai/identify":
+            s = load_settings()
+            if not self._guard(s.get("ai_key"), "ai_key"):
+                return
+            try:
+                return self._json(ai_identify(payload, s))
+            except urllib.error.HTTPError as e:
+                detail = e.read().decode("utf-8", "replace")[:400]
+                return self._json({"ok": False, "error": f"{e.code} {detail}"}, 200)
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)}, 200)
+        if path == "/api/codex/refresh":
+            try:
+                return self._json(refresh_codex())
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)}, 200)
+        if path == "/api/lan":
+            try:
+                return self._json(lan_start() if payload.get("enabled") else lan_stop())
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)}, 200)
         return self._json({"ok": False, "error": "not found"}, 404)
 
 
@@ -1156,8 +1550,19 @@ if __name__ == "__main__":
     # "Open Pocket Edition" link works on first launch of the bundled app.
     if not os.path.isfile(os.path.join(HOME, POCKET_NAME)):
         try:
-            import threading
             threading.Thread(target=build_pocket, daemon=True).start()
+        except Exception:
+            pass
+    # Warm the card codex in the background so the first Scanner search is fast.
+    try:
+        threading.Thread(target=lambda: _load_codex(), daemon=True).start()
+    except Exception:
+        pass
+    if load_settings().get("lan_mode"):
+        try:
+            st = lan_start()
+            for u in st.get("urls") or []:
+                print(f"  LAN (phone) → {u}")
         except Exception:
             pass
     print("┌──────────────────────────────────────────────┐")

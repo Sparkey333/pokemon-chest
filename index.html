@@ -50,6 +50,7 @@
 
 <nav class="tabs" id="tabs">
   <button data-view="dashboard" class="tab active">Dashboard</button>
+  <button data-view="scan" class="tab">📷 Scanner</button>
   <button data-view="arcade" class="tab">🕹 Arcade</button>
   <button data-view="collection" class="tab">Collection</button>
   <button data-view="case" class="tab">🏛 Display Case</button>
@@ -63,6 +64,7 @@
 
 <main id="main">
   <section id="view-dashboard" class="view active"></section>
+  <section id="view-scan" class="view"></section>
   <section id="view-arcade" class="view"></section>
   <section id="view-collection" class="view">
     <div class="toolbar" id="collectionToolbar"></div>
@@ -88,9 +90,10 @@
   <span class="dot">·</span>
   Prices: your PriceCharting export
   <span class="dot">·</span>
-  <span class="muted">Comp links open live data on eBay / TCGplayer / Mercari. Not financial advice.</span>
+  <span class="muted">Scanner searches the full TCGdex codex + PriceCharting products. Not financial advice.</span>
 </footer>
 
 <script src="assets/app.js"></script>
+<script src="assets/scanner.js"></script>
 </body>
 </html>

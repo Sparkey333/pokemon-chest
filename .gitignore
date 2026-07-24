@@ -1,8 +1,16 @@
 # Secrets — your BYOK API keys live here. NEVER commit this.
 settings.local.json
 
+# Python bytecode
+__pycache__/
+*.pyc
+
 # Cached TCGdex set data (re-fetched on demand)
 scripts/cache/
+cache/
+
+# Phone-mode LAN TLS (self-signed, local only)
+lan-tls/
 
 # Node / Tauri build artifacts
 node_modules/
