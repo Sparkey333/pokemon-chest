@@ -1259,7 +1259,7 @@
       "title": "Opt-in error log & diagnostics report",
       "icon": "🩺",
       "area": "publish",
-      "status": "planned",
+      "status": "shipped",
       "priority": "P2",
       "spec": "Local-only, consent-gated error capture — nothing is ever transmitted automatically. In assets/app.js define LS_ERRLOG = 'pokechest.errlog.v1' (JSON array, newest first, capped at 100) and LS_ERRCONSENT = 'pokechest.errconsent.v1' ('on'/'off', default off). At script top (after the State const at app.js:38) register window.addEventListener('error', ...) and window.addEventListener('unhandledrejection', ...) which, only when consent is 'on', push {ts:ISO-8601, msg, stack:(first 800 chars), view:State.view, version:APP_VERSION, ua:navigator.userAgent} via a new logError(entry) helper that trims the array to 100 and saves with loadJSON/localStorage.setItem. In openSettings (app.js:2694) add a checkbox 'Keep a local error log to help fix bugs (stays on this computer)' that toggles LS_ERRCONSENT. In renderAdmin (app.js:2102) add an 'Error log' panel listing entries (time, view, message) with three buttons: '📋 Copy report' — copies the existing diagnostics() output (app.js:1117) plus the log as markdown to the clipboard; '✉ Send' — opens the existing feedback mailto/GitHub-issue flow (feedbackBody at app.js:1126) with the log appended; '🗑 Clear' — deletes LS_ERRLOG. The panel header states 'Off by default. Never sent automatically.' Also wire logError into the catch of the boot sequence so startup failures are captured when consent is on.",
       "ux": "Settings (⚙ Live) modal gains the consent checkbox; Admin tab gains an 'Error log' panel with copy/send/clear.",
@@ -1278,7 +1278,7 @@
       "est": "S",
       "dependsOn": [],
       "demand": "low",
-      "notes": "Publish-gate item 'Crash/error reporting opt-in, privacy policy page'. Deliberately local-only (matches LEGAL.md 'everything is local to your computer'); the privacy-policy text itself lands in the About panel (about-legal-panel)."
+      "notes": "Shipped 2026-07-25. Consent checkbox in ⚙ Live (#s-errlog), window error/unhandledrejection listeners gated on pokechest.errconsent.v1, capped-at-100 pokechest.errlog.v1, Admin tab '🐛 Error log' panel (list + Copy report / Send / Clear) refreshed via errlogRefresh() on every switchView('admin') entry (renderAdmin only paints once at boot, same pattern as the Arcade tab's refresh-on-entry). LEGAL.md gained an explicit '## Privacy' section (also mirrored into the in-app LEGAL_FALLBACK) covering: no accounts/analytics, what network calls exist and why, BYOK key handling, and this log's local-only nature. Verified 13/13 headless checks incl. consent-off no-op, capture + cap + newest-first, zero outbound requests from the handler, Settings toggle, Admin panel refresh, Clear, and the Privacy section rendering in About."
     },
     {
       "id": "onboarding-first-run",

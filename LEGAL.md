@@ -18,6 +18,28 @@ PriceCharting.
 - Marketplace names (eBay, TCGplayer, Mercari, Whatnot, Facebook) are trademarks
   of their respective owners; links open their public sites.
 
+## Privacy
+
+- **No accounts, no analytics, no tracking.** Pokémon Den doesn't know who you
+  are and doesn't want to. There is no sign-up, no telemetry, and no ads.
+- **Your collection data — cards, notes, sales, photos, prices you've
+  entered — never leaves this computer**, full stop. It's stored in your
+  browser's local storage and in local files inside this app's own folder.
+- **The only network calls this app ever makes** are: (1) card artwork from
+  [TCGdex](https://tcgdex.dev), a free open card API; (2) the comp/marketplace
+  links *you* click, which open their own sites; and (3) — only if you've
+  pasted your own key into ⚙ Live — requests to that one provider
+  (PriceCharting, a comps API, or Claude/OpenAI), sent straight from your
+  machine to theirs. Nothing passes through any third-party server of ours,
+  because there is no server of ours.
+- **BYOK keys** live only in `settings.local.json` on your own disk —
+  gitignored, never bundled into a shipped build, never logged.
+- **Error log (optional, off by default):** you can turn on a local-only log
+  of JS errors in ⚙ Live, to make bug reports easier to fix. It's stored
+  exactly like everything else above — on this computer only — and is never
+  transmitted anywhere automatically. You choose if/when to copy or send a
+  report, and you can clear it any time from the Admin tab.
+
 ## What this app deliberately does NOT do
 
 - It does not redistribute card artwork, game assets, or scans beyond your own

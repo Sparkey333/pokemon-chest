@@ -21,6 +21,8 @@ const LS_CASE = 'pokechest.case.v1';          // display-case picks: {pcId:{tier
 const LS_CARDSNAP = 'pokechest.cardsnaps.v1'; // per-card price history for case cards
 const LS_ONBOARD = 'pokechest.onboarded.v2';  // first-run walkthrough seen
 const LS_ARCADE = 'pokechest.arcade.v1';      // capsule-machine tokens, pulls, won cards
+const LS_ERRLOG = 'pokechest.errlog.v1';      // opt-in local crash/error log — never sent automatically
+const LS_ERRCONSENT = 'pokechest.errconsent.v1'; // 'on'/'off', default off
 
 // One-time migration from the PokéVault era — keeps existing snapshots & notes.
 (function migrateLegacyKeys() {
@@ -73,6 +75,45 @@ function adjustQty(c, delta) {
 }
 function applyAllQtyAdjusts() {
   for (const c of State.cards) if (uget(c).qtyAdj) applyQtyAdjust(c);
+}
+
+/* ---------- opt-in local error log ----------
+   Off by default. Nothing is ever transmitted automatically — this only
+   writes to localStorage, and only once you've explicitly turned it on in
+   ⚙ Live. No fetch/XHR happens in this handler under any circumstance. */
+function errLogConsent() { return localStorage.getItem(LS_ERRCONSENT) === 'on'; }
+function logError(entry) {
+  if (!errLogConsent()) return;
+  try {
+    const log = loadJSON(LS_ERRLOG, []);
+    log.unshift(Object.assign({ ts: new Date().toISOString(), view: State.view, version: APP_VERSION, ua: navigator.userAgent }, entry));
+    localStorage.setItem(LS_ERRLOG, JSON.stringify(log.slice(0, 100)));
+  } catch { /* storage unavailable — nothing to do */ }
+}
+window.addEventListener('error', e => {
+  logError({ msg: e.message || 'Unknown error', stack: (e.error && e.error.stack || '').slice(0, 800) });
+});
+window.addEventListener('unhandledrejection', e => {
+  const r = e.reason;
+  logError({ msg: 'Unhandled promise rejection: ' + (r && r.message || String(r)), stack: (r && r.stack || '').slice(0, 800) });
+});
+// Repaints the Admin tab's error-log list — called on initial render AND every
+// time the tab is re-entered (switchView only toggles CSS visibility, it
+// doesn't re-render), so a fresh error since the last visit always shows.
+function errlogRefresh() {
+  const box = $('#errlog-list'); if (!box) return;
+  const log = loadJSON(LS_ERRLOG, []);
+  const on = errLogConsent();
+  box.innerHTML = (on ? '' : '<p class="reason">Off — enable it in ⚙ Live to start capturing.</p>') +
+    (log.length ? `<div style="max-height:220px;overflow:auto;margin-top:6px">${log.slice(0, 30).map(e => `
+      <div style="padding:5px 0;border-top:1px solid #1f2a40">
+        <span class="reason">${esc((e.ts || '').slice(0, 19).replace('T', ' '))} · ${esc(e.view || '?')}</span><br>
+        <span style="font-size:12.5px">${esc(e.msg || '')}</span>
+      </div>`).join('')}</div>` : (on ? '<p class="reason" style="margin-top:6px">No errors logged yet — good sign.</p>' : ''));
+}
+function errlogReport() {
+  const log = loadJSON(LS_ERRLOG, []);
+  return feedbackBody() + `\n## Error log (${log.length} entries)\n\`\`\`\n${log.map(e => `${e.ts} · ${e.view} · ${e.msg}`).join('\n')}\n\`\`\`\n`;
 }
 
 /* ---------- boot ---------- */
@@ -128,6 +169,7 @@ async function init() {
     renderArcade();
     maybeOnboard();
   } catch (e) {
+    logError({ msg: 'Boot failed: ' + e.message, stack: (e.stack || '').slice(0, 800) });
     $('#main').innerHTML = `<div class="panel" style="margin-top:30px"><h3>Couldn’t load your collection</h3>
       <p class="muted">Open this page through the <b>start.command</b> launcher (a local server), not by double-clicking index.html — browsers block data files on <code>file://</code>.</p>
       <pre style="color:var(--red);font-size:12px;white-space:pre-wrap">${esc(e.message)}</pre></div>`;
@@ -171,6 +213,7 @@ function switchView(v) {
   $$('#tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.view === v));
   $$('.view').forEach(s => s.classList.toggle('active', s.id === 'view-' + v));
   if (v === 'arcade') renderArcade();   // refresh daily tokens / shelf on entry
+  if (v === 'admin') errlogRefresh();   // refresh the error-log list on entry (renderAdmin only paints once at boot)
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -2277,6 +2320,17 @@ function renderAdmin() {
       </div>
     </div>
 
+    <div class="panel" style="margin-bottom:16px">
+      <h3>🐛 Error log <span class="reason">— off by default. Never sent automatically.</span></h3>
+      <p class="muted" style="font-size:13.5px;line-height:1.6">Turn this on in <b>⚙ Live</b> and JS errors save locally (last 100) to help fix bugs — nothing leaves this computer unless you click Send.</p>
+      <div id="errlog-list" class="muted" style="font-size:13px"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px">
+        <button class="btn sm" id="errlog-copy">📋 Copy report</button>
+        <button class="btn sm" id="errlog-send">✉ Send</button>
+        <button class="btn ghost sm" id="errlog-clear">🗑 Clear</button>
+      </div>
+    </div>
+
     <div class="cols side">
       <div class="panel"><h3>Product brief</h3>
         <p class="muted" style="font-size:13.5px;line-height:1.6">
@@ -2462,6 +2516,17 @@ function renderAdmin() {
     if (j.ok) { $('#sec-label').value = ''; $('#sec-value').value = ''; toast('Saved to Keychain 🔐'); secRefresh(); }
     else toast(j.error || 'Could not save.');
   };
+  /* ---- 🐛 Error log ---- */
+  errlogRefresh();
+  if ($('#errlog-copy')) $('#errlog-copy').onclick = async () => {
+    try { await navigator.clipboard.writeText(errlogReport()); toast('Report + error log copied to clipboard.'); }
+    catch { toast('Couldn’t copy automatically.'); }
+  };
+  if ($('#errlog-send')) $('#errlog-send').onclick = () => {
+    window.open(`${APP_REPO}/issues/new?title=${enc(`[Bug] Pokémon Den v${APP_VERSION}`)}&body=${enc(errlogReport())}`, '_blank', 'noopener');
+  };
+  if ($('#errlog-clear')) $('#errlog-clear').onclick = () => { localStorage.removeItem(LS_ERRLOG); toast('Error log cleared.'); errlogRefresh(); };
+
   emRefreshStatus(); secRefresh();
   // Resume a live log if a build/install is already running when this tab renders.
   fetch('/api/emerald/log?since=0').then(r => r.json()).then(j => {
@@ -2797,7 +2862,15 @@ approved by Nintendo, The Pokémon Company, Creatures Inc., GAME FREAK inc., or 
 **Pokémon © Nintendo / Creatures Inc. / GAME FREAK inc.** Pokémon and all respective
 character names, card artwork, and logos are trademarks and copyrights of Nintendo /
 The Pokémon Company. Card images are loaded from [TCGdex](https://tcgdex.dev) and belong
-to their respective owners.`;
+to their respective owners.
+
+## Privacy
+
+No accounts, no analytics, no tracking. Your collection data never leaves this
+computer. The only network calls are card art from TCGdex, links you click,
+and — only if you add your own key in ⚙ Live — requests straight from your
+machine to that one provider. An optional local-only error log (off by
+default) is never sent anywhere automatically.`;
 
 // Minimal Markdown → HTML: #/## headings, **bold**, [text](url), '- ' bullets.
 function mdToHtml(md) {
@@ -2891,6 +2964,11 @@ function openSettings() {
       <input id="s-ai-model" class="s-inp" type="text" placeholder="Model (default claude-sonnet-4-6 / gpt-4o)" />
       <input id="s-ai" class="s-inp" type="password" placeholder="AI API key ${L && L.ai?.enabled ? '(connected — leave blank to keep)' : ''}" />
 
+      <div class="subhead">Diagnostics</div>
+      <label class="rv-check" style="display:flex;gap:8px;align-items:center;font-size:13px">
+        <input type="checkbox" id="s-errlog"> Keep a local error log to help fix bugs (stays on this computer, never sent automatically)
+      </label>
+
       <div style="display:flex;gap:10px;margin-top:18px">
         <button class="btn primary" id="s-save">Save &amp; connect</button>
         <button class="btn ghost" id="s-cancel">Close</button>
@@ -2902,6 +2980,8 @@ function openSettings() {
     if (L.comps?.provider) $('#s-comps-provider').value = L.comps.provider;
     if (L.ai?.provider) $('#s-ai-provider').value = L.ai.provider;
   }
+  $('#s-errlog').checked = errLogConsent();
+  $('#s-errlog').onchange = e => { localStorage.setItem(LS_ERRCONSENT, e.target.checked ? 'on' : 'off'); toast(e.target.checked ? 'Local error log on.' : 'Local error log off.'); };
   $('#modalClose').onclick = closeModal; $('#s-cancel').onclick = closeModal;
   $('#modalBg').onclick = e => { if (e.target.id === 'modalBg') closeModal(); };
   $('#s-save').onclick = async () => {

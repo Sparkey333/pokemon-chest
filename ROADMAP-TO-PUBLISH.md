@@ -126,7 +126,11 @@ pkmn.gg, Eyevo, PriceCharting app reviews, and app-store/blog comparisons
       are loopback-only — a phone on LAN mode can browse & scan but never
       administer. Verified with a real LAN-peer simulation: 12/12 admin
       probes 403'd, 6/6 browse/scan paths still 200, keys unwritable.
-- [ ] Crash/error reporting opt-in, privacy policy page
+- [x] Crash/error reporting opt-in, privacy policy page ✅ 2026-07-25 —
+      local-only opt-in error log (⚙ Live checkbox, off by default, capped at
+      100 entries, never transmitted automatically) with a Copy/Send/Clear
+      panel in Admin; LEGAL.md (surfaced in-app via the About panel) gained
+      an explicit `## Privacy` section.
 - [x] Onboarding for people with zero PriceCharting history — the Dashboard now
       shows a 3-path welcome panel (import .xlsx / connect live / add by hand)
       when the collection is empty ✅ 2026-07-24
