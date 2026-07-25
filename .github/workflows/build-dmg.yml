@@ -24,7 +24,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: dmg-latest
+  group: chest-latest
   cancel-in-progress: true
 
 jobs:
@@ -60,18 +60,23 @@ jobs:
       - name: Zip the source tree (tracked files at this commit)
         run: |
           git archive --format=zip -o "PokemonChest-source-${GITHUB_SHA:0:7}.zip" "$GITHUB_SHA"
+          # stable name for the GET-POKEMON-CHEST.html download button
+          cp "PokemonChest-source-${GITHUB_SHA:0:7}.zip" PokemonChest-source-latest.zip
           ls -lh PokemonChest-source-*.zip
 
-      - name: Publish the dmg + source zip to the dmg-latest release
+      # Dedicated tag so the redesign "dmg-latest" (Pokémon Den) cannot overwrite Chest.
+      - name: Publish DMG + source to chest-latest release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           DMG=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg | head -1)
-          SRC=$(ls PokemonChest-source-*.zip | head -1)
-          echo "publishing: $DMG  +  $SRC"
-          NOTES="Universal (Apple Silicon + Intel) build of commit ${GITHUB_SHA:0:7} (v1.14.0). Includes Scanner + full TCGdex EN+JA release codex. Ad-hoc signed — first launch: right-click the app → Open (or build locally via build-app.command). Source zip attached."
-          gh release delete dmg-latest --cleanup-tag --yes || true
-          gh release create dmg-latest "$DMG" "$SRC" \
+          SRC_HASH=$(ls PokemonChest-source-????????.zip | head -1)
+          SRC_LATEST=PokemonChest-source-latest.zip
+          GUIDE=GET-POKEMON-CHEST.html
+          echo "publishing: $DMG + $SRC_HASH + $SRC_LATEST + $GUIDE"
+          NOTES="Pokémon Chest v1.14.0 — commit ${GITHUB_SHA:0:7}. Open GET-POKEMON-CHEST.html for one-page download/build steps. Ad-hoc signed: right-click app → Open on first launch."
+          gh release delete chest-latest --cleanup-tag --yes || true
+          gh release create chest-latest "$DMG" "$SRC_HASH" "$SRC_LATEST" "$GUIDE" \
             --prerelease \
             --target "$GITHUB_SHA" \
             --title "Pokémon Chest — latest macOS build + source" \
@@ -82,6 +87,8 @@ jobs:
         continue-on-error: true
         with:
           name: Pokemon-Chest-dmg
-          path: src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          path: |
+            src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+            GET-POKEMON-CHEST.html
           if-no-files-found: error
           retention-days: 14
