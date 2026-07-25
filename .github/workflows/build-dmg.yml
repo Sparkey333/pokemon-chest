@@ -70,9 +70,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           DMG=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg | head -1)
-          SRC_HASH=$(ls PokemonChest-source-????????.zip | head -1)
+          SRC_HASH="PokemonChest-source-${GITHUB_SHA:0:7}.zip"
           SRC_LATEST=PokemonChest-source-latest.zip
           GUIDE=GET-POKEMON-CHEST.html
+          test -f "$DMG" && test -f "$SRC_HASH" && test -f "$SRC_LATEST" && test -f "$GUIDE"
           echo "publishing: $DMG + $SRC_HASH + $SRC_LATEST + $GUIDE"
           NOTES="Pokémon Chest v1.14.0 — commit ${GITHUB_SHA:0:7}. Open GET-POKEMON-CHEST.html for one-page download/build steps. Ad-hoc signed: right-click app → Open on first launch."
           gh release delete chest-latest --cleanup-tag --yes || true
