@@ -1,7 +1,7 @@
 {
   "about": "Canonical machine-readable feature ledger for Pokémon Den. Rendered by the 📋 Parity tab. Agents & future sessions (any model): implement items from their spec alone, satisfy every acceptance criterion, run the verify steps, then set status=shipped, append \"✅ YYYY-MM-DD\" to notes, bump \"updated\", commit and push. Never change pokechest.* storage keys or the bundle identifier. Authored and adversarially verified by a multi-agent ultracode workflow.",
   "schemaVersion": 1,
-  "updated": "2026-07-24",
+  "updated": "2026-07-25",
   "generatedBy": "ultracode parity-ledger workflow wf_fe2016aa-818 (claude-fable-5): repo inventory + 5 spec agents + competitor matrix + 3 adversarial verifiers; {\"authored\": 49, \"merged\": 49, \"corrections\": 15, \"deleted\": 0}",
   "items": [
     {
@@ -1499,6 +1499,86 @@
       "dependsOn": [],
       "demand": "publish-gate",
       "notes": "Shipped 2026-07-24. Verified end-to-end incl. real LAN-peer simulation (12/12 admin probes 403, 6/6 browse paths 200). Remaining publish-gate security work lives in error-reporting-optin (privacy policy) and signing-notarization-ci."
+    },
+    {
+      "id": "search-cache",
+      "title": "Server-side PriceCharting search cache",
+      "icon": "🗄",
+      "area": "platform",
+      "status": "shipped",
+      "priority": "P1",
+      "spec": "server.py: SEARCH_CACHE_FILE = HOME/search-cache.json, keyed by _search_cache_key(q) (normalized whitespace+case). search_cache_get(q) -> (products, stale) where stale=True once an entry passes SEARCH_CACHE_PRICE_TTL (6h); search_cache_put(q, products) writes with ts+lastUsed and LRU-evicts down to SEARCH_CACHE_MAX (400) by lastUsed when over cap. pc_search(q, token) checks the cache first (fresh hit -> zero network calls), on a stale/miss hits PriceCharting live and reseeds the cache, and on ANY network exception falls back to a stale cache entry if one exists (still ok:True, stale:True) rather than erroring the whole search mid-scan. Gitignored (search-cache.json) — it's regenerated data, not source.",
+      "ux": "Invisible speedup: repeat/similar catalog searches during a scan session (Scanner + Add & Sold) return instantly instead of re-hitting PriceCharting, and a flaky connection mid-scan degrades to slightly-stale results instead of a hard failure.",
+      "files": [
+        "server.py",
+        ".gitignore"
+      ],
+      "acceptance": [
+        "A fresh cache hit for a previously-searched query returns without calling http_json (network) at all.",
+        "An entry older than SEARCH_CACHE_PRICE_TTL reports stale=True but still returns its products.",
+        "On a live network failure with a stale cache entry present, pc_search still returns ok:True with the stale products instead of raising.",
+        "On a true cache miss with a live network failure, pc_search propagates the exception (the existing do_GET try/except already turns this into {ok:false}).",
+        "The cache file never exceeds SEARCH_CACHE_MAX entries; the most-recently-used entries survive eviction."
+      ],
+      "verify": "python3 -c import of server.py with POKECHEST_HOME set to a scratch dir; unit-test search_cache_get/put/pc_search directly (monkeypatching http_json to simulate hit/stale/miss/network-failure), plus a live curl of GET /api/pc/search confirming the existing pricecharting_token guard is unchanged.",
+      "est": "S",
+      "dependsOn": [],
+      "demand": "high",
+      "notes": "Shipped 2026-07-25 — the foundation for scan-catalog-match below; also just makes the existing Add & Sold catalog search noticeably snappier on repeat lookups."
+    },
+    {
+      "id": "scan-catalog-match",
+      "title": "Scanner auto-connects AI guesses to the (cached) catalog — add without leaving the tab",
+      "icon": "🔗",
+      "area": "capture",
+      "status": "shipped",
+      "priority": "P1",
+      "spec": "assets/revamp.js: single-card path — scFetchCatalogMatch(st) fires right after scIdentify() resolves a guess (when a PriceCharting token is configured), calling the now cache-backed /api/pc/search with the guessed name+number, filtering out already-owned pcIds, and storing up to 3 candidates on st.catalog; scRenderStaged() renders them inline as one-click add rows (each calls the shared pcCatalogAdd(p) then scSaveTo(newCard, st.dataUrl) to file the just-taken photo straight onto the new card) — falling back to the old 'jump to Ledger search' button only when there's no token or no catalog match. Binder-scan path — scBinderCatalogMatch(bin, slot, g) does the same per-pocket for any slot with zero owned-collection matches (scBinderMatches), memoized on bin.catalog[slot] so re-renders don't refetch; scRenderBinder() shows up to 2 catalog candidates per pocket as '➕ Name (catalog)' buttons alongside the existing owned-card matches.",
+      "ux": "Scan a card (or a binder page) the AI can't match to anything already owned, and the catalog result — name, set, price — appears right there with a single ➕ to add it and file the photo, no more bouncing to Add & Sold and re-pasting the guess.",
+      "files": [
+        "assets/revamp.js"
+      ],
+      "acceptance": [
+        "scFetchCatalogMatch, scBinderCatalogMatch, and the shared pcCatalogAdd are defined and reachable from the Scanner tab.",
+        "pcCatalogAdd(p) is the single code path used by both the Ledger's manual catalog search and the Scanner's inline match (refactored out of the old duplicated inline handler).",
+        "Binder-scan only auto-fires a catalog lookup for pockets with zero owned-collection matches — already-owned pockets never trigger an extra network/cache call.",
+        "Catalog lookups are memoized per slot (bin.catalog[slot]) so re-rendering the binder grid doesn't re-fetch.",
+        "Zero JS errors across all 17 tabs with the feature active, PriceCharting token configured or not."
+      ],
+      "verify": "Headless: assert the three functions exist on window scope from the Scanner tab; full 17-tab zero-pageerror regression (no live AI/PriceCharting key in CI, so the network paths are exercised via the search-cache unit tests + the existing ai_identify/pc_search guard tests, not a live model call).",
+      "est": "S",
+      "dependsOn": [
+        "search-cache"
+      ],
+      "demand": "high",
+      "notes": "Shipped 2026-07-25 — directly requested: 'connect the searching cache of cards and techniques to scan and add cards.'"
+    },
+    {
+      "id": "sales-import",
+      "title": "Import sales from an eBay CSV export or a pasted sale email",
+      "icon": "📥",
+      "area": "market",
+      "status": "shipped",
+      "priority": "P1",
+      "spec": "assets/revamp.js, new '📥 Import sales' panel in renderLedger(). rvParseCsv(text): general RFC-4180-ish parser (quoted fields, doubled-quote escapes, \\r\\n/\\n). lgSimportParseCsv(text): guesses title/price/date columns by header regex (title|item|name|product ; sold|total price|sale price|item price|price|amount|total ; sale date|date), returns one candidate per non-blank row. lgSimportParseEmail(text): freeform extraction for a pasted 'item sold' / payment-received email — item name via an 'Item:'/'Title:' label else the longest non-boilerplate line; price via a 'sold for $X' style match else the largest $amount in the text; date via a US-format or 'Mon D, YYYY' match; venue sniffed from eBay/Whatnot/Mercari/TCGplayer/Facebook mentions, default 'Other'. lgSimportMatch(name): token-overlap fuzzy match against unsold State.cards, top 5 ranked, auto-preselected when the top score is >=0.5. lgSimportRender(): one editable row per candidate (match dropdown, name/price/date/venue, remove) plus a bulk '💾 Record N sales' button that commits every row with a chosen match + a price through the SAME saleSet()/uset() path as the existing single-card sale form (status:'sold', archived:true) — nothing is written until Record is clicked.",
+      "ux": "Add & Sold tab, below 'Record a sale': paste any sale-notification email OR upload an eBay Seller Hub orders CSV; every row/email becomes an editable match-and-record line (auto-matched to the right owned card when confident) with one bulk commit button.",
+      "files": [
+        "assets/revamp.js"
+      ],
+      "acceptance": [
+        "rvParseCsv correctly handles a quoted field containing a comma and a doubled-quote escape.",
+        "lgSimportParseCsv skips blank rows and correctly parses price ($) and date (ISO YYYY-MM-DD) from realistic eBay-style headers.",
+        "lgSimportParseEmail extracts a labeled item name, a 'sold for $X.XX' price, and detects the eBay venue from a realistic 'your item sold' email body; returns [] for empty input; falls back to the largest $ amount and sniffs a non-eBay venue (e.g. Whatnot) when there's no labeled item/price line.",
+        "Pasting an email for an item whose name matches an owned, not-yet-sold card auto-selects that card in the match dropdown and the commit button shows 'Record 1 sale'.",
+        "Clicking Record writes the exact price/venue/date into pokechest.sales.v1 for that card's pcId, archives the card (pokechest.userdata.v1[pcId].archived===true), and clears the import panel.",
+        "An unmatched CSV row defaults its dropdown to '— skip / no match —' and is not recorded on commit.",
+        "100% local: no live eBay/email account access anywhere in the feature — only pasted text or an uploaded file the user already has."
+      ],
+      "verify": "Headless: unit-test rvParseCsv/lgSimportParseCsv/lgSimportParseEmail/lgSimportMatch via page.evaluate against known inputs; end-to-end — paste a synthetic 'item sold' email for a real owned card's name, confirm the match row renders pre-selected, click Record, assert localStorage pokechest.sales.v1 + pokechest.userdata.v1 update correctly and the panel clears; separately drive the CSV file-upload path via a synthetic File + DataTransfer and confirm an unmatched row defaults to skip. Full 17-tab zero-pageerror regression.",
+      "est": "M",
+      "dependsOn": [],
+      "demand": "high",
+      "notes": "Shipped 2026-07-25 — directly requested: 'easily pull from eBay or an emails for sales.' Deliberately local-paste/upload rather than a live OAuth integration, consistent with the app's 100%-local privacy stance; a live eBay Sell API (BYOK, like PriceCharting) is a natural future upgrade tracked informally here, not yet a separate ledger item."
     }
   ],
   "matrix": {

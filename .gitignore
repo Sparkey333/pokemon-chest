@@ -4,6 +4,9 @@ settings.local.json
 # Cached TCGdex set data (re-fetched on demand)
 scripts/cache/
 
+# Cached PriceCharting catalog searches (re-fetched on demand)
+search-cache.json
+
 # Node / Tauri build artifacts
 node_modules/
 src-tauri/target/

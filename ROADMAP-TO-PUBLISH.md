@@ -64,6 +64,19 @@ pkmn.gg, Eyevo, PriceCharting app reviews, and app-store/blog comparisons
 12. **Offline-first mobile scanning with queue** — scans made offline sync when
     home (frequent complaint about scanner apps needing connection; our phone
     mode + staged scans extend naturally).
+13. **Sell-side data pull: eBay CSV + sale-email import** ✅ 2026-07-25 — paste any
+    "your item sold" / payment email or upload an eBay Seller Hub orders CSV;
+    auto-matched to the right owned card and bulk-recorded as a sale in one
+    click. Shipped in Add & Sold: 📥 Import sales. Kept 100%-local (paste/
+    upload what you already have) rather than a live eBay OAuth integration —
+    a BYOK eBay Sell API is a natural later upgrade, not yet scheduled.
+14. **Search-cache-backed scan → add** ✅ 2026-07-25 — the PriceCharting catalog
+    search server.py hits for the Ledger, Scanner, and binder-scan now shares
+    one persistent, TTL'd cache (`search-cache.json`), and an AI-identified
+    card the app doesn't already own auto-surfaces its catalog match right in
+    the Scanner (single-card and per-pocket in a binder page) with a one-click
+    add — no more bouncing to a separate search box to finish adding what the
+    camera just read.
 
 ## 3 · The Summon (3D Pokémon novelty) — spec
 

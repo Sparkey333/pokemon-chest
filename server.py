@@ -89,6 +89,66 @@ def cents(v):
     except (TypeError, ValueError):
         return None
 
+# ------------------------------------------------------------ search cache ---
+# The Scanner (single-card + 9-pocket binder) and the Add & Sold ledger all
+# funnel card lookups through the same PriceCharting catalog search. Caching
+# results locally means: (1) repeat/similar searches across a scan session
+# are instant instead of round-tripping every keystroke, (2) a stale-but-
+# present cache still resolves a search when the network is flaky mid-scan,
+# and (3) fewer live PriceCharting calls overall. Keyed by normalized query,
+# capped and LRU-evicted by last-used time so a long scanning session doesn't
+# grow the file unbounded.
+SEARCH_CACHE_FILE = os.path.join(HOME, "search-cache.json")
+SEARCH_CACHE_TTL = 7 * 24 * 3600      # catalog names/sets barely change; prices drift, so...
+SEARCH_CACHE_PRICE_TTL = 6 * 3600     # ...refresh just the price fields sooner than a full re-search
+SEARCH_CACHE_MAX = 400
+_search_cache_lock = threading.Lock()
+
+def _search_cache_load():
+    try:
+        with open(SEARCH_CACHE_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def _search_cache_save(cache):
+    os.makedirs(HOME, exist_ok=True)
+    tmp = SEARCH_CACHE_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(cache, f)
+    os.replace(tmp, SEARCH_CACHE_FILE)
+
+def _search_cache_key(q):
+    return re.sub(r"\s+", " ", (q or "").strip().lower())
+
+def search_cache_get(q):
+    """Returns (products, stale) from cache, or (None, False) on a miss."""
+    key = _search_cache_key(q)
+    if not key:
+        return None, False
+    with _search_cache_lock:
+        cache = _search_cache_load()
+        entry = cache.get(key)
+        if not entry:
+            return None, False
+        age = time.time() - entry.get("ts", 0)
+        entry["lastUsed"] = time.time()
+        cache[key] = entry
+        _search_cache_save(cache)
+    return entry.get("products"), age > SEARCH_CACHE_PRICE_TTL
+
+def search_cache_put(q, products):
+    key = _search_cache_key(q)
+    if not key:
+        return
+    with _search_cache_lock:
+        cache = _search_cache_load()
+        cache[key] = {"products": products, "ts": time.time(), "lastUsed": time.time()}
+        if len(cache) > SEARCH_CACHE_MAX:
+            for k in sorted(cache, key=lambda k: cache[k].get("lastUsed", 0))[:len(cache) - SEARCH_CACHE_MAX]:
+                cache.pop(k, None)
+        _search_cache_save(cache)
+
 # ------------------------------------------------------------- integrations ---
 def pricecharting_price(pc_id, token):
     """PriceCharting Product endpoint. Keys mirror the CSV price-guide columns;
@@ -1002,26 +1062,43 @@ def pc_sync_status():
         return dict(PC_SYNC, ok=True)
 
 def pc_search(q, token):
-    """Search PriceCharting's product catalog — powers no-typing card adds."""
+    """Search PriceCharting's product catalog — powers no-typing card adds,
+    the AI-identify -> catalog-match handoff in the Scanner, and binder-scan
+    add. Backed by search_cache_get/put: a fresh cache hit skips the network
+    entirely; a stale hit still answers immediately (stale:True) and a
+    background refresh brings it current for next time; a miss searches live
+    and seeds the cache for every future scan session."""
     q = (q or "").strip()
     if not q:
         return {"ok": True, "products": []}
-    url = "https://www.pricecharting.com/api/products?" + urllib.parse.urlencode({"t": token, "q": q})
-    d = http_json(url)
-    if d.get("status") == "error":
-        return {"ok": False, "error": d.get("error-message", "PriceCharting error")}
-    out = []
-    for p in (d.get("products") or [])[:12]:
-        name = p.get("product-name") or ""
-        m = re.search(r"#\s*([A-Za-z0-9-]+)\s*$", name)
-        out.append({
-            "id": p.get("id"),
-            "name": re.sub(r"\s*#\s*[A-Za-z0-9-]+\s*$", "", name).strip(),
-            "number": m.group(1) if m else None,
-            "set": p.get("console-name") or "",
-            "price": cents(p.get("loose-price")),
-        })
-    return {"ok": True, "products": out}
+    cached, stale = search_cache_get(q)
+    if cached is not None and not stale:
+        return {"ok": True, "products": cached, "cached": True}
+    try:
+        url = "https://www.pricecharting.com/api/products?" + urllib.parse.urlencode({"t": token, "q": q})
+        d = http_json(url)
+        if d.get("status") == "error":
+            if cached is not None:
+                return {"ok": True, "products": cached, "cached": True, "stale": True}
+            return {"ok": False, "error": d.get("error-message", "PriceCharting error")}
+        out = []
+        for p in (d.get("products") or [])[:12]:
+            name = p.get("product-name") or ""
+            m = re.search(r"#\s*([A-Za-z0-9-]+)\s*$", name)
+            out.append({
+                "id": p.get("id"),
+                "name": re.sub(r"\s*#\s*[A-Za-z0-9-]+\s*$", "", name).strip(),
+                "number": m.group(1) if m else None,
+                "set": p.get("console-name") or "",
+                "price": cents(p.get("loose-price")),
+            })
+        search_cache_put(q, out)
+        return {"ok": True, "products": out}
+    except Exception:
+        # Network hiccup mid-scan: a stale cache hit beats a hard failure.
+        if cached is not None:
+            return {"ok": True, "products": cached, "cached": True, "stale": True}
+        raise
 
 # ------------------------------------------------- AI card identification ---
 AI_IDENTIFY_SYSTEM = (

@@ -886,7 +886,7 @@ function renderScan() {
   if ($('#sc-binderfile')) $('#sc-binderfile').onchange = async e => {
     const f = e.target.files && e.target.files[0]; if (!f) return;
     const dataUrl = await blobToDataUrl(f);
-    RV.scan.binder = { dataUrl, guesses: null, crops: {}, saved: {} };
+    RV.scan.binder = { dataUrl, guesses: null, crops: {}, saved: {}, catalog: {} };
     scRenderBinder();
     scBinderIdentify();
     e.target.value = '';
@@ -910,14 +910,21 @@ function scRenderStaged() {
   if (!st) { box.innerHTML = ''; return; }
   const aiOn = State.live && State.live.ai && State.live.ai.enabled;
   const pcOn = State.live && State.live.priceCharting;
+  const cat = st.catalog;
   box.innerHTML = `<div class="sc-stagedcard">
     <img src="${st.dataUrl}" alt="staged shot">
     <div style="flex:1;min-width:0">
       <b>Captured — now match it</b>
       <div class="reason" id="sc-guess">${st.guess ? esc(st.guessLine) : (aiOn ? 'Let the AI read the card, or pick it on the left.' : 'Pick the card on the left to file this shot.')}</div>
+      ${cat === 'loading' ? `<p class="reason">Checking the PriceCharting catalog…</p>` : ''}
+      ${Array.isArray(cat) && cat.length ? `<div class="sc-results" style="margin-top:6px">${cat.slice(0, 3).map((p, i) => `
+        <button class="sc-res sc-catrow" data-x="${i}">
+          <span class="lg-pcprice">${p.price != null ? money(p.price) : '—'}</span>
+          <span><b>${esc(p.name)}</b>${p.number ? ' #' + esc(p.number) : ''}<br><span class="reason">${esc(p.set)} · ➕ add straight from here</span></span>
+        </button>`).join('')}</div>` : ''}
       <div class="rv-row" style="margin-top:7px;flex-wrap:wrap">
         ${aiOn ? `<button class="btn sm primary" id="sc-ident">🔮 Identify card</button>` : ''}
-        ${st.guess && pcOn ? `<button class="btn sm gold" id="sc-pcadd">➕ Not in the chest? Add via PriceCharting</button>` : ''}
+        ${st.guess && pcOn && !(Array.isArray(cat) && cat.length) ? `<button class="btn sm gold" id="sc-pcadd">➕ Not in the chest? Add via PriceCharting</button>` : ''}
         <button class="minilink" id="sc-discard">✕ discard shot</button>
       </div>
     </div></div>`;
@@ -926,7 +933,32 @@ function scRenderStaged() {
     RV.lgQuery = [st.guess.name, st.guess.number].filter(Boolean).join(' ');
     switchView('ledger');
   };
+  if (Array.isArray(cat)) $$('.sc-catrow', box).forEach(b => b.onclick = async () => {
+    const p = cat[+b.dataset.x];
+    const card = pcCatalogAdd(p);
+    if (!card) return;
+    await scSaveTo(card, st.dataUrl);
+    RV.scan.staged = null;
+    scRenderStaged();
+    toast(`${p.name} added and this photo filed with it.`);
+  });
   $('#sc-discard').onclick = () => { RV.scan.staged = null; scRenderStaged(); };
+}
+/* after an AI guess, auto-check the (cache-backed) PriceCharting catalog so
+   a card that isn't owned yet can be added right here — no tab jump, no
+   retyping what the AI already read off the card. */
+async function scFetchCatalogMatch(st) {
+  const pcOn = State.live && State.live.priceCharting;
+  if (!pcOn || !st.guess || !st.guess.name) { st.catalog = null; return; }
+  st.catalog = 'loading';
+  try {
+    const q = [st.guess.name, st.guess.number].filter(Boolean).join(' ');
+    const j = await (await fetch('/api/pc/search?q=' + enc(q), { cache: 'no-store' })).json();
+    if (RV.scan.staged !== st) return;                 // shot was discarded/replaced mid-fetch
+    const owned = new Set(State.cards.map(c => String(c.pcId)));
+    st.catalog = j.ok ? (j.products || []).filter(p => !owned.has(String(p.id))) : null;
+  } catch (e) { if (RV.scan.staged === st) st.catalog = null; }
+  if (RV.scan.staged === st) scRenderStaged();
 }
 async function scIdentify() {
   const st = RV.scan.staged; if (!st) return;
@@ -948,6 +980,7 @@ async function scIdentify() {
       if (!$('.sc-res', $('#sc-results'))) { q.value = st.guess.name; q.oninput({ target: q }); }
     }
     scRenderStaged();
+    scFetchCatalogMatch(st);
   } catch (e) { if (g) g.textContent = '✕ ' + e.message; }
 }
 
@@ -980,6 +1013,22 @@ function scBinderMatches(guess) {
     return toks.every(t => h.includes(t));
   }).slice(0, 4);
 }
+/* an unowned pocket + a PriceCharting token: auto-check the cache-backed
+   catalog so the binder-scan → add loop closes without leaving the tab.
+   Memoized per slot on the binder object so re-renders don't re-fetch. */
+async function scBinderCatalogMatch(bin, slot, g) {
+  const pcOn = State.live && State.live.priceCharting;
+  if (!pcOn || !g || !g.name) { bin.catalog[slot] = null; return; }
+  bin.catalog[slot] = 'loading';
+  try {
+    const q = [g.name, g.number].filter(Boolean).join(' ');
+    const j = await (await fetch('/api/pc/search?q=' + enc(q), { cache: 'no-store' })).json();
+    if (RV.scan.binder !== bin) return;                 // page closed/replaced mid-fetch
+    const owned = new Set(State.cards.map(c => String(c.pcId)));
+    bin.catalog[slot] = j.ok ? (j.products || []).filter(p => !owned.has(String(p.id))).slice(0, 2) : null;
+  } catch (e) { if (RV.scan.binder === bin) bin.catalog[slot] = null; }
+  if (RV.scan.binder === bin) scRenderBinder();
+}
 async function scRenderBinder() {
   const box = $('#sc-binder'); if (!box) return;
   const bin = RV.scan.binder;
@@ -997,6 +1046,8 @@ async function scRenderBinder() {
     if (!g) return `<div class="sc-bcell sc-bcell-empty" data-slot="${s}"><img src="${crop || bin.dataUrl}" alt="pocket ${s}"><span class="reason">no card seen</span></div>`;
     const saved = bin.saved[s];
     const matches = scBinderMatches(g);
+    const cat = bin.catalog[s];
+    if (!saved && matches.length === 0 && cat === undefined) scBinderCatalogMatch(bin, s, g);
     const line = `${g.name || '?'}${g.number ? ' #' + g.number : ''} · ${g.set || 'set unknown'}${g.confidence != null ? ' · ' + Math.round(g.confidence * 100) + '%' : ''}`;
     return `<div class="sc-bcell" data-slot="${s}">
         <img src="${crop || bin.dataUrl}" alt="pocket ${s}">
@@ -1004,7 +1055,9 @@ async function scRenderBinder() {
         ${saved ? `<div class="sc-bsaved">✓ saved to ${esc(saved)}</div>` : `
         <div class="sc-bmatches">
           ${matches.map(c => `<button class="minilink sc-bmatch" data-slot="${s}" data-i="${c.i}">→ ${esc(c.name)}${c.number ? ' #' + esc(c.number) : ''}</button>`).join('') || ''}
-          <button class="minilink sc-badd" data-slot="${s}">➕ Add</button>
+          ${cat === 'loading' ? `<span class="reason">checking catalog…</span>` : ''}
+          ${Array.isArray(cat) ? cat.map((p, ci) => `<button class="minilink sc-bcatadd" data-slot="${s}" data-ci="${ci}">➕ ${esc(p.name)}${p.number ? ' #' + esc(p.number) : ''} (catalog)</button>`).join('') : ''}
+          <button class="minilink sc-badd" data-slot="${s}">➕ Add manually</button>
         </div>`}
       </div>`;
   }).join('')}</div>`;
@@ -1014,6 +1067,15 @@ async function scRenderBinder() {
     const crop = bin.crops[slot];
     const r = await scSaveTo(card, crop);
     if (r) { bin.saved[slot] = card.name; scRenderBinder(); }
+  });
+  $$('.sc-bcatadd', box).forEach(b => b.onclick = async () => {
+    const slot = +b.dataset.slot;
+    const p = bin.catalog[slot][+b.dataset.ci];
+    const card = pcCatalogAdd(p);
+    if (!card) return;
+    await scSaveTo(card, bin.crops[slot]);
+    bin.saved[slot] = card.name;
+    scRenderBinder();
   });
   $$('.sc-badd', box).forEach(b => b.onclick = () => {
     const slot = +b.dataset.slot;
@@ -1231,7 +1293,7 @@ async function scRenderPc() {
    ➕ ADD & SOLD — the ledger: add cards in-app, record sales,
    archive sold cards (kept forever, out of the collection)
    ============================================================ */
-const LG = { saleCard: null };
+const LG = { saleCard: null, simport: null };
 
 function renderLedger() {
   const el = $('#view-ledger');
@@ -1289,6 +1351,21 @@ function renderLedger() {
       <div id="lg-sres" class="sc-results"></div>
       <div id="lg-sform"></div>
     </div>
+  </div>
+
+  <div class="panel" style="margin-top:14px" id="lg-simport-panel">
+    <h3>📥 Import sales <span class="reason">— from an eBay orders CSV, or paste any sale email (eBay, PayPal, Whatnot…)</span></h3>
+    <div class="rv-row" style="flex-wrap:wrap;align-items:flex-start;gap:16px">
+      <div style="flex:1;min-width:240px">
+        <textarea id="lg-simport-text" class="s-inp" placeholder="Paste a &quot;Your item sold!&quot; / payment-received email here…" style="width:100%;min-height:74px;resize:vertical"></textarea>
+        <button class="btn sm" id="lg-simport-parsetext" style="margin-top:6px">📋 Parse pasted email</button>
+      </div>
+      <div style="flex:1;min-width:240px">
+        <label class="btn sm" style="cursor:pointer">📄 Upload eBay orders CSV<input id="lg-simport-file" type="file" accept=".csv,text/csv" style="display:none"></label>
+        <p class="reason" style="margin-top:6px">eBay: Seller Hub → Orders → Download reports, any date range/format. Every row becomes a match-and-record row below — nothing is saved until you click Record.</p>
+      </div>
+    </div>
+    <div id="lg-simport-results"></div>
   </div>
 
   <div class="panel" style="margin-top:14px">
@@ -1351,6 +1428,27 @@ function renderLedger() {
   };
   if (LG.saleCard) lgSaleForm(LG.saleCard);
 
+  $('#lg-simport-parsetext').onclick = () => {
+    const text = $('#lg-simport-text').value;
+    const parsed = lgSimportParseEmail(text);
+    if (!parsed.length) { toast('Could not find an item name or price in that text — try pasting the full email.'); return; }
+    LG.simport = LG.simport || { candidates: [] };
+    LG.simport.candidates.push(...parsed);
+    $('#lg-simport-text').value = '';
+    lgSimportRender();
+  };
+  $('#lg-simport-file').onchange = async e => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    const text = await f.text();
+    e.target.value = '';
+    const parsed = lgSimportParseCsv(text);
+    if (!parsed.length) { toast('No rows with an item name were found in that CSV.'); return; }
+    LG.simport = LG.simport || { candidates: [] };
+    LG.simport.candidates.push(...parsed);
+    lgSimportRender();
+  };
+  if (LG.simport) lgSimportRender();
+
   $$('.lg-thumb', el).forEach(b => b.onclick = () => openModal(State.cards[+b.dataset.i]));
   $$('.lg-archive', el).forEach(b => b.onclick = () => { uset(State.cards[+b.dataset.i], { archived: true }); rvRecalcMeta(); renderLedger(); toast('Archived — saved forever, out of your totals.'); });
   $$('.lg-restore', el).forEach(b => b.onclick = () => { uset(State.cards[+b.dataset.i], { archived: false }); rvRecalcMeta(); renderLedger(); toast('Back in the collection.'); });
@@ -1376,6 +1474,21 @@ function lgStore(cc) {
   all.push(cc);
   localStorage.setItem(LS_CUSTOM, JSON.stringify(all));
   rvMergeCustom(); rvRecalcMeta();
+}
+
+/* shared: add a PriceCharting catalog product straight into the collection —
+   used by the Ledger's catalog search AND the Scanner's inline catalog-match
+   handoff, so "search the cache" and "scan → add" are the same one code path. */
+function pcCatalogAdd(p) {
+  if (State.cards.some(c => String(c.pcId) === String(p.id))) { toast('Already in your collection.'); return null; }
+  lgStore({
+    pcId: String(p.id), name: p.name, number: p.number, set: p.set,
+    lang: /japanese/i.test(p.set) ? 'ja' : 'en',
+    price: p.price || 0, cost: 0, qty: 1, graded: false,
+    dateAdded: new Date().toISOString().slice(0, 10),
+  });
+  toast(`Added ${p.name} @ ${p.price != null ? money(p.price) : 'no price yet'} — straight from PriceCharting.`);
+  return State.cards[State.cards.length - 1];
 }
 
 /* no-typing adds: search the PriceCharting catalog, one click to add */
@@ -1411,16 +1524,7 @@ function lgRenderPcAdd() {
           <span class="reason">${esc(p.set)}${owned.has(String(p.id)) ? ' · <b style="color:var(--green)">already in your chest</b>' : ''}</span></span>
         </button>`).join('') || '<p class="reason" style="padding:6px">No catalog matches.</p>';
       $$('.lg-pcrow', res).forEach(b => b.onclick = () => {
-        const p = prods[+b.dataset.x];
-        if (State.cards.some(c => String(c.pcId) === String(p.id))) return toast('Already in your collection.');
-        lgStore({
-          pcId: String(p.id), name: p.name, number: p.number, set: p.set,
-          lang: /japanese/i.test(p.set) ? 'ja' : 'en',
-          price: p.price || 0, cost: 0, qty: 1, graded: false,
-          dateAdded: new Date().toISOString().slice(0, 10),
-        });
-        toast(`Added ${p.name} @ ${p.price != null ? money(p.price) : 'no price yet'} — straight from PriceCharting.`);
-        renderLedger();
+        if (pcCatalogAdd(prods[+b.dataset.x])) renderLedger();
       });
     } catch (e) { res.innerHTML = `<p class="reason" style="padding:6px">✕ ${esc(e.message)}</p>`; }
   };
@@ -1463,6 +1567,147 @@ function lgSaleForm(c) {
     rvRecalcMeta(); renderLedger();
     toast(`Sold: ${c.name} — ${money(price)}. On the Sold Shelf now.`);
   };
+}
+
+/* ============================================================
+   📥 SALES IMPORT — pull sold-item records straight from an eBay
+   orders CSV or a pasted sale-notification email (eBay/PayPal/
+   Whatnot/etc.), fuzzy-match each to an owned card, and bulk-record
+   through the exact same saleSet()/uset() path as a manual sale.
+   Fully local: nothing is fetched from any live account — the user
+   pastes/uploads what they already exported or received.
+   ============================================================ */
+function rvParseCsv(text) {
+  const rows = []; let row = []; let field = ''; let inQ = false;
+  const s = String(text || '');
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (inQ) {
+      if (ch === '"') { if (s[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
+      else field += ch;
+    } else if (ch === '"') inQ = true;
+    else if (ch === ',') { row.push(field); field = ''; }
+    else if (ch === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+    else if (ch === '\r') { /* paired \n handles the line break */ }
+    else field += ch;
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows.filter(r => r.some(v => v.trim() !== ''));
+}
+
+function lgSimportParseCsv(text) {
+  const rows = rvParseCsv(text);
+  if (rows.length < 2) return [];
+  const headers = rows[0].map(h => h.trim().toLowerCase());
+  const findCol = re => headers.findIndex(h => re.test(h));
+  const nameCol = findCol(/title|item|name|product/);
+  const priceCol = findCol(/sold|total price|sale price|item price|price|amount|total/);
+  const dateCol = findCol(/sale date|date/);
+  if (nameCol === -1) return [];
+  const out = [];
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r];
+    if (!row || row.every(v => !v.trim())) continue;
+    const name = (row[nameCol] || '').trim();
+    if (!name) continue;
+    const price = priceCol !== -1 ? (+String(row[priceCol] || '').replace(/[^0-9.\-]/g, '') || null) : null;
+    let date = dateCol !== -1 ? (row[dateCol] || '').trim() : '';
+    const parsedDate = date ? new Date(date) : null;
+    date = parsedDate && !isNaN(parsedDate) ? parsedDate.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+    out.push({ name, price, date, venue: 'eBay', raw: row.join(' | ').slice(0, 200) });
+  }
+  return out;
+}
+
+function lgSimportParseEmail(text) {
+  text = String(text || '').trim();
+  if (!text) return [];
+  const amounts = [...text.matchAll(/\$\s?([\d,]+\.\d{2})/g)].map(m => +m[1].replace(/,/g, ''));
+  let price = null;
+  const priceLine = text.match(/(?:sold for|item price|sale price|total|you['’]?ve got money)[^$\n]{0,24}\$\s?([\d,]+\.\d{2})/i);
+  if (priceLine) price = +priceLine[1].replace(/,/g, '');
+  else if (amounts.length) price = Math.max(...amounts);
+  let name = null;
+  const labeled = text.match(/(?:item|title)\s*[:\-]\s*(.+)/i);
+  if (labeled) name = labeled[1].trim().slice(0, 120);
+  else {
+    const lines = text.split(/\r?\n/).map(l => l.trim())
+      .filter(l => l.length > 4 && l.length < 90 && !/^\$|^https?:|^(thank|dear|hi\b|view|regards|sincerely|order|payment id|transaction id|track|shipping|buyer|seller)/i.test(l));
+    lines.sort((a, b) => b.length - a.length);
+    name = lines[0] || null;
+  }
+  let date = null;
+  const dm = text.match(/\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/) || text.match(/\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}\b/i);
+  if (dm) { const d = new Date(dm[0]); if (!isNaN(d)) date = d.toISOString().slice(0, 10); }
+  let venue = 'Other';
+  if (/ebay/i.test(text)) venue = 'eBay';
+  else if (/whatnot/i.test(text)) venue = 'Whatnot';
+  else if (/mercari/i.test(text)) venue = 'Mercari';
+  else if (/tcgplayer/i.test(text)) venue = 'TCGplayer';
+  else if (/facebook/i.test(text)) venue = 'Facebook';
+  if (!name && price == null) return [];
+  return [{ name: name || '(unknown item — edit below)', price, date: date || new Date().toISOString().slice(0, 10), venue, raw: text.slice(0, 300) }];
+}
+
+function lgSimportMatch(name) {
+  const toks = String(name || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(Boolean);
+  if (!toks.length) return [];
+  return State.cards.filter(c => !saleGet(c))
+    .map(c => {
+      const hay = (c.name + ' ' + c.set + ' ' + (c.number || '')).toLowerCase();
+      return { i: c.i, c, score: toks.filter(t => hay.includes(t)).length / toks.length };
+    })
+    .filter(m => m.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
+}
+
+function lgSimportRender() {
+  const box = $('#lg-simport-results'); if (!box) return;
+  const imp = LG.simport;
+  if (!imp || !imp.candidates.length) { box.innerHTML = ''; return; }
+  const rowsHtml = imp.candidates.map((cd, ci) => {
+    const matches = lgSimportMatch(cd.name);
+    if (cd.matchIdx === undefined) cd.matchIdx = matches.length && matches[0].score >= 0.5 ? matches[0].i : -1;
+    return `<div class="rv-row" style="align-items:center;flex-wrap:wrap;border-top:1px solid var(--border,#333);padding:8px 0;gap:6px">
+      <select class="s-inp lg-simp-match" data-ci="${ci}" style="flex:2;min-width:180px">
+        <option value="-1" ${cd.matchIdx === -1 ? 'selected' : ''}>— skip / no match —</option>
+        ${matches.map(m => `<option value="${m.i}" ${cd.matchIdx === m.i ? 'selected' : ''}>${esc(m.c.name)}${m.c.number ? ' #' + esc(m.c.number) : ''} · ${esc(m.c.set)} (${Math.round(m.score * 100)}%)</option>`).join('')}
+      </select>
+      <input class="s-inp lg-simp-name" data-ci="${ci}" value="${esc(cd.name)}" title="parsed item name — edit to improve matching" style="flex:2;min-width:140px">
+      <input class="s-inp lg-simp-price" data-ci="${ci}" type="number" min="0" step="0.01" value="${cd.price != null ? cd.price : ''}" placeholder="sold $" style="width:90px">
+      <input class="s-inp lg-simp-date" data-ci="${ci}" type="date" value="${cd.date}" style="width:150px">
+      <select class="s-inp lg-simp-venue" data-ci="${ci}" style="width:120px">${['eBay', 'eBay auction', 'Whatnot', 'Facebook', 'Mercari', 'TCGplayer', 'Local / show', 'Other'].map(v => `<option ${v === cd.venue ? 'selected' : ''}>${v}</option>`).join('')}</select>
+      <button class="minilink lg-simp-rm" data-ci="${ci}">✕</button>
+    </div>`;
+  }).join('');
+  const ready = imp.candidates.filter(c => c.matchIdx !== -1 && c.price != null).length;
+  box.innerHTML = `<div class="lg-form" style="margin-top:10px">${rowsHtml}
+    <div class="rv-row" style="margin-top:8px">
+      <button class="btn primary" id="lg-simp-commit">💾 Record ${ready} sale${ready === 1 ? '' : 's'}</button>
+      <button class="btn ghost" id="lg-simp-clear">✕ clear all</button>
+    </div></div>`;
+  $$('.lg-simp-match', box).forEach(s => s.onchange = e => { imp.candidates[+e.target.dataset.ci].matchIdx = +e.target.value; lgSimportRender(); });
+  $$('.lg-simp-name', box).forEach(i => i.oninput = e => { imp.candidates[+e.target.dataset.ci].name = e.target.value; });
+  $$('.lg-simp-price', box).forEach(i => i.oninput = e => { imp.candidates[+e.target.dataset.ci].price = e.target.value === '' ? null : +e.target.value; });
+  $$('.lg-simp-date', box).forEach(i => i.oninput = e => { imp.candidates[+e.target.dataset.ci].date = e.target.value; });
+  $$('.lg-simp-venue', box).forEach(s => s.onchange = e => { imp.candidates[+e.target.dataset.ci].venue = e.target.value; });
+  $$('.lg-simp-rm', box).forEach(b => b.onclick = e => { imp.candidates.splice(+e.currentTarget.dataset.ci, 1); lgSimportRender(); });
+  $('#lg-simp-commit').onclick = () => {
+    let n = 0;
+    for (const cd of imp.candidates) {
+      if (cd.matchIdx === -1 || cd.price == null) continue;
+      const c = State.cards[cd.matchIdx];
+      if (!c || saleGet(c)) continue;
+      saleSet(c, { price: cd.price, fees: 0, net: cd.price, venue: cd.venue, date: cd.date, note: `Imported: ${cd.name}`.slice(0, 200) });
+      uset(c, { status: 'sold', archived: true });
+      n++;
+    }
+    LG.simport = null;
+    rvRecalcMeta(); renderLedger();
+    toast(n ? `Imported ${n} sale${n === 1 ? '' : 's'} — on the Sold Shelf now.` : 'Nothing matched to record — pick a card for at least one row.');
+  };
+  $('#lg-simp-clear').onclick = () => { LG.simport = null; renderLedger(); };
 }
 
 /* ============================================================
