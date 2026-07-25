@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Get Pokémon Chest — Download &amp; Build</title>
+<title>Get Pokémon Chest — Download &amp; Fix “Not Opened”</title>
 <style>
   :root {
     --bg: #0b1220;
@@ -14,6 +14,8 @@
     --gold: #f0c14b;
     --blue: #5cbcff;
     --green: #3ad6a0;
+    --warn: #ffb36b;
+    --red: #ff8b8b;
   }
   * { box-sizing: border-box; }
   body {
@@ -26,16 +28,8 @@
       var(--bg);
     line-height: 1.5;
   }
-  main {
-    max-width: 760px;
-    margin: 0 auto;
-    padding: 40px 20px 80px;
-  }
-  h1 {
-    font-size: clamp(28px, 5vw, 40px);
-    margin: 0 0 8px;
-    letter-spacing: -0.02em;
-  }
+  main { max-width: 780px; margin: 0 auto; padding: 40px 20px 80px; }
+  h1 { font-size: clamp(28px, 5vw, 40px); margin: 0 0 8px; letter-spacing: -0.02em; }
   h1 span { color: var(--gold); }
   .lead { color: var(--muted); margin: 0 0 28px; font-size: 17px; }
   section {
@@ -45,160 +39,135 @@
     padding: 22px 22px 18px;
     margin: 0 0 16px;
   }
-  h2 {
-    margin: 0 0 10px;
-    font-size: 18px;
-  }
+  section.fix { border-color: #6a4a1a; box-shadow: inset 0 0 0 1px rgba(255,179,107,.15); }
+  h2 { margin: 0 0 10px; font-size: 18px; }
   ol, ul { margin: 8px 0 0; padding-left: 22px; }
   li { margin: 8px 0; }
   a.btn {
-    display: inline-block;
-    margin: 6px 8px 6px 0;
-    padding: 12px 16px;
-    border-radius: 10px;
-    text-decoration: none;
-    font-weight: 700;
-    color: #111;
+    display: inline-block; margin: 6px 8px 6px 0; padding: 12px 16px;
+    border-radius: 10px; text-decoration: none; font-weight: 700; color: #111;
     background: linear-gradient(135deg, var(--gold), #d9a52e);
   }
-  a.btn.blue {
-    color: #062034;
-    background: linear-gradient(135deg, #8fd8ff, var(--blue));
-  }
-  a.btn.ghost {
-    color: var(--text);
-    background: transparent;
-    border: 1px solid var(--line);
-  }
-  code, pre {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: 13px;
-  }
+  a.btn.blue { color: #062034; background: linear-gradient(135deg, #8fd8ff, var(--blue)); }
+  a.btn.ghost { color: var(--text); background: transparent; border: 1px solid var(--line); }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
   pre {
-    background: #0a101c;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    padding: 12px 14px;
-    overflow: auto;
-    color: #d7e6ff;
-    margin: 10px 0 0;
+    background: #0a101c; border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 14px; overflow: auto; color: #d7e6ff; margin: 10px 0 0;
   }
-  .note {
-    color: var(--muted);
-    font-size: 14px;
-    margin-top: 10px;
-  }
+  .note { color: var(--muted); font-size: 14px; margin-top: 10px; }
   .ok { color: var(--green); font-weight: 700; }
-  .warn { color: #ffb36b; }
+  .warn { color: var(--warn); }
   .stepnum {
-    display: inline-grid;
-    place-items: center;
-    width: 22px; height: 22px;
-    border-radius: 50%;
-    background: var(--blue);
-    color: #062034;
-    font-size: 12px;
-    font-weight: 800;
-    margin-right: 6px;
+    display: inline-grid; place-items: center; width: 22px; height: 22px;
+    border-radius: 50%; background: var(--blue); color: #062034;
+    font-size: 12px; font-weight: 800; margin-right: 6px;
+  }
+  .shot {
+    margin-top: 12px; padding: 12px 14px; border-radius: 12px;
+    background: #0a101c; border: 1px dashed #6a4a1a; color: var(--warn); font-size: 14px;
   }
 </style>
 </head>
 <body>
 <main>
   <h1>Get <span>Pokémon Chest</span></h1>
-  <p class="lead">One page. Three paths. Pick the first one that works for you.</p>
+  <p class="lead">Download the app, then unlock macOS Gatekeeper once. That “Not Opened / Done” dialog is normal for our GitHub builds.</p>
+
+  <section class="fix">
+    <h2>If you see “Pokemon Chest” Not Opened</h2>
+    <div class="shot">
+      Apple could not verify “Pokemon Chest”… &nbsp;→&nbsp; button only says <b>Done</b>.<br>
+      That is Gatekeeper. The DMG is safe for you; it is just <b>not Apple-notarized</b> yet (needs a paid Developer ID in CI).
+    </div>
+    <p><b>Fix A — Settings (works on newest macOS):</b></p>
+    <ol>
+      <li>Click <b>Done</b> on that dialog.</li>
+      <li>Apple menu  → <b>System Settings</b> → <b>Privacy &amp; Security</b>.</li>
+      <li>Scroll to the <b>Security</b> section (lower half of the page).</li>
+      <li>Find: <i>“Pokemon Chest” was blocked from use because it is not from an identified developer.</i></li>
+      <li>Click <b>Open Anyway</b>.</li>
+      <li>Enter your Mac password or Touch ID → click <b>Open</b>.</li>
+    </ol>
+    <p><b>Fix B — one Terminal command</b> (after the app is in Applications):</p>
+<pre>xattr -cr "/Applications/Pokemon Chest.app"
+open "/Applications/Pokemon Chest.app"</pre>
+    <p><b>Fix C — helper script</b> (in the source zip / project folder):</p>
+    <ol>
+      <li>Double-click <code>OPEN-ANYWAY.command</code> (first time: right-click → Open).</li>
+      <li>It clears quarantine and launches the app.</li>
+    </ol>
+    <p class="note warn">You only need this once per Mac. After Open Anyway, normal double-clicks work.</p>
+  </section>
 
   <section>
-    <h2><span class="stepnum">1</span> Easiest — download the Mac installer (DMG)</h2>
-    <p>This is the finished app. No coding.</p>
+    <h2><span class="stepnum">1</span> Download the Mac installer (DMG)</h2>
     <p>
       <a class="btn" id="dmgLink" href="https://github.com/Sparkey333/pokemon-chest/releases/download/chest-latest/Pokemon.Chest_1.14.0_universal.dmg">Download DMG</a>
       <a class="btn blue" id="srcLink" href="https://github.com/Sparkey333/pokemon-chest/releases/download/chest-latest/PokemonChest-source-latest.zip">Download source zip</a>
       <a class="btn ghost" href="https://github.com/Sparkey333/pokemon-chest/releases/tag/chest-latest">Open Releases page</a>
     </p>
     <ol>
-      <li>Click <b>Download DMG</b>.</li>
-      <li>Open the file → drag <b>Pokémon Chest</b> into <b>Applications</b>.</li>
-      <li>First launch: <b>right-click the app → Open</b> (macOS Gatekeeper). Confirm Open.</li>
-      <li>Done. Your collection loads from this folder / your PriceCharting export.</li>
+      <li>Open the DMG → drag <b>Pokemon Chest</b> into <b>Applications</b>.</li>
+      <li>Eject the DMG.</li>
+      <li>Open from Applications — if blocked, use the Gatekeeper fix above.</li>
     </ol>
-    <p class="note warn">If the button 404s, use the Releases page link above, or Path 2 / Path 3 below.</p>
   </section>
 
   <section>
-    <h2><span class="stepnum">2</span> Run in browser (no DMG build)</h2>
-    <p>From the project folder on your Mac:</p>
+    <h2><span class="stepnum">2</span> Skip the DMG — run in browser</h2>
+    <p>No Gatekeeper fight. From the project / source zip folder:</p>
     <ol>
-      <li>Double-click <code>start.command</code></li>
-      <li>Allow it if macOS asks (right-click → Open the first time)</li>
-      <li>Browser opens at <code>http://localhost:8787</code></li>
-      <li>Keep the Terminal window open while you use the app</li>
+      <li>Double-click <code>start.command</code> (first time: right-click → Open).</li>
+      <li>Browser opens <code>http://localhost:8787</code>.</li>
+      <li>Keep the Terminal window open while you use it.</li>
     </ol>
-    <pre># same thing from Terminal:
-cd "/path/to/pokemon-chest"
+<pre>cd "/path/to/pokemon-chest"
 ./start.command</pre>
-    <p class="note">Scanner, PriceCharting live search, and iPhone phone-mode need this local server (or the .app).</p>
   </section>
 
   <section>
-    <h2><span class="stepnum">3</span> Build a fresh DMG on your Mac</h2>
-    <p>Only needed if you changed code and want a new installer.</p>
+    <h2><span class="stepnum">3</span> Build a DMG on your own Mac</h2>
+    <p>Uses <b>your</b> Apple Development signing when available (often opens cleaner than the GitHub ad-hoc build).</p>
     <ol>
-      <li>Install once (if missing):
-        <pre>curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-# also need Node from https://nodejs.org</pre>
-      </li>
-      <li>In the project folder, double-click <code>build-app.command</code>
-        <pre>./build-app.command</pre>
-      </li>
-      <li>When it finishes, Finder opens the DMG folder:
-        <pre>src-tauri/target/release/bundle/dmg/*.dmg</pre>
-      </li>
+      <li>Install Rust + Node once if needed.</li>
+      <li>Double-click <code>build-app.command</code>.</li>
+      <li>Install from <code>src-tauri/target/release/bundle/dmg/</code>.</li>
     </ol>
-    <p class="note">First build can take several minutes while Rust compiles.</p>
+<pre>curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+# Node: https://nodejs.org
+./build-app.command</pre>
+    <p class="note">Still may need Open Anyway once unless you notarize with a Developer ID.</p>
   </section>
 
   <section>
-    <h2>What each file is</h2>
+    <h2>Why this keeps happening</h2>
     <ul>
-      <li><code>Pokemon.Chest_*.dmg</code> — Mac installer</li>
-      <li><code>PokemonChest-source-*.zip</code> — full source for that build</li>
-      <li><code>start.command</code> — run in browser</li>
-      <li><code>build-app.command</code> — make a new DMG on your Mac</li>
-      <li><code>GET-POKEMON-CHEST.html</code> — this guide</li>
+      <li>GitHub CI signs the app <b>ad-hoc</b> (no Apple notarization ticket).</li>
+      <li>Safari/Chrome mark downloads with a <b>quarantine</b> flag.</li>
+      <li>macOS Sequoia shows <b>“Not Opened”</b> with only <b>Done</b> — the allow button moved to <b>Privacy &amp; Security</b>.</li>
     </ul>
+    <p class="note ok">Permanent product fix later = Apple Developer ID + notarize in CI. Until then: Open Anyway once, or use <code>start.command</code>.</p>
   </section>
 
-  <section>
-    <h2>Quick test checklist</h2>
-    <ol>
-      <li>Stop any old server (close the Terminal, or <code>Ctrl+C</code>)</li>
-      <li>Start again with <code>start.command</code></li>
-      <li>Hard-refresh the browser (<code>Cmd+Shift+R</code>)</li>
-      <li>Open the <b>📷 Scanner</b> tab</li>
-    </ol>
-    <p class="note ok">When you ask me to test, I should restart the local server and reopen the browser every time — not reuse a stale tab.</p>
-  </section>
-
-  <p class="note">Repo: <a href="https://github.com/Sparkey333/pokemon-chest" style="color:var(--blue)">github.com/Sparkey333/pokemon-chest</a>
-  · Guide version for app <b>1.14.0</b></p>
+  <p class="note">Release: <a href="https://github.com/Sparkey333/pokemon-chest/releases/tag/chest-latest" style="color:var(--blue)">chest-latest</a>
+  · Guide for app <b>1.14.0</b></p>
 </main>
 <script>
-  // Prefer chest-latest. Fall back to showing the Releases page if fetch fails.
-  (async function () {
-    const dmg = document.getElementById('dmgLink');
-    const src = document.getElementById('srcLink');
-    try {
-      const r = await fetch('https://api.github.com/repos/Sparkey333/pokemon-chest/releases/tags/chest-latest');
-      if (!r.ok) return;
-      const j = await r.json();
-      const assets = j.assets || [];
-      const d = assets.find(a => /\.dmg$/i.test(a.name));
-      const z = assets.find(a => /\.zip$/i.test(a.name));
-      if (d) { dmg.href = d.browser_download_url; dmg.textContent = 'Download DMG — ' + d.name; }
-      if (z) { src.href = z.browser_download_url; src.textContent = 'Download source — ' + z.name; }
-    } catch (_) { /* keep static links */ }
-  })();
+(async function () {
+  const dmg = document.getElementById('dmgLink');
+  const src = document.getElementById('srcLink');
+  try {
+    const r = await fetch('https://api.github.com/repos/Sparkey333/pokemon-chest/releases/tags/chest-latest');
+    if (!r.ok) return;
+    const j = await r.json();
+    const assets = j.assets || [];
+    const d = assets.find(a => /\.dmg$/i.test(a.name));
+    const z = assets.find(a => /source-latest\.zip$/i.test(a.name)) || assets.find(a => /\.zip$/i.test(a.name));
+    if (d) { dmg.href = d.browser_download_url; dmg.textContent = 'Download DMG — ' + d.name; }
+    if (z) { src.href = z.browser_download_url; src.textContent = 'Download source — ' + z.name; }
+  } catch (_) {}
+})();
 </script>
 </body>
 </html>

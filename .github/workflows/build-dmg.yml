@@ -73,11 +73,12 @@ jobs:
           SRC_HASH="PokemonChest-source-${GITHUB_SHA:0:7}.zip"
           SRC_LATEST=PokemonChest-source-latest.zip
           GUIDE=GET-POKEMON-CHEST.html
-          test -f "$DMG" && test -f "$SRC_HASH" && test -f "$SRC_LATEST" && test -f "$GUIDE"
-          echo "publishing: $DMG + $SRC_HASH + $SRC_LATEST + $GUIDE"
-          NOTES="Pokémon Chest v1.14.0 — commit ${GITHUB_SHA:0:7}. Open GET-POKEMON-CHEST.html for one-page download/build steps. Ad-hoc signed: right-click app → Open on first launch."
+          UNLOCK=OPEN-ANYWAY.command
+          test -f "$DMG" && test -f "$SRC_HASH" && test -f "$SRC_LATEST" && test -f "$GUIDE" && test -f "$UNLOCK"
+          echo "publishing: $DMG + $SRC_HASH + $SRC_LATEST + $GUIDE + $UNLOCK"
+          NOTES="Pokémon Chest v1.14.0 — commit ${GITHUB_SHA:0:7}. If macOS shows Not Opened / Done only: System Settings → Privacy & Security → Open Anyway (or run OPEN-ANYWAY.command). Details in GET-POKEMON-CHEST.html."
           gh release delete chest-latest --cleanup-tag --yes || true
-          gh release create chest-latest "$DMG" "$SRC_HASH" "$SRC_LATEST" "$GUIDE" \
+          gh release create chest-latest "$DMG" "$SRC_HASH" "$SRC_LATEST" "$GUIDE" "$UNLOCK" \
             --prerelease \
             --target "$GITHUB_SHA" \
             --title "Pokémon Chest — latest macOS build + source" \
