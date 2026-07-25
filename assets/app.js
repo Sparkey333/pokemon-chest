@@ -136,6 +136,11 @@ function wireChrome() {
     if (e.key === 'Escape') closeModal();
     if (e.key === '/' && document.activeElement !== $('#search')) { e.preventDefault(); $('#search').focus(); }
   };
+  // Deep-link: /index.html?view=scan (used for fresh browser tests)
+  try {
+    const v = new URLSearchParams(location.search).get('view');
+    if (v && $(`#tabs .tab[data-view="${v}"]`)) switchView(v);
+  } catch { /* ignore */ }
 }
 function switchView(v) {
   const prev = State.view;
@@ -661,7 +666,14 @@ function openWalkthrough(step) {
   $$('#modalRoot .wt-dot').forEach(d => d.onclick = () => openWalkthrough(+d.dataset.step));
 }
 function maybeOnboard() {
-  try { if (localStorage.getItem(LS_ONBOARD)) return; } catch { return; }
+  try {
+    // ?skipGuide=1 — used for fresh browser tests / deep-links without the tour modal
+    if (new URLSearchParams(location.search).get('skipGuide') === '1') {
+      localStorage.setItem(LS_ONBOARD, '1');
+      return;
+    }
+    if (localStorage.getItem(LS_ONBOARD)) return;
+  } catch { return; }
   openWalkthrough(0);
 }
 window.openWalkthrough = openWalkthrough;
