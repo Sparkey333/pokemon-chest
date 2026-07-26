@@ -38,9 +38,11 @@ pkmn.gg, Eyevo, PriceCharting app reviews, and app-store/blog comparisons
 1. **Bulk binder-page scan** ✅ 2026-07-24 — read all 9 cards of a binder page in
    one photo (PullVault's killer feature; #1 complaint about single-card
    scanners). Shipped in Scanner: 🗂 Scan a 9-pocket binder page.
-2. **AI condition pre-grade from photos** — centering/corners/edges/surface
-   estimate + grade-ROI verdict (CollectorVault/PokéVault do this; pairs
-   perfectly with our Grade Lab break-even math and GradeStage rig).
+2. **AI condition pre-grade from photos** ✅ 2026-07-26 — centering/corners/
+   edges/surface estimate + grade-ROI verdict. Shipped in Grade Lab →
+   Pre-grade a card → 📷 AI pre-grade from a photo: the AI's estimate blends
+   with the existing centering/flaw-checklist math (whichever is lowest
+   wins) and still feeds the same GradeStage-era $ + ROI verdict.
 3. **Price alerts** — per-card/slab thresholds and "top mover" pushes
    (Shiny/PokéVault). *Fit: PC sync already fetches prices; add thresholds +
    notification (menu-bar/badge locally, push later).*

@@ -1,7 +1,7 @@
 {
   "about": "Canonical machine-readable feature ledger for Pokémon Den. Rendered by the 📋 Parity tab. Agents & future sessions (any model): implement items from their spec alone, satisfy every acceptance criterion, run the verify steps, then set status=shipped, append \"✅ YYYY-MM-DD\" to notes, bump \"updated\", commit and push. Never change pokechest.* storage keys or the bundle identifier. Authored and adversarially verified by a multi-agent ultracode workflow.",
   "schemaVersion": 1,
-  "updated": "2026-07-25",
+  "updated": "2026-07-26",
   "generatedBy": "ultracode parity-ledger workflow wf_fe2016aa-818 (claude-fable-5): repo inventory + 5 spec agents + competitor matrix + 3 adversarial verifiers; {\"authored\": 49, \"merged\": 49, \"corrections\": 15, \"deleted\": 0}",
   "items": [
     {
@@ -712,7 +712,7 @@
       "title": "AI condition pre-grade from a photo",
       "icon": "📐",
       "area": "capture",
-      "status": "planned",
+      "status": "shipped",
       "priority": "P1",
       "spec": "In server.py add AI_GRADE_SYSTEM next to AI_IDENTIFY_SYSTEM (~line 997): 'You pre-grade trading cards from a photo like a PSA grader. Respond with ONLY a JSON object, no prose: {\"centering\":{\"lr\":\"55/45\",\"tb\":\"60/40\",\"worstPct\":60},\"corners\":0-10,\"edges\":0-10,\"surface\":0-10,\"flaws\":[short strings],\"estGrade\":1-10,\"confidence\":0-1}. worstPct is the worst-axis border percentage. Use null for anything unreadable.' Add def ai_grade(payload, settings) modeled exactly on ai_identify (same provider branches for anthropic/openai, same data-url regex, max_tokens 500, prompt 'Pre-grade this trading card.'), parsing re.search(r\"\\{.*\\}\", text, re.S) and returning {\"ok\":True,\"grade\":parsed,\"provider\":provider,\"model\":model}. Register route POST /api/ai/grade in do_POST (server.py, next to the /api/ai/identify block at ~line 1488) with the identical _guard(s.get('ai_key'),'ai_key') check and the same HTTPError/Exception handling. In assets/app.js labPregradeHTML() (~line 1937), inside the '2 · Centering calculator' panel add — only when State.live && State.live.ai && State.live.ai.enabled — a row: <label class=\"btn sm\" style=\"cursor:pointer\">📷 AI pre-grade from a photo<input id=\"pg-photo\" type=\"file\" accept=\"image/*\" style=\"display:none\"></label><span id=\"pg-ai\" class=\"reason\"></span>. In wirePregrade() (~line 1969) add a closure variable let aiEst = null and let aiRec = null; the #pg-photo onchange handler reads the file with blobToDataUrl (app.js line 370), POSTs /api/ai/grade with {dataUrl}, and on ok sets aiRec = j.grade, aiEst = +j.grade.estGrade || null, writes a summary into #pg-ai ('AI: centering 60/40 worst · corners 9 · edges 9 · surface 8 → est PSA 8 · 72% sure'), and if j.grade.centering.worstPct is a number and all four #pg-left/right/top/bottom inputs are empty, treats centeringCeiling(worstPct) as the centering ceiling; then calls update(). Modify update() so est = Math.min(centCeil == null ? 10 : centCeil, checkCeil, aiEst == null ? 10 : aiEst); the existing verdict body already runs gradeLadder(current) (line 2001) to compute PSA 10/9/8 dollar values and the net-vs-raw grade-ROI verdict (net = est$ * (1 - 0.136) - allInGradingCost), so the AI estimate flows into that math with no further change. Extend the existing pregradeSet(current.pcId, {...}) call (line 2007) to also persist ai: aiRec under the existing LS_PREGRADE key 'pokechest.pregrade.v1'.",
       "ux": "Grade Lab tab (🧪) → 'Pre-grade a card' sub-tab: an 'AI pre-grade from a photo' upload button in the centering panel whose result feeds the existing #pg-verdict grade-ROI box.",
@@ -731,7 +731,7 @@
       "est": "M",
       "dependsOn": [],
       "demand": "high",
-      "notes": "Roadmap backlog #2 — CollectorVault and PokéVault ship photo pre-grading; pairs with the existing Grade Lab break-even math (gradeLadder, app.js line 221) and the GradeStage rig."
+      "notes": "Shipped 2026-07-26. server.py: AI_GRADE_SYSTEM + ai_grade() modeled exactly on ai_identify (same provider branches, same data-url regex, same guard/error shape); POST /api/ai/grade registered next to /api/ai/identify. assets/app.js: Grade Lab -> Pre-grade a card -> '2 · Centering calculator' gains a '📷 AI pre-grade from a photo' upload (AI-enabled only); wirePregrade() blends est = min(centering ceiling, flaw-checklist ceiling, AI estGrade), uses the AI's centering.worstPct as a fallback ceiling when the manual border fields are empty, and persists the AI record into pokechest.pregrade.v1[pcId].ai alongside the existing est/centering/flaws/date. Verified 11/11 headless: guard-shape parity with ai/identify (curl), #pg-photo present/absent with AI on/off, AI summary render, blended verdict (min() confirmed via a real 9/10/8 -> 8 case), gradeLadder $ + ROI line intact, flaw-checklist still factors in, persisted ai object, full 17-tab zero-error regression."
     },
     {
       "id": "offline-scan-queue",

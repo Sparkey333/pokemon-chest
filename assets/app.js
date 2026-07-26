@@ -2096,6 +2096,11 @@ function labPregradeHTML() {
           <input id="pg-bottom" type="number" step="0.1" min="0" placeholder="Bottom" style="width:74px">
         </div>
         <div id="pg-centering" class="rb muted" style="font-size:13px;margin-top:8px">Enter borders to compute centering.</div>
+        ${State.live && State.live.ai && State.live.ai.enabled ? `
+        <div style="margin-top:10px">
+          <label class="btn sm" style="cursor:pointer">📷 AI pre-grade from a photo<input id="pg-photo" type="file" accept="image/*" style="display:none"></label>
+          <span id="pg-ai" class="reason"></span>
+        </div>` : ''}
       </div>
     </div>
     <div class="panel" style="margin-top:16px"><h3>3 · Flaw checklist <span class="hint">— check anything you can see using the listed light technique</span></h3>
@@ -2111,6 +2116,7 @@ function labPregradeHTML() {
 
 function wirePregrade() {
   let current = null;
+  let aiEst = null, aiRec = null;
   const saved = pregradeAll();
   const findCard = (val) => {
     const opt = [...$('#pg-list').options].find(o => o.value === val);
@@ -2127,6 +2133,12 @@ function wirePregrade() {
       centCeil = ceil ? ceil.g : 6;
       const w = Math.round(worst);
       centTxt = `L/R <b>${lr ? lr.label : '—'}</b> · T/B <b>${tb ? tb.label : '—'}</b> → worst axis <b>${w}/${100 - w}</b> → centering supports <b style="color:var(--gold)">${ceil ? esc(ceil.row.grade) : 'below PSA 7'}</b>`;
+    } else if (aiRec && aiRec.centering && typeof aiRec.centering.worstPct === 'number') {
+      const worst = aiRec.centering.worstPct;
+      const ceil = centeringCeiling(worst);
+      centCeil = ceil ? ceil.g : 6;
+      const w = Math.round(worst);
+      centTxt = `AI-read centering: worst axis <b>${w}/${100 - w}</b> → centering supports <b style="color:var(--gold)">${ceil ? esc(ceil.row.grade) : 'below PSA 7'}</b> <span class="reason">(from the photo — measure manually to override)</span>`;
     }
     $('#pg-centering').innerHTML = centTxt;
     const dg = labDowngraders();
@@ -2134,12 +2146,12 @@ function wirePregrade() {
     $$('#pg-checks input:checked').forEach(cb => {
       checkCeil = Math.min(checkCeil, parseDropCap(dg[+cb.dataset.di].dropsTo));
     });
-    const est = Math.min(centCeil == null ? 10 : centCeil, checkCeil);
+    const est = Math.min(centCeil == null ? 10 : centCeil, checkCeil, aiEst == null ? 10 : aiEst);
     const box = $('#pg-verdict');
-    if (centCeil == null && checkCeil === 10 && !current) return;
+    if (centCeil == null && checkCeil === 10 && aiEst == null && !current) return;
     let cls = est >= 10 ? 'strong' : est >= 9 ? 'maybe' : 'no';
     let head = est >= 10 ? '★ Looks like a 10 candidate' : est >= 9 ? `◐ Tops out around PSA ${est}` : `○ Caps at PSA ${est} — think raw`;
-    let body = `Centering ceiling: <b>${centCeil == null ? 'not measured' : 'PSA ' + centCeil}</b> · flaw ceiling: <b>PSA ${checkCeil}</b>.`;
+    let body = `Centering ceiling: <b>${centCeil == null ? 'not measured' : 'PSA ' + centCeil}</b> · flaw ceiling: <b>PSA ${checkCeil}</b>${aiEst != null ? ` · AI estimate: <b>PSA ${aiEst}</b>` : ''}.`;
     if (current) {
       const lad = gradeLadder(current);
       const vals = { 10: lad.psa10, 9: lad.psa9, 8: lad.psa8 };
@@ -2147,7 +2159,7 @@ function wirePregrade() {
       const net = est$ * (1 - 0.136) - (State.intel.thresholds.allInGradingCost || 35);
       const beats = net > (current.price || 0);
       body += ` For <b>${esc(current.name)}</b>: a PSA ${est} ≈ <b>${money(est$)}</b>, netting ≈ ${money(net)} after fees+grading vs <b>${money(current.price)}</b> raw → <b style="color:${beats ? 'var(--green)' : 'var(--red)'}">${beats ? 'grading still wins at this grade' : 'sell raw unless it grades higher'}</b>.`;
-      pregradeSet(current.pcId, { est, centering: centCeil, flaws: $$('#pg-checks input:checked').length, date: new Date().toISOString().slice(0, 10) });
+      pregradeSet(current.pcId, { est, centering: centCeil, flaws: $$('#pg-checks input:checked').length, date: new Date().toISOString().slice(0, 10), ai: aiRec });
     }
     box.className = 'rec-box ' + cls;
     box.innerHTML = `<div class="rh">${head}</div><div class="rb">${body}</div>`;
@@ -2163,6 +2175,22 @@ function wirePregrade() {
   };
   ['pg-left', 'pg-right', 'pg-top', 'pg-bottom'].forEach(id => $('#' + id).oninput = update);
   $$('#pg-checks input').forEach(cb => cb.onchange = update);
+  if ($('#pg-photo')) $('#pg-photo').onchange = async e => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    e.target.value = '';
+    const ai = $('#pg-ai');
+    if (ai) ai.textContent = 'Reading the card…';
+    try {
+      const dataUrl = await blobToDataUrl(f);
+      const j = await (await fetch('/api/ai/grade', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ dataUrl }) })).json();
+      if (!j.ok) { if (ai) ai.textContent = '✕ ' + (j.error || 'could not pre-grade'); return; }
+      const g = j.grade || {};
+      aiRec = g; aiEst = +g.estGrade || null;
+      const centBit = g.centering && (g.centering.lr || g.centering.tb) ? `centering ${g.centering.lr || '?'} / ${g.centering.tb || '?'} · ` : '';
+      if (ai) ai.innerHTML = `AI: ${centBit}corners ${g.corners ?? '?'} · edges ${g.edges ?? '?'} · surface ${g.surface ?? '?'} → est PSA ${g.estGrade ?? '?'}${g.confidence != null ? ` · ${Math.round(g.confidence * 100)}% sure` : ''}`;
+      update();
+    } catch (err) { if (ai) ai.textContent = '✕ ' + err.message; }
+  };
 }
 
 function labStandardsHTML(L) {

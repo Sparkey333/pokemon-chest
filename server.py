@@ -1169,6 +1169,58 @@ def ai_identify(payload, settings):
         return {"ok": False, "error": "Could not parse the model's JSON.", "raw": text[:300]}
     return {"ok": True, "guess": guess, "provider": provider, "model": model}
 
+# ------------------------------------------------------- AI condition pre-grade ---
+AI_GRADE_SYSTEM = (
+    "You pre-grade trading cards from a photo like a PSA grader. Respond with ONLY a JSON "
+    "object, no prose: {\"centering\":{\"lr\":\"55/45\",\"tb\":\"60/40\",\"worstPct\":60},"
+    "\"corners\":0-10,\"edges\":0-10,\"surface\":0-10,\"flaws\":[short strings],\"estGrade\":1-10,"
+    "\"confidence\":0-1}. worstPct is the worst-axis border percentage. Use null for anything unreadable.")
+
+def ai_grade(payload, settings):
+    """Modeled exactly on ai_identify: same provider branches, same data-url regex,
+    same error shape — only the system prompt, token budget, and JSON-object (not
+    array) parsing differ."""
+    provider = settings.get("ai_provider", "anthropic")
+    key = settings.get("ai_key")
+    model = settings.get("ai_model") or ("claude-sonnet-4-6" if provider == "anthropic" else "gpt-4o")
+    data_url = (payload.get("dataUrl") or "")
+    m = re.match(r"data:(image/[a-z+.-]+);base64,(.+)$", data_url, re.S)
+    if not m:
+        return {"ok": False, "error": "Send the photo as a data URL."}
+    media_type, b64 = m.group(1), m.group(2).strip()
+    system = AI_GRADE_SYSTEM
+    prompt = "Pre-grade this trading card."
+    max_tokens = 500
+    if provider == "anthropic":
+        d = http_json(
+            "https://api.anthropic.com/v1/messages", method="POST",
+            headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+            body={"model": model, "max_tokens": max_tokens, "system": system,
+                  "messages": [{"role": "user", "content": [
+                      {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": b64}},
+                      {"type": "text", "text": prompt}]}]})
+        text = "".join(b.get("text", "") for b in d.get("content", []) if b.get("type") == "text")
+    elif provider == "openai":
+        d = http_json(
+            "https://api.openai.com/v1/chat/completions", method="POST",
+            headers={"Authorization": f"Bearer {key}", "content-type": "application/json"},
+            body={"model": model, "max_tokens": max_tokens,
+                  "messages": [{"role": "system", "content": system},
+                               {"role": "user", "content": [
+                                   {"type": "image_url", "image_url": {"url": data_url}},
+                                   {"type": "text", "text": prompt}]}]})
+        text = d["choices"][0]["message"]["content"]
+    else:
+        return {"ok": False, "error": f"Unknown AI provider: {provider}"}
+    j = re.search(r"\{.*\}", text, re.S)
+    if not j:
+        return {"ok": False, "error": "The model returned no JSON.", "raw": text[:300]}
+    try:
+        grade = json.loads(j.group(0))
+    except Exception:
+        return {"ok": False, "error": "Could not parse the model's JSON.", "raw": text[:300]}
+    return {"ok": True, "grade": grade, "provider": provider, "model": model}
+
 # --------------------------------------------------- auto inventory import ---
 # Watches for a new/updated PriceCharting export (project folder, POKECHEST_HOME,
 # ~/Downloads) and rebuilds the collection automatically — download the export,
@@ -1675,6 +1727,17 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             try:
                 return self._json(ai_identify(payload, s))
+            except urllib.error.HTTPError as e:
+                detail = e.read().decode("utf-8", "replace")[:400]
+                return self._json({"ok": False, "error": f"{e.code} {detail}"}, 200)
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)}, 200)
+        if path == "/api/ai/grade":
+            s = load_settings()
+            if not self._guard(s.get("ai_key"), "ai_key"):
+                return
+            try:
+                return self._json(ai_grade(payload, s))
             except urllib.error.HTTPError as e:
                 detail = e.read().decode("utf-8", "replace")[:400]
                 return self._json({"ok": False, "error": f"{e.code} {detail}"}, 200)
