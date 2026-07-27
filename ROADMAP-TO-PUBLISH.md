@@ -43,9 +43,11 @@ pkmn.gg, Eyevo, PriceCharting app reviews, and app-store/blog comparisons
    Pre-grade a card → 📷 AI pre-grade from a photo: the AI's estimate blends
    with the existing centering/flaw-checklist math (whichever is lowest
    wins) and still feeds the same GradeStage-era $ + ROI verdict.
-3. **Price alerts** — per-card/slab thresholds and "top mover" pushes
-   (Shiny/PokéVault). *Fit: PC sync already fetches prices; add thresholds +
-   notification (menu-bar/badge locally, push later).*
+3. **Price alerts** ✅ 2026-07-27 — per-card above/below thresholds with a
+   🔔 bell + badge in the header and a toast when one fires (deduped per
+   card per day). Shipped: 🔔 Alert button in every card modal, bell panel
+   listing armed thresholds + recent events. OS-level push notifications
+   remain a later upgrade.
 4. **Per-card price history charts** — every app gets dinged for missing
    real-time collection growth (Dex reviews). *Fit: PC sync snapshots per card
    over time; chart in the card modal.*

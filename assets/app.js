@@ -23,6 +23,7 @@ const LS_ONBOARD = 'pokechest.onboarded.v2';  // first-run walkthrough seen
 const LS_ARCADE = 'pokechest.arcade.v1';      // capsule-machine tokens, pulls, won cards
 const LS_ERRLOG = 'pokechest.errlog.v1';      // opt-in local crash/error log — never sent automatically
 const LS_ERRCONSENT = 'pokechest.errconsent.v1'; // 'on'/'off', default off
+const LS_ALERTS = 'pokechest.alerts.v1';       // { thresholds:{pcId:{above,below,added}}, events:[...], seenAt }
 
 // One-time migration from the PokéVault era — keeps existing snapshots & notes.
 (function migrateLegacyKeys() {
@@ -149,6 +150,7 @@ async function init() {
     State.venues = venues;
     recordSnapshot(col.meta.totalValue);
     recordCardSnaps();
+    checkPriceAlerts();
     State.live = await loadLiveConfig();
     await hydrateServerArt();     // merge card-art saved as real files (survives a localStorage wipe)
     updateLiveBtn();
@@ -188,6 +190,93 @@ function snapshotSeries() {
   return Object.entries(snaps).sort((a, b) => a[0] < b[0] ? -1 : 1);
 }
 
+/* ---------- price alerts (thresholds + bell panel) ---------- */
+function alertsAll() { return loadJSON(LS_ALERTS, { thresholds: {}, events: [], seenAt: null }); }
+function alertsSave(a) { localStorage.setItem(LS_ALERTS, JSON.stringify(a)); }
+function alertGet(c) { return alertsAll().thresholds[String(c.pcId)] || null; }
+function alertSet(c, { above, below }) {
+  const a = alertsAll();
+  const key = String(c.pcId);
+  if (above == null && below == null) delete a.thresholds[key];
+  else a.thresholds[key] = { above: above ?? null, below: below ?? null, added: (a.thresholds[key] && a.thresholds[key].added) || new Date().toISOString().slice(0, 10) };
+  alertsSave(a);
+  updateAlertsBadge();
+}
+function updateAlertsBadge() {
+  const badge = $('#alertsBadge'); if (!badge) return;
+  const a = alertsAll();
+  const n = a.events.filter(e => !a.seenAt || (e.ts || e.at) > a.seenAt).length;
+  badge.textContent = n > 0 ? String(n) : '';
+  badge.style.display = n > 0 ? '' : 'none';
+}
+function checkPriceAlerts() {
+  const a = alertsAll();
+  const today = new Date().toISOString().slice(0, 10);
+  const fired = [];
+  for (const key in a.thresholds) {
+    const t = a.thresholds[key];
+    const c = State.cards.find(x => String(x.pcId) === key);
+    if (!c || c.price == null) continue;
+    const fire = (dir, threshold, hit) => {
+      if (threshold == null || !hit) return;
+      if (a.events.some(e => String(e.pcId) === key && e.dir === dir && e.at === today)) return;
+      const ev = { pcId: c.pcId, name: c.name, dir, threshold, price: c.price, at: today, ts: new Date().toISOString() };
+      a.events.unshift(ev);
+      fired.push(ev);
+    };
+    fire('above', t.above, t.above != null && c.price >= t.above);
+    fire('below', t.below, t.below != null && c.price <= t.below);
+  }
+  if (a.events.length > 100) a.events = a.events.slice(0, 100);
+  if (fired.length) {
+    alertsSave(a);
+    toast(fired.length === 1
+      ? `🔔 ${fired[0].name} hit ${money(fired[0].price)} — alert was ${fired[0].dir} ${money(fired[0].threshold)}`
+      : `🔔 ${fired.length} price alerts triggered — check the bell`);
+  }
+  updateAlertsBadge();
+}
+function openAlertsPanel() {
+  const a = alertsAll();
+  const keys = Object.keys(a.thresholds);
+  const rows = keys.map(key => {
+    const t = a.thresholds[key];
+    const c = State.cards.find(x => String(x.pcId) === key);
+    const name = c ? c.name : `Card #${key}`;
+    const priceTxt = c ? money(c.price) : '—';
+    return `<div class="rv-row" style="align-items:center;border-top:1px solid #1f2a40;padding:8px 0;flex-wrap:wrap">
+      <span style="flex:1;min-width:160px"><b>${esc(name)}</b><br><span class="reason">now ${priceTxt}${t.above != null ? ` · above ${money(t.above)}` : ''}${t.below != null ? ` · below ${money(t.below)}` : ''}</span></span>
+      <button class="minilink" data-al-rm="${esc(key)}">✕ remove</button>
+    </div>`;
+  }).join('') || '<p class="reason">No alerts armed yet — open any card and tap 🔔 Alert.</p>';
+  const events = a.events.slice(0, 40).map(e => `<div class="rv-row" style="border-top:1px solid #1f2a40;padding:6px 0">
+    <span class="reason" style="min-width:150px">${esc((e.ts || e.at || '').slice(0, 19).replace('T', ' '))}</span>
+    <span>${esc(e.name)} hit ${money(e.price)} <span class="reason">(${e.dir} ${money(e.threshold)})</span></span>
+  </div>`).join('') || '<p class="reason">No alerts fired yet.</p>';
+  $('#modalRoot').innerHTML = `<div class="modal-bg" id="modalBg"><div class="modal" style="max-width:560px">
+    <button class="close-x" id="modalClose">×</button>
+    <div class="modal-body" style="padding:26px">
+      <h2 style="font-size:20px;margin-bottom:10px">🔔 Price alerts</h2>
+      <div class="subhead">Armed thresholds</div>
+      <div id="al-thresholds">${rows}</div>
+      <div class="subhead" style="margin-top:16px">Recent events</div>
+      <div id="al-events">${events}</div>
+    </div></div></div>`;
+  $('#modalClose').onclick = closeModal;
+  $('#modalBg').onclick = e => { if (e.target.id === 'modalBg') closeModal(); };
+  $$('[data-al-rm]').forEach(b => b.onclick = () => {
+    const key = b.dataset.alRm;
+    const c = State.cards.find(x => String(x.pcId) === key);
+    if (c) alertSet(c, { above: null, below: null });
+    else { const aa = alertsAll(); delete aa.thresholds[key]; alertsSave(aa); }
+    openAlertsPanel();
+  });
+  const aa = alertsAll();
+  aa.seenAt = new Date().toISOString();
+  alertsSave(aa);
+  updateAlertsBadge();
+}
+
 /* ---------- chrome / routing ---------- */
 function wireChrome() {
   $$('#tabs .tab').forEach(t => t.onclick = () => switchView(t.dataset.view));
@@ -202,6 +291,7 @@ function wireChrome() {
   $('#refreshBtn').onclick = refreshData;
   if ($('#helpBtn')) $('#helpBtn').onclick = () => openWalkthrough(0);
   $('#settingsBtn').onclick = openSettings;
+  if ($('#alertsBtn')) $('#alertsBtn').onclick = openAlertsPanel;
   if ($('#aboutBtn')) $('#aboutBtn').onclick = openAbout;
   document.onkeydown = e => {
     if (e.key === 'Escape') closeModal();
@@ -2818,10 +2908,12 @@ function openModal(c) {
           <button class="btn primary sm" id="mk-list">📤 List for sale</button>
           <button class="btn-lightblue sm" id="mk-photos">📸 Add my photos</button>
           <button class="btn ${caseGet(c) ? 'gold' : ''} sm" id="mk-case">${caseGet(c) ? '★ In case' : '★ Display Case'}</button>
+          <button class="btn ${alertGet(c) ? 'gold' : ''} sm" id="mk-alert">🔔 Alert</button>
           <button class="btn ${u.status === 'forsale' ? 'gold' : ''} sm" id="mk-fs">${u.status === 'forsale' ? '✓ For sale' : 'Mark “For sale”'}</button>
           <button class="btn ${u.status === 'sold' ? 'primary' : ''} sm" id="mk-sold">${u.status === 'sold' ? '✓ Sold' : 'Mark “Sold”'}</button>
           ${u.status ? `<button class="btn ghost sm" id="mk-clear">Clear</button>` : ''}
         </div>
+        <div id="mk-alertbox"></div>
       </div>
     </div>
     <div class="modal-body">
@@ -2863,6 +2955,30 @@ function openModal(c) {
   if ($('#mk-photos')) $('#mk-photos').onclick = () => openPhotoStudio(c, false);
   if ($('#mk-imgedit')) $('#mk-imgedit').onclick = () => openImageEditor(c, true);
   $('#mk-case').onclick = () => openCasePicker(c);
+  $('#mk-alert').onclick = () => {
+    const box = $('#mk-alertbox');
+    if (box.dataset.open === '1') { box.innerHTML = ''; box.dataset.open = ''; return; }
+    box.dataset.open = '1';
+    const t = alertGet(c) || {};
+    box.innerHTML = `<div class="rv-row" style="margin-top:8px;align-items:center;flex-wrap:wrap">
+      <input id="al-above" class="s-inp" type="number" min="0" step="0.01" placeholder="Alert above $" value="${t.above ?? ''}" style="width:140px">
+      <input id="al-below" class="s-inp" type="number" min="0" step="0.01" placeholder="Alert below $" value="${t.below ?? ''}" style="width:140px">
+      <button class="btn primary sm" id="al-save">Save</button>
+      <button class="btn ghost sm" id="al-remove">Remove</button>
+    </div>`;
+    $('#al-save').onclick = () => {
+      const above = $('#al-above').value === '' ? null : +$('#al-above').value;
+      const below = $('#al-below').value === '' ? null : +$('#al-below').value;
+      alertSet(c, { above, below });
+      toast('Alert armed.');
+      openModal(c);
+    };
+    $('#al-remove').onclick = () => {
+      alertSet(c, { above: null, below: null });
+      toast('Alert removed.');
+      openModal(c);
+    };
+  };
   $('#mk-fs').onclick = () => { uset(c, { status: uget(c).status === 'forsale' ? '' : 'forsale' }); openModal(c); refreshAfterUser(); };
   $('#mk-sold').onclick = () => { uset(c, { status: uget(c).status === 'sold' ? '' : 'sold' }); openModal(c); refreshAfterUser(); };
   if ($('#mk-clear')) $('#mk-clear').onclick = () => { uset(c, { status: '' }); openModal(c); refreshAfterUser(); };
