@@ -1852,20 +1852,80 @@ function caseSet(c, patch) {
 }
 function caseRemove(c) { const all = caseAll(); delete all[c.pcId]; localStorage.setItem(LS_CASE, JSON.stringify(all)); }
 
+const CARDSNAP_MAX = 120;               // newest dated points kept per card
+
+/* History key for one card. A raw copy and a graded copy of the same card
+   share a PriceCharting id but are worth wildly different amounts (a raw
+   Charmander at $3.35 vs the PSA 8 at $30.75), so graded copies get their own
+   series. Ungraded cards keep the plain pcId key, which is exactly what the
+   Display Case has always written — so existing history carries over intact.
+   Two ungraded copies of the same card still share a series on purpose: same
+   product, and the cent-level export differences are noise. */
+function snapKey(c) {
+  return c.graded ? `${c.pcId}#${(c.grader || 'G')}${c.grade != null ? c.grade : ''}` : String(c.pcId);
+}
+
 function recordCardSnaps() {
-  // record today's price for every card currently on display (small footprint)
+  // Record today's price for EVERY priced card (not just Display Case picks),
+  // so any card's modal can chart its own history. Kept small by two rules:
+  // only write when the price actually moved since that card's last recorded
+  // point, and prune each card to its newest CARDSNAP_MAX entries. The key and
+  // shape are unchanged (LS_CARDSNAP: {pcId: {'YYYY-MM-DD': price}}), so
+  // existing Display Case history carries straight over, and history for cards
+  // that later leave the export is left in place rather than deleted.
   const snaps = loadJSON(LS_CARDSNAP, {});
   const today = new Date().toISOString().slice(0, 10);
-  const byId = {}; (State.cards || []).forEach(c => byId[c.pcId] = c);
-  Object.keys(caseAll()).forEach(pcId => {
-    const c = byId[pcId]; if (!c || c.price == null) return;
-    (snaps[pcId] = snaps[pcId] || {})[today] = Math.round(c.price * 100) / 100;
-  });
+  for (const c of (State.cards || [])) {
+    if (c.price == null || !isFinite(c.price)) continue;
+    const price = Math.round(c.price * 100) / 100;
+    const key = snapKey(c);
+    const hist = snaps[key] = snaps[key] || {};
+    const dates = Object.keys(hist).sort();
+    if (dates.length && hist[dates[dates.length - 1]] === price && hist[today] === undefined) continue;
+    hist[today] = price;
+    if (dates.length + 1 > CARDSNAP_MAX) {
+      const keep = Object.keys(hist).sort().slice(-CARDSNAP_MAX);
+      snaps[key] = Object.fromEntries(keep.map(d => [d, hist[d]]));
+    }
+  }
   localStorage.setItem(LS_CARDSNAP, JSON.stringify(snaps));
 }
 
+/* Full-width price-history chart for a single card's modal — same visual
+   language as the dashboard sparkline(), but fed a per-card series. */
+function cardHistoryChart(series) {
+  const vals = series.map(s => s[1]);
+  const min = Math.min(...vals), max = Math.max(...vals), W = 600, H = 110, pad = 8;
+  const x = i => pad + i * (W - 2 * pad) / (series.length - 1);
+  const y = v => H - pad - (max === min ? 0.5 : (v - min) / (max - min)) * (H - 2 * pad);
+  const pts = series.map((s, i) => `${x(i).toFixed(1)},${y(s[1]).toFixed(1)}`).join(' ');
+  const area = `${pad},${H - pad} ${pts} ${W - pad},${H - pad}`;
+  const first = vals[0], last = vals[vals.length - 1];
+  const delta = Math.round((last - first) * 100) / 100;
+  const pct = first ? (last - first) / first * 100 : 0;
+  const up = delta >= 0, col = up ? 'var(--green)' : 'var(--red)', sign = up ? '+' : '-';
+  const gid = 'chg' + Math.random().toString(36).slice(2, 8);
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    <defs><linearGradient id="${gid}" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#4cc2ff" stop-opacity=".35"/><stop offset="1" stop-color="#4cc2ff" stop-opacity="0"/></linearGradient></defs>
+    <polygon points="${area}" fill="url(#${gid})"/>
+    <polyline points="${pts}" fill="none" stroke="#4cc2ff" stroke-width="2.5" stroke-linejoin="round"/>
+    <circle cx="${x(series.length - 1)}" cy="${y(last)}" r="3.5" fill="#ffce4d"/>
+  </svg>
+  <div class="muted" style="font-size:12px;margin-top:6px">${series.length} points · ${money(first)} → ${money(last)}
+    <b style="color:${col}">(${sign}${money(Math.abs(delta))}, ${sign}${Math.abs(pct).toFixed(1)}%)</b></div>`;
+}
+function cardHistoryHTML(c) {
+  const t = cardTrend(c);
+  const body = (t.series && t.series.length >= 2)
+    ? cardHistoryChart(t.series)
+    : `<div class="spark-empty">Tracking started ${new Date().toISOString().slice(0, 10)} at ${money(c.price)} — history builds with every sync and refresh.</div>`;
+  return `<div class="subhead">Price history</div>${body}`;
+}
+
 function cardTrend(c) {
-  const hist = loadJSON(LS_CARDSNAP, {})[c.pcId] || {};
+  const all = loadJSON(LS_CARDSNAP, {});
+  const hist = all[snapKey(c)] || (c.graded ? {} : all[c.pcId]) || {};
   const series = Object.entries(hist).sort((a, b) => a[0] < b[0] ? -1 : 1);
   if (series.length >= 2) {
     const first = series[0][1], last = series[series.length - 1][1];
@@ -2900,7 +2960,7 @@ function openModal(c) {
           </span>
         </div>
         <div class="stat-grid">
-          ${statBox('Market', money(c.price), 'var(--gold)')}
+          ${statBox('Market', money(c.price) + trendSpark((cardTrend(c) || {}).series), 'var(--gold)')}
           ${statBox('Cost', money(c.cost))}
           ${statBox('P/L', c.pl == null ? '—' : (c.pl >= 0 ? '+' : '') + money(c.pl), plColor)}
         </div>
@@ -2940,6 +3000,8 @@ function openModal(c) {
 
       <div class="subhead">Sell math</div>
       <div class="rb muted" style="font-size:13px">At <b style="color:var(--gold)">${money(c.value)}</b>${c.qty > 1 ? ` (×${c.qty})` : ''}, a sale nets ≈ <b style="color:var(--green)">${money(s.net)}</b> after ~${s.feePct}% fees on ${c.graded || c.lang === 'ja' || c.value > 100 ? 'eBay' : 'a low-fee venue'}. ${c.datePurchased ? `Bought ${c.datePurchased}.` : ''} Added ${c.dateAdded || '—'}.</div>
+
+      ${cardHistoryHTML(c)}
 
       ${liveZoneHTML(c)}
 

@@ -48,9 +48,12 @@ pkmn.gg, Eyevo, PriceCharting app reviews, and app-store/blog comparisons
    card per day). Shipped: 🔔 Alert button in every card modal, bell panel
    listing armed thresholds + recent events. OS-level push notifications
    remain a later upgrade.
-4. **Per-card price history charts** — every app gets dinged for missing
-   real-time collection growth (Dex reviews). *Fit: PC sync snapshots per card
-   over time; chart in the card modal.*
+4. **Per-card price history charts** ✅ 2026-07-27 — every priced card now
+   records its own price series (deduped, capped at 120 points, ~32 KB for
+   1,100+ cards), charted in the card modal with a change caption plus a
+   sparkline beside the Market price. Raw and graded copies that share a
+   PriceCharting id are tracked separately, so a $2.56 raw card no longer
+   shows its $36.92 PSA 8 sibling's history.
 5. **Set completion tracker** — master-set progress bars, missing-card list,
    cost-to-complete (Pokellector/pkmn.gg's core loop; we have full set data).
 6. **Trade checker** — two stacks side-by-side with live values and a fairness
