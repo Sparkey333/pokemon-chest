@@ -9,6 +9,12 @@
 
 Both rebuild **automatically on every push** — the [`dmg-latest` release](https://github.com/Sparkey333/pokemon-chest/releases/tag/dmg-latest) is always the newest build. Prefer a clean double‑click with your own signing? Clone and run `build-app.command`.
 
+> **macOS says “can’t be verified” / “Not Opened”?** That’s Gatekeeper on an
+> ad‑hoc‑signed build, not a broken download. Double‑click **`OPEN-ANYWAY.command`**
+> in the project folder — it strips the quarantine flag and launches the app.
+> (Manual equivalent: `xattr -cr "/Applications/Pokemon Den.app"`, or System
+> Settings → Privacy & Security → **Open Anyway**.)
+
 ---
 
 A premium‑style, **free** database & sell/grade advisor for your Pokémon card
@@ -45,7 +51,7 @@ same local server and UI.
 | **Dashboard** | Your action board: portfolio value, cost basis, unrealized P/L, EN‑vs‑JP & raw‑vs‑graded splits, top sets, most valuable cards, a value‑over‑time chart, and a **feedback card** for sending suggestions. |
 | **Collection** | Every entry with card art. Search + filter by language, set, era, graded/raw, status, and price; sort by value, profit, return %, name, or date added. Click any card for full detail. |
 | **➕ Add & Sold** | The ledger: **add cards in‑app** (typed or scanned — they survive refreshes and join every tab), **record every sale** (price/fees/venue/date), and **archive** sold cards — kept forever with their photos & sale data on the **Sold Shelf**, just out of your collection totals. Exports a sales CSV. |
-| **📷 Scanner** | Smooth camera capture: hold a card up to your Mac camera (or iPhone via Continuity), snap it, and the photo is **stored with that card's file**. Includes **Phone mode** — a LAN/QR link (HTTPS when possible) so your phone opens the app and scans directly — and the **PriceCharting sync** panel (below). |
+| **📷 Scanner** | Smooth camera capture: hold a card up to your Mac camera (or iPhone via Continuity), snap it, and the photo is **stored with that card's file**. Searches in three tiers — your collection, then the **bundled card codex** (395 sets / 31,603 EN+JA cards including secret rares — no API key, works offline), then the live PriceCharting catalog. Includes **Phone mode** — a LAN/QR link (HTTPS when possible) so your phone opens the app and scans directly — and the **PriceCharting sync** panel (below). |
 | **🏠 The Den** | Your collection as a walk‑in 3D display room (Amber‑Den‑style): trophy wall, slab shelf, side gallery, a spinning pedestal card, a live value ticker, and a **💸 Sold Shelf**. Drag to look, scroll to walk, click any card. Every display is auto‑loaded and editable (source pickers + 3 themes). |
 | **🧊 3D Studio** | Turn any card into a 3D visual asset — draggable/auto‑spin viewer with a holo‑foil effect and a fullscreen **Showcase mode** (screen‑record it for Shorts) — plus **3D‑print STL exports**: an easel stand and a wall frame, auto‑sized to raw / toploader / slab. |
 | **💰 Best Sellers** | What to sell *right now*: every card scored for liquidity (price band × era × set heat), the top‑25 **Best‑Sell Board** with fee‑adjusted nets, and the channel matrix + playbooks for **eBay auctions (bidding), Whatnot live, YouTube, Facebook, TCGplayer, Mercari**. |

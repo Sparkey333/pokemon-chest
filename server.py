@@ -1061,6 +1061,51 @@ def pc_sync_status():
     with PC_LOCK:
         return dict(PC_SYNC, ok=True)
 
+# ---------------------------------------------------------------- card codex ---
+# data/codex.json: every EN + JA Pokémon TCG set and card from TCGdex
+# (395 sets / 31,603 cards, secret + special rares included). Built by
+# scripts/build_codex.py, no API key required. This is the ONLY card lookup
+# that needs neither a PriceCharting token nor a network connection, so it
+# backstops both the collection search and the paid catalog search.
+CODEX = {"data": None, "loaded": False}
+CODEX_LOCK = threading.Lock()
+
+def _codex_load():
+    """Lazy-load + memoize codex.json (7.6 MB) on first search, not at boot."""
+    with CODEX_LOCK:
+        if CODEX["loaded"]:
+            return CODEX["data"]
+        CODEX["loaded"] = True
+        for p in (os.path.join(HOME, "data", "codex.json"),
+                  os.path.join(ROOT, "data", "codex.json")):
+            try:
+                with open(p, encoding="utf-8") as f:
+                    CODEX["data"] = json.load(f)
+                break
+            except Exception:
+                continue
+        return CODEX["data"]
+
+def codex_search(q, limit=25, special_only=False):
+    """Token-AND over each card's prebuilt lowercase `q` field — same matching
+    rule the collection search uses, so results feel identical."""
+    d = _codex_load()
+    if not d:
+        return {"ok": False, "error": "codex.json not found — run scripts/build_codex.py"}
+    terms = [t for t in re.split(r"\s+", (q or "").strip().lower()) if t]
+    if not terms:
+        return {"ok": True, "cards": [], "meta": d.get("meta", {})}
+    out = []
+    for c in d.get("cards", []):
+        if special_only and not c.get("special"):
+            continue
+        hay = c.get("q") or ""
+        if all(t in hay for t in terms):
+            out.append(c)
+            if len(out) >= limit:
+                break
+    return {"ok": True, "cards": out, "meta": d.get("meta", {})}
+
 def pc_search(q, token):
     """Search PriceCharting's product catalog — powers no-typing card adds,
     the AI-identify -> catalog-match handoff in the Scanner, and binder-scan
@@ -1622,6 +1667,16 @@ class Handler(SimpleHTTPRequestHandler):
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             try:
                 return self._json(pc_search((qs.get("q") or [""])[0], s["pricecharting_token"]))
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)}, 200)
+        if path == "/api/codex/search":
+            # No guard: the codex is bundled local data, needs no key and no network.
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            try:
+                return self._json(codex_search(
+                    (qs.get("q") or [""])[0],
+                    limit=min(100, max(1, int((qs.get("limit") or ["25"])[0] or 25))),
+                    special_only=(qs.get("special") or [""])[0] in ("1", "true", "yes")))
             except Exception as e:
                 return self._json({"ok": False, "error": str(e)}, 200)
         if path == "/api/secrets":

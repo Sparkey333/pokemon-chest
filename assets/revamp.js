@@ -853,10 +853,14 @@ function renderScan() {
 
   /* --- card picking --- */
   const results = $('#sc-results');
-  const renderResults = list => {
+  const renderResults = (list, q) => {
     results.innerHTML = list.map(c => `<button class="sc-res" data-i="${c.i}">${rvThumb(c)}<span><b>${esc(c.name)}</b>${c.number ? ' #' + esc(c.number) : ''}<br><span class="reason">${esc(c.set)} · ${money(c.price)}</span></span></button>`).join('')
-      || '<p class="reason" style="padding:8px">No matches.</p>';
+      || '<p class="reason" style="padding:8px">Not in your collection — checking the card codex…</p>';
     $$('.sc-res', results).forEach(b => b.onclick = () => scSelect(State.cards[+b.dataset.i]));
+    // Nothing owned matched: fall back to the bundled 31,603-card codex, which
+    // needs no API key and no network — so scanning still identifies a card you
+    // don't own yet, and can hand it straight to the ledger to add.
+    if (!list.length && q) scCodexSearch(q);
   };
   $('#sc-q').oninput = e => {
     const q = e.target.value.trim().toLowerCase();
@@ -865,7 +869,7 @@ function renderScan() {
     renderResults(State.cards.filter(c => {
       const hay = (c.name + ' ' + c.set + ' ' + (c.number || '')).toLowerCase();
       return toks.every(t => hay.includes(t));
-    }).slice(0, 8));
+    }).slice(0, 8), q);
   };
   $('#sc-q').oninput({ target: $('#sc-q') });
   if (RV.scan.card) scSelect(RV.scan.card);
@@ -944,6 +948,38 @@ function scRenderStaged() {
   });
   $('#sc-discard').onclick = () => { RV.scan.staged = null; scRenderStaged(); };
 }
+/* Third search tier: the bundled TCGdex codex (395 sets / 31,603 EN+JA cards,
+   secret & special rares included). Unlike the collection search it covers
+   cards you don't own, and unlike the PriceCharting catalog search it needs
+   no token and no network — it's local data shipped with the app. */
+let SC_CODEX_SEQ = 0;
+async function scCodexSearch(q) {
+  const box = $('#sc-results'); if (!box) return;
+  const seq = ++SC_CODEX_SEQ;
+  try {
+    const j = await (await fetch('/api/codex/search?limit=8&q=' + enc(q), { cache: 'no-store' })).json();
+    if (seq !== SC_CODEX_SEQ || !$('#sc-results')) return;   // a newer keystroke won
+    if (!j.ok || !j.cards || !j.cards.length) {
+      box.innerHTML = `<p class="reason" style="padding:8px">No matches in your collection or the card codex.</p>`;
+      return;
+    }
+    const pcOn = State.live && State.live.priceCharting;
+    box.innerHTML = `<p class="reason" style="padding:6px 8px 2px">Not in your collection — found in the card codex:</p>` +
+      j.cards.map((c, i) => `<button class="sc-res sc-codexrow" data-x="${i}">
+        ${c.img ? `<img class="sc-thumb" src="${esc(c.img)}" alt="" loading="lazy">` : ''}
+        <span><b>${esc(c.name)}</b>${c.number ? ' #' + esc(c.number) : ''}${c.special ? ' <span class="chip gold" style="font-size:9px">secret</span>' : ''}<br>
+        <span class="reason">${esc(c.set)} · ${c.lang === 'ja' ? '🇯🇵 JP' : '🇺🇸 EN'} · ➕ add via ${pcOn ? 'PriceCharting' : 'Add &amp; Sold'}</span></span>
+      </button>`).join('');
+    $$('.sc-codexrow', box).forEach(b => b.onclick = () => {
+      const c = j.cards[+b.dataset.x];
+      RV.lgQuery = [c.name, c.number].filter(Boolean).join(' ');
+      switchView('ledger');
+    });
+  } catch (e) {
+    if (seq === SC_CODEX_SEQ && $('#sc-results')) box.innerHTML = `<p class="reason" style="padding:8px">No matches.</p>`;
+  }
+}
+
 /* after an AI guess, auto-check the (cache-backed) PriceCharting catalog so
    a card that isn't owned yet can be added right here — no tab jump, no
    retyping what the AI already read off the card. */

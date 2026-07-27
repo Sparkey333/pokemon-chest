@@ -1579,6 +1579,35 @@
       "dependsOn": [],
       "demand": "high",
       "notes": "Shipped 2026-07-25 — directly requested: 'easily pull from eBay or an emails for sales.' Deliberately local-paste/upload rather than a live OAuth integration, consistent with the app's 100%-local privacy stance; a live eBay Sell API (BYOK, like PriceCharting) is a natural future upgrade tracked informally here, not yet a separate ledger item."
+    },
+    {
+      "id": "card-codex",
+      "title": "Offline card codex — every EN+JA set & card, no keys required",
+      "icon": "📖",
+      "area": "capture",
+      "status": "shipped",
+      "priority": "P1",
+      "spec": "data/codex.json (7.6 MB: 395 sets / 31,603 cards — 23,444 EN + 8,159 JA, 5,663 secret/special), built from TCGdex by scripts/build_codex.py (no API key, re-runnable). server.py: CODEX/_codex_load() lazily memoizes the file on first search (not at boot, so startup cost is unchanged); codex_search(q, limit, special_only) does token-AND over each card's prebuilt lowercase `q` field — the same matching rule the collection search uses. GET /api/codex/search?q=&limit=&special= is deliberately unguarded: the codex is bundled local data needing neither a PriceCharting token nor a network connection. assets/revamp.js: scCodexSearch(q) is the Scanner's third search tier — when the collection search returns nothing, it queries the codex and renders labelled 'not in your collection' rows (with set, language, secret-rare chip and TCGdex art); clicking one sets RV.lgQuery and jumps to Add & Sold prefilled. Guarded by a SC_CODEX_SEQ sequence counter so a slower response can't overwrite a newer keystroke.",
+      "ux": "📷 Scanner: search any card — if you don't own it, it still resolves out of the bundled codex (including Japanese sets and secret rares) with a one-click handoff to add it. Works with zero API keys and offline.",
+      "files": [
+        "data/codex.json",
+        "scripts/build_codex.py",
+        "server.py",
+        "assets/revamp.js"
+      ],
+      "acceptance": [
+        "GET /api/codex/search?q=charizard+base returns ok:true with cards and the 395-set/31,603-card meta, with NO API key configured",
+        "Searching an owned card in the Scanner shows collection rows and never triggers the codex fallback",
+        "Searching a card you don't own falls through to codex results labelled 'found in the card codex'",
+        "Clicking a codex result jumps to Add & Sold with RV.lgQuery prefilled to name + number",
+        "A nonsense query shows one clean 'no matches' message rather than a spinner or an error",
+        "Zero JS errors across all 17 tabs"
+      ],
+      "verify": "curl the endpoint with no keys set and assert meta.cards === 31603; headless: assert scCodexSearch exists, owned-card search yields .sc-res with zero .sc-codexrow, unowned search yields .sc-codexrow rows, clicking one lands on the ledger with RV.lgQuery set, nonsense query renders the no-matches copy, then the full 17-tab zero-error regression.",
+      "est": "M",
+      "dependsOn": [],
+      "demand": "high",
+      "notes": "Shipped 2026-07-27. RECOVERED WORK: data/codex.json + scripts/build_codex.py were built by a parallel Cursor agent on branch cursor/card-scan-codex-8306 (PR #2), which branched off the OLD main (Pokémon Chest v1.14.0) and so never reached this branch — the asset was effectively stranded. Ported here and wired into this branch's much newer Scanner instead of PR #2's scanner.js (which targets the old app and would conflict). OPEN-ANYWAY.command came across in the same recovery."
     }
   ],
   "matrix": {
