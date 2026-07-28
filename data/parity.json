@@ -1,7 +1,7 @@
 {
   "about": "Canonical machine-readable feature ledger for Pokémon Den. Rendered by the 📋 Parity tab. Agents & future sessions (any model): implement items from their spec alone, satisfy every acceptance criterion, run the verify steps, then set status=shipped, append \"✅ YYYY-MM-DD\" to notes, bump \"updated\", commit and push. Never change pokechest.* storage keys or the bundle identifier. Authored and adversarially verified by a multi-agent ultracode workflow.",
   "schemaVersion": 1,
-  "updated": "2026-07-27",
+  "updated": "2026-07-28",
   "generatedBy": "ultracode parity-ledger workflow wf_fe2016aa-818 (claude-fable-5): repo inventory + 5 spec agents + competitor matrix + 3 adversarial verifiers; {\"authored\": 49, \"merged\": 49, \"corrections\": 15, \"deleted\": 0}",
   "items": [
     {
@@ -1609,6 +1609,33 @@
       "dependsOn": [],
       "demand": "high",
       "notes": "Shipped 2026-07-27. RECOVERED WORK: data/codex.json + scripts/build_codex.py were built by a parallel Cursor agent on branch cursor/card-scan-codex-8306 (PR #2), which branched off the OLD main (Pokémon Chest v1.14.0) and so never reached this branch — the asset was effectively stranded. Ported here and wired into this branch's much newer Scanner instead of PR #2's scanner.js (which targets the old app and would conflict). OPEN-ANYWAY.command came across in the same recovery."
+    },
+    {
+      "id": "ship-build-profile",
+      "title": "shipBuild flag — strip Emerald Lab from store/public builds",
+      "icon": "🚢",
+      "area": "publish",
+      "status": "shipped",
+      "priority": "P0",
+      "spec": "data/build-flags.json gains shipBuild (default false) alongside publicArt. server.py: build_flags() reads the profile from ROOT (the app bundle) ONLY — never the writable HOME — so a build profile can't be flipped by dropping a file in a user's home dir; ship_build() exposes it; Handler._ship_blocked(path) returns 404 for any /api/emerald* route in a ship build and is called at the top of BOTH do_GET and do_POST. assets/app.js: shipBuild() helper beside applyPublicArtMode(); renderAdmin() omits the entire Emerald Lab panel when it's true.",
+      "ux": "Invisible in personal builds. In a ship build the Admin tab simply has no Emerald Lab, and its endpoints 404.",
+      "files": [
+        "data/build-flags.json",
+        "server.py",
+        "assets/app.js"
+      ],
+      "acceptance": [
+        "Default profile (shipBuild:false): Emerald Lab panel renders and /api/emerald/* returns 200",
+        "shipBuild:true: the panel is absent and every /api/emerald/* route returns 404 on both GET and POST",
+        "The rest of the Admin tab (Card Art Vault, Secure Inputs, Error log) is unaffected in both profiles",
+        "build_flags() ignores a build-flags.json planted in POKECHEST_HOME",
+        "Zero JS errors across all 18 tabs in both profiles"
+      ],
+      "verify": "Boot server.py; curl /api/emerald/status + /api/emerald/install under each profile; run the headless suite twice (WANT_SHIP=0/1) flipping data/build-flags.json, asserting panel presence/absence, flag value, and the full 18-tab zero-error regression.",
+      "est": "S",
+      "dependsOn": [],
+      "demand": "publish-gate",
+      "notes": "Shipped 2026-07-28. Emerald Lab compiles the pokeemerald decompilation and runs it in an emulator — an automatic App Store rejection (guideline 2.5.2 executable code / 4.7 emulators) and indefensible in a product that's sold. This is the first of the three store blockers identified in the 2026-07-27 audit; the other two (IP rename, and sandboxing the bundled Python server) remain open. Verified 12/12 across both profiles. Note build_flags() is bundle-only by design — see spec."
     }
   ],
   "matrix": {

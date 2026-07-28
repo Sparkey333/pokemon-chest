@@ -1,7 +1,7 @@
 /* ===================== Pokémon Den ===================== */
 'use strict';
 
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '2.3.0';
 const APP_REPO = 'https://github.com/Sparkey333/pokemon-chest';
 
 /* ---------- tiny helpers ---------- */
@@ -516,6 +516,14 @@ function applyPublicArtMode() {
     if (/^https?:\/\//i.test(c.img || '')) c.img = null;
   }
 }
+/* Store/ship builds (data/build-flags.json → shipBuild:true) drop the Emerald
+   Lab entirely. It compiles the pokeemerald decompilation and runs it in an
+   emulator, which is an automatic App Store rejection (guideline 2.5.2
+   executable code / 4.7 emulators) and isn't defensible in a product that's
+   sold. Personal builds (shipBuild:false, the default) keep it. The server
+   refuses the /api/emerald/* routes under the same flag, so hiding the panel
+   isn't the only thing standing between a ship build and that code path. */
+function shipBuild() { return !!(State.flags && State.flags.shipBuild); }
 async function hydrateServerArt() {
   // Fold in any card-art files saved on disk that this browser has no local
   // override for (e.g. a fresh install, or images set from another device),
@@ -2441,7 +2449,7 @@ function renderAdmin() {
       <p class="reason" style="margin-top:8px">“Bake” copies your art into the project’s source <code>card-art/</code> folder so a future rebuild ships with them baked in (dev checkout only — the packaged app can’t rewrite itself, so there it just reveals the folder to back up).</p>
     </div>
 
-    <div class="panel accent-emerald" style="margin-bottom:16px">
+    ${shipBuild() ? '' : `<div class="panel accent-emerald" style="margin-bottom:16px">
       <h3>🎮 Emerald Lab — build &amp; play Pokémon Emerald, no Terminal</h3>
       <p class="muted" style="font-size:13.5px;line-height:1.6">Compiles the open-source <b>pokeemerald</b> decompilation into a fresh, <b>fully legal</b> ROM right on your Mac — no downloaded ROM, no command line. ${liveOn ? '' : '<b style="color:var(--gold)">Launch via start.command / the app to enable the buttons.</b>'}</p>
       <div id="em-status" class="muted" style="font-size:13px;margin:8px 0;display:flex;gap:16px;flex-wrap:wrap">Checking…</div>
@@ -2457,7 +2465,7 @@ function renderAdmin() {
       </div>
       <p class="reason" style="margin-top:8px">🔒 The one-time toolchain install is the only step that needs your Mac password — and macOS itself asks for it (one click, never stored here). Build &amp; Play need no password. Nothing is downloaded except the free open-source build tools.</p>
       <pre id="em-log" style="display:none;background:#0a0e16;border:1px solid #1f2a40;border-radius:8px;padding:10px;max-height:280px;overflow:auto;font-size:11.5px;line-height:1.5;white-space:pre-wrap;margin-top:8px"></pre>
-    </div>
+    </div>`}
 
     <div class="panel" style="margin-bottom:16px">
       <h3>🔐 Secure Inputs — saved in your macOS Keychain</h3>

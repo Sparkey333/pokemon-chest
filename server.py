@@ -30,7 +30,7 @@ Run:  python3 server.py     (or double-click start.command)
 import os, sys, re, json, html, base64, socket, ssl, time, datetime, ipaddress, subprocess, threading, shutil, shlex, urllib.request, urllib.error, urllib.parse
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "2.1.0"
+VERSION = "2.3.0"
 ROOT = os.path.dirname(os.path.abspath(__file__))
 HOME = os.path.abspath(os.environ.get("POKECHEST_HOME") or ROOT)
 SETTINGS = os.path.join(HOME, "settings.local.json")
@@ -41,6 +41,24 @@ PORT = int(os.environ.get("POKECHEST_PORT") or os.environ.get("POKEVAULT_PORT") 
 POCKET_NAME = "Pokémon Den — Pocket.html"
 
 # ---------------------------------------------------------------- settings ---
+def build_flags():
+    """data/build-flags.json — the build profile. shipBuild:true marks an
+    App-Store/public build, where the Emerald Lab routes are refused outright
+    (it compiles + runs a GBA decompilation: an automatic store rejection).
+
+    Read from ROOT (the app bundle) ONLY, never from the writable HOME: a
+    build profile is a property of the build, not a user preference, so
+    dropping a file in ~ must not be able to turn a ship build back into a
+    personal one. The browser reads the same bundled file over HTTP."""
+    try:
+        with open(os.path.join(ROOT, "data", "build-flags.json"), encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def ship_build():
+    return bool(build_flags().get("shipBuild"))
+
 def load_settings():
     try:
         with open(SETTINGS, encoding="utf-8") as f:
@@ -1642,6 +1660,14 @@ class Handler(SimpleHTTPRequestHandler):
             raise PayloadTooLarge()
         return json.loads(self.rfile.read(n) or b"{}") if n else {}
 
+    def _ship_blocked(self, path):
+        """Emerald Lab is stripped from ship builds — refuse its routes there
+        so the flag isn't just a hidden UI panel."""
+        if path.startswith("/api/emerald") and ship_build():
+            self._json({"ok": False, "error": "not available in this build"}, 404)
+            return True
+        return False
+
     def _loopback_only(self):
         """This-Mac-only controls: Keychain, subprocess runners, Finder reveals,
         key writes, LAN on/off. The phone (LAN listener) can browse and scan,
@@ -1701,6 +1727,8 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         path = urllib.parse.urlparse(self.path).path
         if path.startswith("/api/") and not self._local_ok():
+            return
+        if self._ship_blocked(path):
             return
         if path == "/api/health":
             return self._json({"ok": True, "version": VERSION})
@@ -1798,6 +1826,8 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self):
         path = urllib.parse.urlparse(self.path).path
         if not self._local_ok():
+            return
+        if self._ship_blocked(path):
             return
         if (path.startswith(("/api/secrets", "/api/emerald")) or path.endswith("/reveal")
                 or path in ("/api/config", "/api/lan", "/api/import", "/api/mobile/deliver")):

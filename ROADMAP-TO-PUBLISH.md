@@ -145,6 +145,13 @@ pkmn.gg, Eyevo, PriceCharting app reviews, and app-store/blog comparisons
 - [x] Onboarding for people with zero PriceCharting history — the Dashboard now
       shows a 3-path welcome panel (import .xlsx / connect live / add by hand)
       when the collection is empty ✅ 2026-07-24
+- [x] Strip App-Store-blocking features from ship builds ✅ 2026-07-28 —
+      `shipBuild` flag in `data/build-flags.json` (bundle-only, not
+      user-overridable) removes the **Emerald Lab** from the UI *and* 404s
+      its `/api/emerald/*` routes. It compiles the pokeemerald decompilation
+      and runs an emulator: automatic rejection under guidelines 2.5.2 / 4.7.
+      Remaining store blockers: the IP rename, and sandboxing the bundled
+      Python server (see §4 — direct notarized distribution avoids the latter).
 - [ ] Real signing + notarization in CI (needs Apple cert secrets in repo)
 - [ ] Top-5 backlog features above implemented
 - [ ] Beta round (TestFlight / direct DMG) with 5–10 collectors

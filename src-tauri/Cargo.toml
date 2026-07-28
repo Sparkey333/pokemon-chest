@@ -1,7 +1,7 @@
 [package]
 name = "pokemon-chest"
-version = "1.13.0"
-description = "Pokémon Chest — your card collection, live comps, and sell & grade intelligence."
+version = "2.3.0"
+description = "Pokémon Den — your card collection, live comps, and sell & grade intelligence."
 authors = ["DarkHearts"]
 edition = "2021"
 
