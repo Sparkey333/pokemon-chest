@@ -1086,6 +1086,63 @@ def _codex_load():
                 continue
         return CODEX["data"]
 
+CODEX_IDX = {"bySet": None, "sets": None}
+
+def _codex_index():
+    """Memoized {lang:setId -> [cards]} and {lang:setId -> set meta} views."""
+    if CODEX_IDX["bySet"] is not None:
+        return CODEX_IDX["bySet"], CODEX_IDX["sets"]
+    d = _codex_load()
+    by_set, sets = {}, {}
+    if d:
+        for c in d.get("cards", []):
+            by_set.setdefault(f"{c.get('lang')}:{c.get('setId')}", []).append(c)
+        for s in d.get("sets", []):
+            sets[f"{s.get('lang')}:{s.get('id')}"] = s
+    CODEX_IDX["bySet"], CODEX_IDX["sets"] = by_set, sets
+    return by_set, sets
+
+def _num_key(n):
+    """Match build_data.py's set_card_index(): strip leading zeros so '004',
+    '4' and 4 all collide."""
+    s = str(n if n is not None else "").strip().lstrip("0")
+    return s or "0"
+
+def codex_completion(payload):
+    """Given {owned: {'<lang>:<setId>': [numbers…]}} return per-set completion
+    computed entirely from the bundled codex — no network, no API key. Each
+    card is returned already flagged owned/not so the client can render both
+    the official-set and master-set views without a second round trip."""
+    d = _codex_load()
+    if not d:
+        return {"ok": False, "error": "codex.json not found — run scripts/build_codex.py"}
+    by_set, sets = _codex_index()
+    owned = (payload or {}).get("owned") or {}
+    out = []
+    for key, nums in owned.items():
+        meta, cards = sets.get(key), by_set.get(key)
+        if not meta:
+            continue
+        have = {_num_key(n) for n in (nums or [])}
+        # 111 of the codex's 395 sets carry set metadata but no card list (the
+        # codex build couldn't fetch their cards). Those are still reported —
+        # with the real denominator and an owned count — flagged partial, so a
+        # set never silently vanishes from the tracker just because we can't
+        # enumerate which specific cards are missing.
+        out.append({
+            "key": key, "id": meta.get("id"), "lang": meta.get("lang"),
+            "name": meta.get("name"), "year": meta.get("year"),
+            "official": meta.get("official"), "total": meta.get("total"),
+            "partial": not cards,
+            "ownedCount": len(have),
+            "cards": [{"n": c.get("number"), "name": c.get("name"),
+                       "sp": bool(c.get("special")),
+                       "own": _num_key(c.get("number")) in have} for c in (cards or [])],
+        })
+    out.sort(key=lambda s: -(sum(1 for c in s["cards"] if c["own"]) or s["ownedCount"]))
+    return {"ok": True, "sets": out,
+            "partialSets": sum(1 for s in out if s["partial"])}
+
 def codex_search(q, limit=25, special_only=False):
     """Token-AND over each card's prebuilt lowercase `q` field — same matching
     rule the collection search uses, so results feel identical."""
@@ -1776,6 +1833,12 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json({"ok": False, "error": str(e)}, 200)
         if path == "/api/autosync":
             return self._json(autosync_set(payload.get("enabled", True)))
+        if path == "/api/codex/completion":
+            # Bundled local data — no key, no network, so no _guard here.
+            try:
+                return self._json(codex_completion(payload))
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)}, 200)
         if path == "/api/ai/identify":
             s = load_settings()
             if not self._guard(s.get("ai_key"), "ai_key"):

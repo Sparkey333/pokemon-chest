@@ -344,3 +344,18 @@
   .den-viewport{height:60vh;min-height:380px}
   .rv-cardcell{min-width:170px}
 }
+
+/* ---------- 🧩 Sets — set-completion tracker ---------- */
+.set-panel{margin-top:12px}
+.set-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.set-count{font-weight:800;font-size:15px;white-space:nowrap}
+.set-count.set-done{color:var(--green)}
+.set-prog{height:9px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden;margin:8px 0 5px}
+.set-prog-bar{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--gold));transition:width .4s ease}
+.set-sub{margin-bottom:2px}
+.set-missing{margin-top:8px}
+.set-missing summary{cursor:pointer;padding:4px 0}
+.set-misslist{max-height:260px;overflow-y:auto;margin:6px 0 8px;display:grid;gap:2px}
+.set-missrow{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;
+  padding:3px 6px;border-radius:5px;background:rgba(255,255,255,.03)}
+.set-pstat{margin-left:8px}

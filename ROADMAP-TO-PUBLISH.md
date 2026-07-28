@@ -54,8 +54,12 @@ pkmn.gg, Eyevo, PriceCharting app reviews, and app-store/blog comparisons
    sparkline beside the Market price. Raw and graded copies that share a
    PriceCharting id are tracked separately, so a $2.56 raw card no longer
    shows its $36.92 PSA 8 sibling's history.
-5. **Set completion tracker** — master-set progress bars, missing-card list,
-   cost-to-complete (Pokellector/pkmn.gg's core loop; we have full set data).
+5. **Set completion tracker** ✅ 2026-07-27 — new **🧩 Sets** tab: every owned
+   set with a progress bar against its real size, an official/master-set
+   toggle, the full missing-card list, and a PriceCharting cost-to-complete.
+   Computed from the bundled codex, so it needs no API key and works
+   offline. Sets the codex lacks a card list for are shown flagged rather
+   than silently dropped.
 6. **Trade checker** — two stacks side-by-side with live values and a fairness
    verdict (PokéVault). Great for live streams too.
 7. **Multi-TCG expansion** — Magic, Yu-Gi-Oh!, sports (Collectr's moat; your

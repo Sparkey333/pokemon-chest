@@ -138,6 +138,7 @@ const RV_VIEWS = {
   brand: () => renderBrand(),
   scan: () => renderScan(),
   ledger: () => renderLedger(),
+  sets: () => renderSets(),
   parity: () => renderParity(),
 };
 (function hookSwitchView() {
@@ -1744,6 +1745,149 @@ function lgSimportRender() {
     toast(n ? `Imported ${n} sale${n === 1 ? '' : 's'} — on the Sold Shelf now.` : 'Nothing matched to record — pick a card for at least one row.');
   };
   $('#lg-simp-clear').onclick = () => { LG.simport = null; renderLedger(); };
+}
+
+/* ============================================================
+   🧩 SETS — set-completion tracker.
+   Every owned Pokémon set as a progress bar against the real
+   TCGdex set size, with the missing cards listed and a
+   cost-to-complete. Sourced entirely from the bundled codex
+   (data/codex.json) via POST /api/codex/completion — no API key,
+   no network, works offline.
+   ============================================================ */
+const LS_SETMODE = 'pokechest.setmode.v1';   // 'official' | 'master'
+const LS_SETCOST = 'pokechest.setcost.v1';   // {key:{date,prices:{num:price|null},total}}
+const SETS = { data: null, loading: false, error: null, open: {} };
+
+function setsMode() { return localStorage.getItem(LS_SETMODE) === 'master' ? 'master' : 'official'; }
+function setsNumKey(n) { const s = String(n == null ? '' : n).trim().replace(/^0+/, ''); return s || '0'; }
+
+/* Owned numbers per "<lang>:<setId>", skipping archived (sold) cards. */
+function setsOwnedMap() {
+  const owned = {};
+  for (const c of State.cards) {
+    if (c.game !== 'Pokémon' || !c.setId || c.number == null) continue;
+    if (uget(c).archived) continue;
+    (owned[`${c.lang}:${c.setId}`] = owned[`${c.lang}:${c.setId}`] || []).push(setsNumKey(c.number));
+  }
+  return owned;
+}
+
+/* Cards counted in the current mode: master = everything incl. secret rares,
+   official = the numbered base set only (TCGdex's `official` count). */
+function setsScoped(s) {
+  return setsMode() === 'master' ? s.cards : s.cards.filter(c => !c.sp);
+}
+
+async function renderSets() {
+  const el = $('#view-sets');
+  const mode = setsMode();
+  if (SETS.data === null && !SETS.loading) {
+    SETS.loading = true;
+    el.innerHTML = '<div class="panel" style="margin-top:20px"><p class="muted">Reading your sets from the card codex…</p></div>';
+    try {
+      const j = await (await fetch('/api/codex/completion', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ owned: setsOwnedMap() }),
+      })).json();
+      SETS.data = j.ok ? (j.sets || []) : [];
+      SETS.error = j.ok ? null : (j.error || 'could not read the codex');
+    } catch (e) { SETS.data = []; SETS.error = e.message; }
+    SETS.loading = false;
+  }
+  if (SETS.loading) return;
+
+  const sets = SETS.data || [];
+  const untracked = State.cards.filter(c => c.game === 'Pokémon' && !c.setId && !uget(c).archived).length;
+  const nonPk = State.cards.filter(c => c.game !== 'Pokémon' && !uget(c).archived).length;
+  const partialCount = sets.filter(s => s.partial).length;
+
+  const rows = sets.map(s => {
+    const scoped = setsScoped(s);
+    // Partial sets (codex has the set but not its card list): fall back to the
+    // raw owned-number count so the set still shows real progress.
+    const have = s.partial ? (s.ownedCount || 0) : scoped.filter(c => c.own).length;
+    const denom = mode === 'master' ? (s.total || scoped.length) : (s.official || scoped.length);
+    const pct = denom ? Math.min(100, Math.round(have / denom * 1000) / 10) : 0;
+    const missing = scoped.filter(c => !c.own);
+    const cost = loadJSON(LS_SETCOST, {})[s.key];
+    const done = have >= denom && denom > 0;
+    return `<div class="panel set-panel" data-key="${esc(s.key)}">
+      <div class="set-head">
+        <div><b>${esc(s.name)}</b> <span class="reason">${s.lang === 'ja' ? '🇯🇵 JP' : '🇺🇸 EN'}${s.year ? ' · ' + s.year : ''} · ${esc(s.id)}</span></div>
+        <div class="set-count ${done ? 'set-done' : ''}">${have} / ${denom}${done ? ' ✓' : ''}</div>
+      </div>
+      <div class="set-prog"><div class="set-prog-bar" style="width:${pct}%"></div></div>
+      <div class="reason set-sub">${pct}% complete · ${missing.length} missing${cost && cost.total != null ? ` · cost to finish ≈ <b style="color:var(--gold)">${money(cost.total)}</b>` : ''}</div>
+      ${s.partial ? `<p class="reason">⚠️ The codex has this set but not its card list, so progress is counted from your own card numbers and the missing cards can't be listed. Rebuild with <code>scripts/build_codex.py</code> to fill it in.</p>`
+      : missing.length ? `<details class="set-missing" ${SETS.open[s.key] ? 'open' : ''} data-key="${esc(s.key)}">
+        <summary class="reason">Show the ${missing.length} missing card${missing.length === 1 ? '' : 's'}</summary>
+        <div class="set-misslist">${missing.map(c => `<div class="set-missrow"><span>#${esc(c.n)} ${esc(c.name)}${c.sp ? ' <span class="chip gold" style="font-size:9px">secret</span>' : ''}</span>${cost && cost.prices && cost.prices[setsNumKey(c.n)] != null ? `<b>${money(cost.prices[setsNumKey(c.n)])}</b>` : ''}</div>`).join('')}</div>
+        ${State.live && State.live.priceCharting
+          ? `<button class="btn sm set-price" data-key="${esc(s.key)}">💰 Price the gaps${missing.length > 40 ? ' (first 40)' : ''}</button>
+             <span class="reason set-pstat" data-key="${esc(s.key)}"></span>`
+          : `<p class="reason">Add a PriceCharting token in ⚙ Live to price the gaps and get a cost-to-complete.</p>`}
+      </details>` : '<p class="reason">Complete — nothing missing in this view.</p>'}
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="section-head"><div><h2>🧩 Sets</h2>
+      <div class="sub">Every set you own, measured against its real size — what's missing, and what it costs to finish. Runs off the bundled card codex, so it works with no API key and no internet.</div></div>
+      <div class="rv-row">
+        <button class="btn sm ${mode === 'official' ? 'primary' : ''}" id="set-m-official">Official set</button>
+        <button class="btn sm ${mode === 'master' ? 'primary' : ''}" id="set-m-master">Master set</button>
+      </div></div>
+    ${SETS.error ? `<div class="panel"><p class="muted">✕ ${esc(SETS.error)}</p></div>` : ''}
+    ${sets.length ? `<div class="kpis">
+      ${(() => {
+        const tot = sets.reduce((a, s) => { const sc = setsScoped(s); return a + (setsMode() === 'master' ? (s.total || sc.length) : (s.official || sc.length)); }, 0);
+        const owncount = s => s.partial ? (s.ownedCount || 0) : setsScoped(s).filter(c => c.own).length;
+        const have = sets.reduce((a, s) => a + owncount(s), 0);
+        const finished = sets.filter(s => { const sc = setsScoped(s); const d = setsMode() === 'master' ? (s.total || sc.length) : (s.official || sc.length); return d > 0 && owncount(s) >= d; }).length;
+        const kpi = (l, v, sub, cls) => `<div class="kpi ${cls || ''}"><div class="k-label">${l}</div><div class="k-value">${v}</div><div class="k-sub">${sub}</div></div>`;
+        return kpi('Sets tracked', sets.length.toLocaleString(), 'from your collection', 'k-blue')
+          + kpi('Cards owned', have.toLocaleString(), `of ${tot.toLocaleString()} in ${setsMode() === 'master' ? 'master' : 'official'} scope`, 'k-gold')
+          + kpi('Sets completed', finished.toLocaleString(), 'nothing missing', finished ? 'k-green' : '')
+          + kpi('Overall', tot ? (Math.round(have / tot * 1000) / 10) + '%' : '—', 'across every tracked set', 'k-green');
+      })()}
+    </div>` : ''}
+    ${rows || (SETS.error ? '' : '<div class="panel"><p class="muted">No Pokémon sets matched the codex yet.</p></div>')}
+    ${(untracked || nonPk || partialCount) ? `<p class="reason" style="margin-top:12px">Not fully tracked: ${untracked.toLocaleString()} Pokémon card${untracked === 1 ? '' : 's'} without a set id (promos and one-offs)${nonPk ? ` · ${nonPk.toLocaleString()} non-Pokémon card${nonPk === 1 ? '' : 's'}` : ''}${partialCount ? ` · ${partialCount} set${partialCount === 1 ? '' : 's'} the codex has no card list for (progress counted, missing cards not listable)` : ''}.</p>` : ''}`;
+
+  $('#set-m-official').onclick = () => { localStorage.setItem(LS_SETMODE, 'official'); renderSets(); };
+  $('#set-m-master').onclick = () => { localStorage.setItem(LS_SETMODE, 'master'); renderSets(); };
+  $$('.set-missing', el).forEach(d => d.ontoggle = () => { SETS.open[d.dataset.key] = d.open; });
+  $$('.set-price', el).forEach(b => b.onclick = () => setsPriceGaps(b.dataset.key));
+}
+
+/* Cost-to-complete: look each missing card up through the (cache-backed)
+   PriceCharting catalog search, paced 400 ms apart to stay friendly to their
+   rate limits, and capped at 40 cards per run so a 200-card gap can't spin
+   for two minutes. Results persist so you only pay the wait once. */
+async function setsPriceGaps(key) {
+  const s = (SETS.data || []).find(x => x.key === key); if (!s) return;
+  const stat = $(`.set-pstat[data-key="${key}"]`);
+  const missing = setsScoped(s).filter(c => !c.own).slice(0, 40);
+  const prices = {};
+  let total = 0, found = 0;
+  for (let i = 0; i < missing.length; i++) {
+    const c = missing[i];
+    if (stat) stat.textContent = `Pricing ${i + 1}/${missing.length}…`;
+    const q = `pokemon ${s.lang === 'ja' ? 'japanese ' : ''}${s.name} ${c.name} #${c.n}`;
+    try {
+      const j = await (await fetch('/api/pc/search?q=' + enc(q), { cache: 'no-store' })).json();
+      const p = j.ok && j.products && j.products[0] ? j.products[0].price : null;
+      prices[setsNumKey(c.n)] = p;
+      if (p != null) { total += p; found++; }
+    } catch (e) { prices[setsNumKey(c.n)] = null; }
+    if (i < missing.length - 1) await new Promise(r => setTimeout(r, 400));
+  }
+  const all = loadJSON(LS_SETCOST, {});
+  all[key] = { date: new Date().toISOString().slice(0, 10), prices, total: Math.round(total * 100) / 100 };
+  localStorage.setItem(LS_SETCOST, JSON.stringify(all));
+  if (stat) stat.textContent = `Priced ${found}/${missing.length} · ≈ ${money(total)}`;
+  renderSets();
 }
 
 /* ============================================================

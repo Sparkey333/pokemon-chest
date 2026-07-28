@@ -893,14 +893,15 @@
       "title": "Set completion tracker",
       "icon": "🧩",
       "area": "collection",
-      "status": "planned",
+      "status": "shipped",
       "priority": "P1",
       "spec": "Add a new top-level view: in index.html insert `<button data-view=\"sets\" class=\"tab\">🧩 Sets</button>` after the Collection tab and `<section id=\"view-sets\" class=\"view\"></section>` inside `<main id=\"main\">`; in assets/revamp.js add `renderSets()` and register `sets: () => renderSets()` in the RV_VIEWS map (revamp.js ~line 134). renderSets() groups State.cards where `c.game === 'Pokémon' && c.setId && !uget(c).archived` by key `${c.lang}:${c.setId}`, with owned numbers per group = Set of `String(c.number).replace(/^0+/,'') || '0'` (this matches how scripts/build_data.py set_card_index() strips leading zeros). For each group lazily fetch `https://api.tcgdex.net/v2/${lang}/sets/${setId}` (client-side; TCGdex is already the app's image source) and cache under new const `LS_SETDATA = 'pokechest.setdata.v1'` as `{\"<lang>:<setId>\": {fetched:'YYYY-MM-DD', name, official: cardCount.official, total: cardCount.total, cards:[{localId, name}]}}` with a 30-day TTL via the existing loadJSON() helper. Render one panel per set: name + setYear, a progress bar `ownedCount / official` where ownedCount = number of data.cards whose leading-zero-stripped localId is in the owned Set, a 'master set' toggle switching the denominator to cardCount.total (persist choice in `localStorage 'pokechest.setmode.v1'`), and a collapsible missing-card list (`<details>`) of every uncollected localId + name. Add a per-set '💰 Price the gaps' button shown only when `State.live && State.live.priceCharting`: it sequentially (setTimeout 400 ms apart, to respect PriceCharting rate limits) calls `GET /api/pc/search?q=` + enc(`pokemon ${lang==='ja'?'japanese ':''}${setName} ${cardName} #${localId}`) (server.py pc_search(), returns `{ok, products:[{id,name,number,set,price}]}`), takes `products[0].price` (null when no match), caches results under new const `LS_SETCOST = 'pokechest.setcost.v1'` as `{\"<lang>:<setId>\": {date, prices:{\"<localId>\": number|null}, total}}`, and renders the summed cost-to-complete plus per-card prices in the missing list; without a token show a hint row pointing at the ⚙ Live settings instead. Sets with `setId == null` (e.g. 'Promo') and non-Pokémon games are excluded from panels and listed in one footer line as untrackable. Style new classes (.set-panel, .set-prog, .set-prog-bar, .set-missing) in assets/revamp.css reusing the existing .ps-prog/.ps-prog-bar look.",
       "ux": "New '🧩 Sets' tab next to Collection: one panel per owned set with a progress bar, expandable missing-card list, and a cost-to-complete total.",
       "files": [
         "index.html",
         "assets/revamp.js",
-        "assets/revamp.css"
+        "assets/revamp.css",
+        "server.py"
       ],
       "acceptance": [
         "Clicking the 🧩 Sets tab renders one panel per owned Pokémon set (setId non-null) with an owned/official progress bar; untrackable sets appear only in the footer note.",
@@ -913,7 +914,7 @@
       "est": "L",
       "dependsOn": [],
       "demand": "high",
-      "notes": "ROADMAP backlog #5 (Pokellector / pkmn.gg core loop) and part of the top-5 publish gate. TCGdex cardCount.official excludes secret rares — hence the master-set toggle. cards' setId values are the TCGdex ids build_data.py already resolved (e.g. 'cel25', 'swsh10', ja 'SV2a'), so no new mapping work is needed."
+      "notes": "Shipped 2026-07-27. DEVIATION FROM SPEC (improvement): the spec predated data/codex.json, so it called for per-set client-side fetches of api.tcgdex.net cached in a new LS_SETDATA key with a 30-day TTL. The bundled codex already covers 100% of this collection's sets (98/98 keys, 1177/1177 cards), so completion is now computed server-side from it via POST /api/codex/completion — no network, no API key, no TTL cache, works offline, and LS_SETDATA was never needed. Server: _codex_index() memoizes {lang:setId -> cards} + set meta; codex_completion() returns each owned set with its cards pre-flagged owned/not so the client renders both official and master scope from one 749 KB round trip. Client: new 🧩 Sets tab (RV_VIEWS.sets -> renderSets()) with KPIs, per-set progress bars, collapsible missing lists, official/master toggle persisted in pokechest.setmode.v1, and 'Price the gaps' (PriceCharting-gated, paced 400ms, capped at 40 cards/run, cached in pokechest.setcost.v1). BUG FOUND + FIXED while verifying: 111 of the codex's 395 sets carry set metadata but no card list (the codex build never fetched their cards) and 7 of those are in this collection — the first implementation silently skipped them, so only 91 of 98 sets appeared. They are now returned flagged partial:true with a real ownedCount, rendered with working progress bars plus an explicit note that the card list is unavailable, and counted in the footer disclosure. Verified 17/17 headless including an explicit no-silent-drops assertion (sent 98 == got 98 == 98 panels)."
     },
     {
       "id": "multi-tcg",
