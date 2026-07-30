@@ -2,7 +2,11 @@
 # ── Pokémon Chest launcher ───────────────────────────────────────────
 # Double-click this file to open your collection in the browser.
 # (Prefer the native "Pokémon Chest.app" once built — same app, no Terminal.)
-cd "$(dirname "$0")" || exit 1
+ROOT="$(cd "$(dirname "$0")" && pwd -P)"
+export POKECHEST_ROOT="$ROOT"
+# shellcheck source=scripts/pokechest-env.sh
+source "$ROOT/scripts/pokechest-env.sh"
+cd "$ROOT" || exit 1
 PORT=8787
 PY="$(command -v python3 || echo /usr/bin/python3)"
 

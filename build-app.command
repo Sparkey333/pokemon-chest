@@ -5,7 +5,11 @@
 # "Pokemon Chest.app" and the .dmg via Tauri.
 # ─────────────────────────────────────────────────────────────────────────────
 set -e
-cd "$(dirname "$0")"
+ROOT="$(cd "$(dirname "$0")" && pwd -P)"
+export POKECHEST_ROOT="$ROOT"
+# shellcheck source=scripts/pokechest-env.sh
+source "$ROOT/scripts/pokechest-env.sh"
+cd "$ROOT"
 echo "── Pokémon Chest · Mac app builder ──"
 
 if ! command -v cargo >/dev/null 2>&1; then

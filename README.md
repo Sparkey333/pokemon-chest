@@ -49,14 +49,26 @@ that exact card, sell math, and a private note + "For sale / Sold" tags.
 ## Keeping prices current — the ↻ Refresh flow
 
 1. On **PriceCharting.com**: Collection → **Download** (Excel).
-2. Drop the new `.xlsx` into this project folder **or just leave it in `~/Downloads`**
-   (any name containing "PriceCharting").
+2. Drop the new `.xlsx` into this project folder, **`~/Downloads`**, Desktop,
+   Documents, or **iCloud Drive** (any name containing "PriceCharting").
 3. Click **↻ Refresh** in the app's top bar. It finds the newest export, rebuilds
    `data/collection.json` (new prices + new cards, re‑fetching card art), and reloads.
 
 Fallback: double‑clicking `refresh-data.command` does exactly the same rebuild from
 Terminal. Your value‑over‑time history, For‑sale / Sold tags, and notes are stored
 privately in your browser and survive every refresh.
+
+### After migrating to iCloud Drive
+
+If this project (or your exports) moved into iCloud:
+
+1. Double‑click **`fix-icloud.command`** once — it scans Desktop / Documents /
+   Downloads / iCloud Drive, downloads cloud‑only placeholders when possible, and
+   seeds a local writable home.
+2. When the project itself lives in iCloud, live writes (settings, rebuilt data,
+   card art) go to **`~/Library/Application Support/PokemonChest`** so iCloud sync
+   doesn't fight the server. Launchers set this automatically.
+3. Then use **`start.command`** as usual.
 
 ---
 

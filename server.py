@@ -27,7 +27,9 @@ Keys live in settings.local.json (gitignored, never bundled). Endpoints:
   POST /api/refresh           -> rebuild data/collection.json from the newest export
   GET  /data/collection.json  -> POKECHEST_HOME copy when present, else bundled file
 
-Env:  POKECHEST_HOME (writable home; default: this script's directory)
+Env:  POKECHEST_HOME (writable home; default: this script's directory, or
+                      ~/Library/Application Support/PokemonChest when the
+                      project lives in iCloud Drive)
       POKECHEST_PORT (port; POKEVAULT_PORT kept as a legacy fallback)
 
 Run:  python3 server.py     (or double-click start.command)
@@ -35,15 +37,40 @@ Run:  python3 server.py     (or double-click start.command)
 import os, sys, re, json, html, base64, socket, ipaddress, subprocess, threading, shutil, shlex, ssl, urllib.request, urllib.error, urllib.parse
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "1.14.0"
+VERSION = "1.14.1"
 ROOT = os.path.dirname(os.path.abspath(__file__))
-HOME = os.path.abspath(os.environ.get("POKECHEST_HOME") or ROOT)
+sys.path.insert(0, os.path.join(ROOT, "scripts"))
+try:
+    from mac_paths import (  # noqa: E402
+        resolve_writable_home, seed_home_from_root, path_report,
+        deliver_destinations, is_under_icloud,
+    )
+except ImportError:
+    resolve_writable_home = seed_home_from_root = path_report = None
+    deliver_destinations = is_under_icloud = None
+
+def _resolve_home():
+    env = (os.environ.get("POKECHEST_HOME") or "").strip()
+    if env:
+        return os.path.abspath(env), "POKECHEST_HOME env"
+    if resolve_writable_home:
+        home, why = resolve_writable_home(ROOT)
+        if home != ROOT and seed_home_from_root:
+            seeded = seed_home_from_root(home, ROOT)
+            if seeded:
+                print(f"  Seeded Application Support from iCloud project: {', '.join(seeded)}", flush=True)
+            os.environ["POKECHEST_HOME"] = home
+        return home, why
+    return ROOT, "project folder"
+
+HOME, _HOME_REASON = _resolve_home()
 SETTINGS = os.path.join(HOME, "settings.local.json")
 CARD_ART_DIR = os.path.join(HOME, "card-art")           # your live saves (writable)
 BUNDLED_ART_DIR = os.path.join(ROOT, "card-art")        # baked-in defaults (ship with the build)
 LISTING_DIR = os.path.join(HOME, "listing-photos")      # YOUR OWN photos of each card, for selling
 PORT = int(os.environ.get("POKECHEST_PORT") or os.environ.get("POKEVAULT_PORT") or "8787")
 POCKET_NAME = "Pokémon Chest — Pocket.html"
+MOBILE_NAME = "Pokémon Chest — Deck.html"
 
 # ---------------------------------------------------------------- settings ---
 def load_settings():
@@ -917,8 +944,6 @@ def build_pocket():
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
-MOBILE_NAME = "Pokémon Chest — Deck.html"
-
 def build_mobile():
     """Build the self-contained MOBILE app (swipe deck + deck builder + 3D battle
     buildup), embedding your CAUGHT cards' real photos + a few wild thumbnails."""
@@ -945,27 +970,30 @@ def build_mobile():
     return {"ok": True, "file": MOBILE_NAME, "path": out, "kb": kb, "report": report or {}}
 
 def deliver_mobile():
-    """Copy the built mobile app to the user's own devices/paths: iCloud Drive
-    (→ Files app on iPhone) and the Desktop (→ AirDrop). Local copies only."""
+    """Copy the built mobile app to Desktop / iCloud Drive / Documents so the
+    Files app on iPhone (and AirDrop) can pick it up — works after iCloud migration."""
     out = os.path.join(HOME, MOBILE_NAME)
     if not os.path.isfile(out):
         r = build_mobile()
         if not r.get("ok"):
             return r
     delivered = []
-    desk = os.path.join(os.path.expanduser("~/Desktop"), MOBILE_NAME)
-    try:
-        shutil.copy2(out, desk); delivered.append({"where": "Desktop (AirDrop it)", "path": desk})
-    except Exception as e:
-        delivered.append({"where": "Desktop", "error": str(e)})
-    icloud = os.path.expanduser("~/Library/Mobile Documents/com~apple~CloudDocs")
-    if os.path.isdir(icloud):
-        dst = os.path.join(icloud, MOBILE_NAME)
+    targets = deliver_destinations(MOBILE_NAME) if deliver_destinations else [
+        ("Desktop (AirDrop it)", os.path.join(os.path.expanduser("~/Desktop"), MOBILE_NAME)),
+    ]
+    seen = set()
+    for label, dst in targets:
+        key = os.path.realpath(dst) if os.path.exists(os.path.dirname(dst)) else dst
+        if key in seen:
+            continue
+        seen.add(key)
         try:
-            shutil.copy2(out, dst); delivered.append({"where": "iCloud Drive (Files app on iPhone)", "path": dst})
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.copy2(out, dst)
+            delivered.append({"where": label, "path": dst})
         except Exception as e:
-            delivered.append({"where": "iCloud Drive", "error": str(e)})
-    ok = any("path" in d for d in delivered)     # honest: true only if a copy landed
+            delivered.append({"where": label, "error": str(e)})
+    ok = any("path" in d for d in delivered)
     return {"ok": ok, "delivered": delivered,
             **({} if ok else {"error": "Could not copy anywhere — use “Reveal file” and move it manually."})}
 
@@ -1328,7 +1356,14 @@ class Handler(SimpleHTTPRequestHandler):
         if path.startswith("/api/") and not self._local_ok():
             return
         if path == "/api/health":
-            return self._json({"ok": True, "version": VERSION})
+            payload = {"ok": True, "version": VERSION, "home": HOME, "homeReason": _HOME_REASON,
+                       "projectInICloud": bool(is_under_icloud and is_under_icloud(ROOT))}
+            if path_report:
+                try:
+                    payload["paths"] = path_report(ROOT, HOME)
+                except Exception as e:
+                    payload["pathsError"] = str(e)
+            return self._json(payload)
         if path == "/api/config":
             return self._json(config_view(load_settings()))
         if path == "/api/emerald/status":
@@ -1569,5 +1604,8 @@ if __name__ == "__main__":
     print(f"│  Pokémon Chest running → http://localhost:{PORT} │")
     print("│  Keep this window open. Close it to stop.    │")
     print("└──────────────────────────────────────────────┘")
+    if HOME != ROOT:
+        print(f"  Writable home → {HOME}")
+        print(f"  ({_HOME_REASON})")
     print(f"POKECHEST_READY port={PORT}", flush=True)
     server.serve_forever()

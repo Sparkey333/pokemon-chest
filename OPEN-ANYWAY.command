@@ -9,7 +9,13 @@ for cand in \
   "/Applications/Pokemon Chest.app" \
   "/Applications/Pokémon Chest.app" \
   "$HOME/Applications/Pokemon Chest.app" \
-  "$HOME/Applications/Pokémon Chest.app"
+  "$HOME/Applications/Pokémon Chest.app" \
+  "$HOME/Desktop/Pokemon Chest.app" \
+  "$HOME/Desktop/Pokémon Chest.app" \
+  "$HOME/Library/Mobile Documents/com~apple~CloudDocs/Pokemon Chest.app" \
+  "$HOME/Library/Mobile Documents/com~apple~CloudDocs/Pokémon Chest.app" \
+  "$HOME/Library/Mobile Documents/com~apple~CloudDocs/Desktop/Pokemon Chest.app" \
+  "$HOME/Library/Mobile Documents/com~apple~CloudDocs/Applications/Pokemon Chest.app"
 do
   if [ -d "$cand" ]; then APP="$cand"; break; fi
 done

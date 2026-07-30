@@ -3,10 +3,15 @@
 # NOTE: the ↻ Refresh button inside the app now does this same rebuild for
 # you — this script is the Terminal fallback if the app isn't running.
 # 1. Export a fresh collection from PriceCharting.com (Collection → Download).
-# 2. Drop the .xlsx into THIS folder (keep the name containing "PriceCharting").
+# 2. Drop the .xlsx into THIS folder, ~/Downloads, Desktop/Documents, or iCloud
+#    Drive (keep the name containing "PriceCharting").
 # 3. Double-click this file. It rebuilds data/collection.json with new prices
 #    and any new cards, re-fetching card images as needed.
-cd "$(dirname "$0")" || exit 1
+ROOT="$(cd "$(dirname "$0")" && pwd -P)"
+export POKECHEST_ROOT="$ROOT"
+# shellcheck source=scripts/pokechest-env.sh
+source "$ROOT/scripts/pokechest-env.sh"
+cd "$ROOT" || exit 1
 PY="$(command -v python3 || echo /usr/bin/python3)"
 
 echo "Checking for openpyxl (needed to read the .xlsx)…"
@@ -15,7 +20,7 @@ if ! "$PY" -c "import openpyxl" 2>/dev/null; then
   "$PY" -m pip install --user openpyxl || { echo "Could not install openpyxl."; read -r -p "Press Enter to close."; exit 1; }
 fi
 
-echo "Rebuilding data from the newest PriceCharting .xlsx in this folder…"
+echo "Rebuilding data from the newest PriceCharting .xlsx (project / Downloads / iCloud)…"
 "$PY" scripts/build_data.py
 
 echo "Refreshing the iPhone Pocket Edition…"

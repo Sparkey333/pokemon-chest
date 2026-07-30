@@ -11,9 +11,10 @@ No API keys required. Card images come from TCGdex (https://tcgdex.dev), a free,
 open Pokemon card API covering English AND Japanese sets.
 
 When POKECHEST_HOME is set (e.g. when bundled read-only inside the .app), all
-output (data/collection.json) and the TCGdex cache go under POKECHEST_HOME, and
-the source .xlsx is searched in POKECHEST_HOME, the project root, and
-~/Downloads — newest wins.
+output (data/collection.json) and the TCGdex cache go under POKECHEST_HOME.
+The source .xlsx is searched across the project, POKECHEST_HOME, ~/Downloads,
+~/Desktop, ~/Documents, iCloud Drive, and common CloudStorage mounts — newest
+PriceCharting-named file wins.
 
 At the very end prints one machine-readable line for the in-app refresh:
   REPORT_JSON={"entries":...,"cards":...,"value":...,"imagesMatched":...}
@@ -25,45 +26,39 @@ import os, re, json, sys, unicodedata, datetime, urllib.request, urllib.error, u
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
+sys.path.insert(0, HERE)
+from mac_paths import find_pricecharting_xlsx, resolve_writable_home, seed_home_from_root  # noqa: E402
+
 _home_env = (os.environ.get("POKECHEST_HOME") or "").strip()
-HOME = os.path.abspath(_home_env) if _home_env else None
-OUT_DIR = os.path.join(HOME, "data") if HOME else os.path.join(ROOT, "data")
-CACHE = os.path.join(HOME, "cache") if HOME else os.path.join(HERE, "cache")
+if _home_env:
+    HOME = os.path.abspath(_home_env)
+else:
+    # When the checkout lives in iCloud, write under Application Support.
+    HOME, _why = resolve_writable_home(ROOT)
+    if HOME != ROOT:
+        seed_home_from_root(HOME, ROOT)
+        os.environ["POKECHEST_HOME"] = HOME
+OUT_DIR = os.path.join(HOME, "data")
+CACHE = os.path.join(HOME, "cache") if HOME != ROOT else os.path.join(HERE, "cache")
 os.makedirs(CACHE, exist_ok=True)
 os.makedirs(OUT_DIR, exist_ok=True)
 
 # ---- locate the newest PriceCharting export ---------------------------------
-# Searched in POKECHEST_HOME (when set), the project root, and ~/Downloads —
-# the newest matching file across all of them wins.
 def find_source():
-    dirs = []
-    if HOME:
-        dirs.append(HOME)
-    dirs.append(ROOT)
-    dirs.append(os.path.expanduser("~/Downloads"))
-    seen, files = set(), []
-    for d in dirs:
-        d = os.path.abspath(d)
-        if d in seen or not os.path.isdir(d):
-            continue
-        seen.add(d)
-        try:
-            names = os.listdir(d)
-        except OSError:
-            continue
-        for f in names:
-            if f.lower().endswith(".xlsx") and not f.startswith("~$"):
-                files.append(os.path.join(d, f))
-    cands = [p for p in files if "pricecharting" in os.path.basename(p).lower()]
-    if not cands:
-        # fall back to any .xlsx, but only in our own folders (never grab a
-        # random spreadsheet out of ~/Downloads)
-        own = {os.path.abspath(x) for x in ([HOME] if HOME else []) + [ROOT]}
-        cands = [p for p in files if os.path.dirname(p) in own]
-    if not cands:
-        sys.exit("No PriceCharting .xlsx export found in POKECHEST_HOME, the "
-                 "project folder, or ~/Downloads.")
-    return max(cands, key=os.path.getmtime)
+    path, diag = find_pricecharting_xlsx(ROOT, HOME)
+    if not path:
+        stubs = diag.get("icloudPlaceholders") or []
+        hint = ""
+        if stubs:
+            hint = ("\nFound iCloud placeholders (cloud-only — open once in Finder to download):\n  "
+                    + "\n  ".join(stubs))
+        sys.exit(
+            "No PriceCharting .xlsx export found in the project folder, "
+            "POKECHEST_HOME, ~/Downloads, ~/Desktop, ~/Documents, or iCloud Drive."
+            + hint
+        )
+    print(f"Using PriceCharting export:\n  {path}", flush=True)
+    return path
 
 SRC = find_source()
 
