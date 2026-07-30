@@ -523,6 +523,41 @@ body{overflow-x:hidden}
 .arc-won:hover{transform:translateY(-3px) scale(1.05)}
 .arc-won img{width:100%;height:100%;object-fit:cover}
 
+.arc-games{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+.arc-gchip{font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;border-radius:999px;padding:6px 12px;
+  color:var(--muted);background:var(--panel2);border:1px solid var(--border)}
+.arc-gchip.on,.arc-gchip:hover{color:var(--text);border-color:var(--sapphire);background:rgba(76,194,255,.08)}
+.arc-wild-list{display:flex;flex-direction:column;gap:6px}
+.arc-wild{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;
+  font-family:inherit;text-align:left;cursor:pointer;border-radius:10px;padding:8px 10px;
+  color:var(--text);background:var(--panel2);border:1px solid var(--border)}
+.arc-wild:hover{border-color:var(--sapphire)}
+
+.plinko{position:relative;background:linear-gradient(180deg,#0e1524,#121a2b);border:1px solid var(--border);
+  border-radius:12px;padding:10px 10px 6px;margin:0 0 10px;overflow:hidden;min-height:210px}
+.pk-board{position:relative;height:150px}
+.pk-row{display:flex;justify-content:space-around;height:18px;align-items:center}
+.pk-peg{width:7px;height:7px;border-radius:50%;background:#8792a8;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+.pk-slots{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:6px}
+.pk-slot{font-size:9.5px;font-weight:800;text-align:center;padding:5px 2px;border-radius:6px;
+  border:1px solid var(--border2);color:var(--muted2);text-transform:uppercase;letter-spacing:.04em}
+.pk-slot.lit{color:#0a101c;border-color:transparent}
+.pk-slot.t-leg.lit{background:#f0c33c}.pk-slot.t-epic.lit{background:#a97bff}
+.pk-slot.t-rare.lit{background:#4cc2ff}.pk-slot.t-unc.lit{background:#3ad6a0}.pk-slot.t-com.lit{background:#8f9bb3}
+.pk-chip{position:absolute;top:8px;left:0;width:14px;height:14px;margin-left:-7px;border-radius:50%;
+  background:#ffce4d;box-shadow:0 0 10px rgba(255,206,77,.55);z-index:2}
+.pk-chip.drop{animation:pkfall 1.35s cubic-bezier(.2,.7,.3,1) forwards}
+.pk-chip.t-leg{background:#f0c33c}.pk-chip.t-epic{background:#a97bff}.pk-chip.t-rare{background:#4cc2ff}
+.pk-chip.t-unc{background:#3ad6a0}.pk-chip.t-com{background:#8f9bb3}
+@keyframes pkfall{
+  0%{transform:translate(var(--pk-x0,40%),0)}
+  18%{transform:translate(calc(var(--pk-x0,40%) + 18px),22px)}
+  36%{transform:translate(calc(var(--pk-x0,40%) - 14px),48px)}
+  54%{transform:translate(calc(var(--pk-x0,40%) + 10px),78px)}
+  72%{transform:translate(calc((var(--pk-x0,40%) + var(--pk-x1,50%)) / 2),110px)}
+  100%{transform:translate(var(--pk-x1,50%),148px)}
+}
+
 /* ============ 📸 Photo Studio · light-blue action · Listing kit ============ */
 .btn-lightblue{font-family:inherit;font-weight:800;font-size:13px;cursor:pointer;border:none;border-radius:10px;
   padding:9px 16px;color:#062134;background:linear-gradient(135deg,#8fd8ff,#4cc2ff);

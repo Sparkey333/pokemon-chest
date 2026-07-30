@@ -37,7 +37,7 @@ Run:  python3 server.py     (or double-click start.command)
 import os, sys, re, json, html, base64, socket, ipaddress, subprocess, threading, shutil, shlex, ssl, urllib.request, urllib.error, urllib.parse
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "1.14.1"
+VERSION = "1.15.0"
 ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 try:

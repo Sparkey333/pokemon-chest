@@ -1,7 +1,8 @@
 name: Build macOS DMG
 
 # Builds "Pokemon Chest.app" + the .dmg on GitHub's macOS runners, then
-# publishes a rolling dmg-latest release (DMG + source zip) on the Releases page.
+# publishes a rolling chest-latest release (DMG + source zip + guide) so the
+# GET-POKEMON-CHEST.html download buttons always point at a fresh build.
 on:
   workflow_dispatch:
   push:
@@ -18,6 +19,8 @@ on:
       - "server.py"
       - "icon-source.png"
       - "package.json"
+      - "GET-POKEMON-CHEST.html"
+      - "OPEN-ANYWAY.command"
       - ".github/workflows/build-dmg.yml"
 
 permissions:
@@ -49,36 +52,53 @@ jobs:
       - name: Regenerate the full icon set from icon-source.png
         run: npx --yes "@tauri-apps/cli@^2" icon icon-source.png
 
-      # CI has no Apple Developer certificate — ad-hoc sign ("-") instead of the
-      # configured identity. First launch needs right-click → Open (Gatekeeper).
+      # CI has no Apple Developer certificate secrets in this repo yet — ad-hoc
+      # sign ("-") instead of the configured Apple Development identity.
+      # Gatekeeper still needs Open Anyway once (see OPEN-ANYWAY.command).
+      # When Developer ID + notarization secrets exist, /gitkit switches to them.
       - name: Build app + dmg (universal, ad-hoc signed)
         run: >
           npx --yes "@tauri-apps/cli@^2" build
           --target universal-apple-darwin
-          --config '{"bundle":{"macOS":{"signingIdentity":"-"}}}'
+          --config '{"bundle":{"macOS":{"signingIdentity":"-","hardenedRuntime":false}}}'
 
       - name: Zip the source tree (tracked files at this commit)
         run: |
           git archive --format=zip -o "PokemonChest-source-${GITHUB_SHA:0:7}.zip" "$GITHUB_SHA"
-          # stable name for the GET-POKEMON-CHEST.html download button
           cp "PokemonChest-source-${GITHUB_SHA:0:7}.zip" PokemonChest-source-latest.zip
           ls -lh PokemonChest-source-*.zip
 
-      # Dedicated tag so the redesign "dmg-latest" (Pokémon Den) cannot overwrite Chest.
       - name: Publish DMG + source to chest-latest release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          VER=$(python3 -c "import json; print(json.load(open('package.json'))['version'])")
           DMG=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg | head -1)
           SRC_HASH="PokemonChest-source-${GITHUB_SHA:0:7}.zip"
           SRC_LATEST=PokemonChest-source-latest.zip
           GUIDE=GET-POKEMON-CHEST.html
           UNLOCK=OPEN-ANYWAY.command
           test -f "$DMG" && test -f "$SRC_HASH" && test -f "$SRC_LATEST" && test -f "$GUIDE" && test -f "$UNLOCK"
-          echo "publishing: $DMG + $SRC_HASH + $SRC_LATEST + $GUIDE + $UNLOCK"
-          NOTES="Pokémon Chest v1.14.0 — commit ${GITHUB_SHA:0:7}. If macOS shows Not Opened / Done only: System Settings → Privacy & Security → Open Anyway (or run OPEN-ANYWAY.command). Details in GET-POKEMON-CHEST.html."
+          # SHA256 checksums — verify before trusting a download
+          shasum -a 256 "$DMG" "$SRC_HASH" "$SRC_LATEST" "$GUIDE" "$UNLOCK" > SHA256SUMS.txt
+          echo "publishing: $DMG + source + guide + unlock + checksums (v$VER)"
+          NOTES=$(cat <<EOF
+          Pokémon Chest v${VER} — commit ${GITHUB_SHA:0:7}.
+
+          **Download:** DMG installer, source zip, GET-POKEMON-CHEST.html, OPEN-ANYWAY.command, SHA256SUMS.txt.
+
+          **Gatekeeper (Sequoia “Not Opened / Done only”):**
+          1. Install from the DMG into Applications
+          2. System Settings → Privacy & Security → Open Anyway
+             — or double-click OPEN-ANYWAY.command
+             — or: \`xattr -cr "/Applications/Pokemon Chest.app"\`
+
+          Ad-hoc signed CI build (no Apple notarization ticket yet). Local
+          \`build-app.command\` uses your Apple Development identity when present.
+          EOF
+          )
           gh release delete chest-latest --cleanup-tag --yes || true
-          gh release create chest-latest "$DMG" "$SRC_HASH" "$SRC_LATEST" "$GUIDE" "$UNLOCK" \
+          gh release create chest-latest "$DMG" "$SRC_HASH" "$SRC_LATEST" "$GUIDE" "$UNLOCK" SHA256SUMS.txt \
             --prerelease \
             --target "$GITHUB_SHA" \
             --title "Pokémon Chest — latest macOS build + source" \
@@ -92,5 +112,7 @@ jobs:
           path: |
             src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
             GET-POKEMON-CHEST.html
+            OPEN-ANYWAY.command
+            SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14

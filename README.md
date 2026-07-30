@@ -35,8 +35,9 @@ On a Mac you can also double‑click **`build-app.command`** to build a fresh DM
 
 | View | What it does |
 |------|--------------|
-| **Dashboard** | Your action board: portfolio value, cost basis, unrealized P/L, EN‑vs‑JP & raw‑vs‑graded splits, top sets, most valuable cards, a value‑over‑time chart, and a **feedback card** for sending suggestions. |
+| **Dashboard** | Your action board: portfolio value, cost basis, unrealized P/L, **by-game split** (Pokémon / Yu-Gi-Oh! / Magic / sports / Dragon Ball…), EN‑vs‑JP & raw‑vs‑graded, top sets, most valuable cards, value‑over‑time, and a feedback card. |
 | **Scanner** | Mac / Continuity Camera / iPhone phone‑mode capture. Search the **full TCGdex EN+JA release codex** (every set + special/secret rares) and — with your PriceCharting token — the same **`/api/products`** catalog PriceCharting uses. Optional AI photo Identify (BYOK). |
+| **Arcade** | Capsule Machine + **Plinko** that pull real cards from **every game** in your export. Emerald “Catch in the Wild” is the Pokémon Phase 2 path (Admin → Emerald Lab). |
 | **Collection** | Every entry with card art. Search + filter by language, set, era, graded/raw, status, and price; sort by value, profit, return %, name, or date added. Click any card for full detail. |
 | **Sell Hub** | Cards ranked for selling with fee‑adjusted **net estimates**, one‑click **sold comps** (eBay raw + graded, TCGplayer, 130point, Mercari, PriceCharting), a **Grading Candidates** list with break‑even math and estimated PSA‑10 value, and your **For‑sale** worklist. |
 | **Sell & Grade Guide** | Current grading tiers & costs, when to grade vs. not, grade‑value multiples, marketplace fees, and the best venue for raw English / graded / Japanese cards — with sources. |

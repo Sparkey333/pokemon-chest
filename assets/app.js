@@ -1,7 +1,7 @@
 /* ===================== Pokémon Chest ===================== */
 'use strict';
 
-const APP_VERSION = '1.14.0';
+const APP_VERSION = '1.15.0';
 const APP_REPO = 'https://github.com/Sparkey333/pokemon-chest';
 
 /* ---------- tiny helpers ---------- */
@@ -11,6 +11,38 @@ const money = (n, d = 2) => (n == null ? '—' : '$' + Number(n).toLocaleString(
 const money0 = (n) => money(n, 0);
 const enc = encodeURIComponent;
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* Multi-game helpers — PriceCharting exports already carry Magic / YuGiOh /
+   sports / Dragon Ball alongside Pokémon. Grading math stays Pokémon-only. */
+const GAME_META = {
+  'Pokémon': { icon: '🔴', short: 'Pokémon', grade: true },
+  'Pokemon': { icon: '🔴', short: 'Pokémon', grade: true },
+  'YuGiOh': { icon: '🟣', short: 'Yu-Gi-Oh!', grade: false },
+  'Magic': { icon: '🔵', short: 'Magic', grade: false },
+  'Football': { icon: '🏈', short: 'Football', grade: false },
+  'Basketball': { icon: '🏀', short: 'Basketball', grade: false },
+  'Baseball': { icon: '⚾', short: 'Baseball', grade: false },
+  'Dragon': { icon: '🟠', short: 'Dragon Ball', grade: false },
+};
+function gameIcon(g) { return (GAME_META[g] || {}).icon || '🃏'; }
+function gameShort(g) { return (GAME_META[g] || {}).short || g || 'Other'; }
+function isPokemonGame(gOrCard) {
+  const g = typeof gOrCard === 'string' ? gOrCard : (gOrCard && gOrCard.game);
+  return g === 'Pokémon' || g === 'Pokemon';
+}
+function gamesOwned() {
+  const bg = (State.meta && State.meta.byGame) || {};
+  return Object.keys(bg).sort((a, b) => (bg[b] || 0) - (bg[a] || 0));
+}
+function countByGame(game) {
+  return (State.cards || []).filter(c => !game || game === 'all' || c.game === game).length;
+}
+function filterCollectionToGame(game) {
+  State.filters.game = game || 'all';
+  switchView('collection');
+  buildToolbar();
+  renderCollection(true);
+}
 
 const LS_SNAP = 'pokechest.snapshots.v1';
 const LS_USER = 'pokechest.userdata.v1';
@@ -692,15 +724,21 @@ const ARC_TIERS = [
 ];
 function arcTierOf(c) { const p = c.price || 0; return ARC_TIERS.find(t => p >= t.min) || ARC_TIERS[ARC_TIERS.length - 1]; }
 function arcadeGet() {
-  const s = loadJSON(LS_ARCADE, { tokens: ARCADE_DAILY, day: '', pulls: 0, won: [] });
+  const s = loadJSON(LS_ARCADE, { tokens: ARCADE_DAILY, day: '', pulls: 0, won: [], game: 'all', plinko: 0 });
   if (!Array.isArray(s.won)) s.won = [];
+  if (!s.game) s.game = 'all';
+  if (s.plinko == null) s.plinko = 0;
   const today = new Date().toISOString().slice(0, 10);
   if (s.day !== today) { s.day = today; s.tokens = ARCADE_DAILY; arcadeSet(s); }
   return s;
 }
 function arcadeSet(s) { try { localStorage.setItem(LS_ARCADE, JSON.stringify(s)); } catch { /* storage off/full — play without persistence */ } }
-function arcadeDraw() {
-  const pool = (State.cards || []).filter(c => c.price != null);
+function arcadePool(game) {
+  const g = game || arcadeGet().game || 'all';
+  return (State.cards || []).filter(c => c.price != null && (g === 'all' || c.game === g));
+}
+function arcadeDraw(game) {
+  const pool = arcadePool(game);
   if (!pool.length) return null;
   const byTier = {}; ARC_TIERS.forEach(t => byTier[t.key] = []);
   pool.forEach(c => byTier[arcTierOf(c).key].push(c));
@@ -736,37 +774,42 @@ function machineSVG() {
 function renderArcade() {
   const el = $('#view-arcade'); if (!el) return;
   const s = arcadeGet();
-  const pool = (State.cards || []).filter(c => c.price != null);
-  // odds shown must match the actual draw (which renormalizes over tiers you own)
+  const games = gamesOwned();
+  const pool = arcadePool(s.game);
   const tierHas = {}; ARC_TIERS.forEach(t => tierHas[t.key] = 0);
   pool.forEach(c => tierHas[arcTierOf(c).key]++);
   const availT = ARC_TIERS.filter(t => tierHas[t.key]);
   const oddsTotal = availT.reduce((a, t) => a + t.pct, 0) || 1;
   const oddsRow = availT.map(t => `<div class="arc-odd ${t.cls}"><span class="ao-dot"></span><span class="ao-l">${t.label}</span><span class="ao-p">${Math.round(t.pct / oddsTotal * 100)}%</span></div>`).join('');
-  // resolve won cards by array index (pcId isn't unique — 158 pcIds repeat across raw/graded variants)
   const wonCard = (w) => (w.i != null && State.cards[w.i]) || (State.cards || []).find(c => c.pcId === w.pcId);
   const shelf = s.won.slice(-24).reverse().map(w => {
     const c = wonCard(w); if (!c) return '';
     const t = arcTierOf(c);
     return `<div class="arc-won ${t.cls}" data-i="${c.i}" title="${esc(c.name)} — ${money(c.price)}">${c.img ? `<img loading="lazy" src="${esc(c.img)}" onerror="this.outerHTML=phThumb(${c.i})">` : phThumb(c.i)}</div>`;
   }).join('');
+  const gameChips = `<div class="arc-games">
+      <button class="arc-gchip ${s.game === 'all' ? 'on' : ''}" data-g="all">All games · ${countByGame('all')}</button>
+      ${games.map(g => `<button class="arc-gchip ${s.game === g ? 'on' : ''}" data-g="${esc(g)}">${gameIcon(g)} ${esc(gameShort(g))} · ${countByGame(g)}</button>`).join('')}
+    </div>`;
   el.innerHTML = `
     <div class="section-head"><h2>🕹 Arcade — turn your collection into a game</h2>
-      <span class="sub">Phase 1: the Capsule Machine. Every crank pulls a real card from your vault — chase cards are rarer to win.</span></div>
+      <span class="sub">Capsule Machine + Plinko pull real cards from every game in your vault (Pokémon, Yu-Gi-Oh!, Magic, sports, Dragon Ball…). Chase cards stay rarer.</span></div>
+
+    ${gameChips}
 
     <div class="arc-grid">
       <div class="panel accent-amethyst arc-machine">
         <div class="arc-tokens">🎟️ <b id="arc-tok">${s.tokens}</b> crank${s.tokens === 1 ? '' : 's'} left today <span class="reason">· refills daily</span></div>
         <div class="gm-stage" id="gm-stage">${machineSVG()}<div class="gm-capsule" id="gm-capsule"></div></div>
         <button class="btn primary arc-crank" id="arc-crank" ${s.tokens > 0 && pool.length && !_arcBusy ? '' : 'disabled'}>🎰 Turn the crank</button>
-        <div class="reason" id="arc-msg" style="margin-top:8px;min-height:18px">${pool.length ? 'Give it a crank!' : 'Load your collection to play.'}</div>
+        <div class="reason" id="arc-msg" style="margin-top:8px;min-height:18px">${pool.length ? 'Give it a crank!' : 'No priced cards in this game filter — pick All games or another title.'}</div>
       </div>
 
       <div class="panel accent-gold arc-prizewrap">
         <div class="subhead" style="margin-top:0">Your pull</div>
-        <div class="arc-prize" id="arc-prize"><div class="arc-empty">Turn the crank to reveal a card ✨</div></div>
-        <div class="arc-odds">${oddsRow}</div>
-        <div class="reason" style="margin-top:8px">Lifetime cranks: <b>${s.pulls}</b></div>
+        <div class="arc-prize" id="arc-prize"><div class="arc-empty">Turn the crank or drop a Plinko chip ✨</div></div>
+        <div class="arc-odds">${oddsRow || '<span class="reason">No odds yet for this filter.</span>'}</div>
+        <div class="reason" style="margin-top:8px">Lifetime cranks: <b>${s.pulls}</b> · Plinko drops: <b>${s.plinko || 0}</b></div>
       </div>
     </div>
 
@@ -776,61 +819,149 @@ function renderArcade() {
     </div>
 
     <div class="cols two" style="margin-top:16px">
-      <div class="panel accent-emerald"><h3>🎳 Next up — Plinko drop (Phase 1b)</h3>
-        <p class="muted" style="font-size:13.5px;line-height:1.6">Drop a chip and watch it bounce through the pegs into a rarity slot — same odds, more suspense. Coming in the next build.</p></div>
-      <div class="panel accent-sapphire"><h3>🌍 The big one — Catch in the Wild (Phase 2)</h3>
-        <p class="muted" style="font-size:13.5px;line-height:1.6">Beat the Emerald hack, then <b>scan a card from your collection</b> → its Pokémon spawns in the game world for you to go find and catch. This is the ROM-hack build (personal-only) we’re working toward.</p></div>
+      <div class="panel accent-emerald">
+        <h3>🎳 Plinko drop</h3>
+        <p class="muted" style="font-size:13.5px;line-height:1.55;margin:0 0 10px">Same rarity odds as the capsule machine — watch the chip bounce into a slot, then reveal a real card from the active game filter. Costs 1 crank token.</p>
+        <div class="plinko" id="plinko">
+          <div class="pk-board" id="pk-board"></div>
+          <div class="pk-slots" id="pk-slots">${ARC_TIERS.map(t => `<div class="pk-slot ${t.cls}" data-tier="${t.key}">${t.label}</div>`).join('')}</div>
+          <div class="pk-chip" id="pk-chip" hidden></div>
+        </div>
+        <button class="btn" id="arc-plinko" ${s.tokens > 0 && pool.length && !_arcBusy ? '' : 'disabled'}>Drop a chip</button>
+        <div class="reason" id="pk-msg" style="margin-top:8px;min-height:18px"></div>
+      </div>
+      <div class="panel accent-sapphire">
+        <h3>🌍 Catch in the Wild (Phase 2)</h3>
+        <p class="muted" style="font-size:13.5px;line-height:1.55">Pokémon path: beat the Emerald Lab hack, then scan a card → spawn it in the wild. Other games use the same Scanner + Arcade loop today — pick a title above, pull it, open the card, and mark it caught with Photo Studio.</p>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">
+          <button class="btn sm" id="arc-to-scan">📷 Open Scanner</button>
+          <button class="btn sm ghost" id="arc-to-emerald">🛠 Emerald Lab</button>
+          <button class="btn sm ghost" id="arc-to-games">🃏 Browse other games</button>
+        </div>
+        <div class="arc-wild-list" style="margin-top:12px">${games.filter(g => !isPokemonGame(g)).slice(0, 6).map(g => {
+          const n = countByGame(g); const v = (State.meta.byGame || {})[g] || 0;
+          return `<button class="arc-wild" data-g="${esc(g)}"><span>${gameIcon(g)} ${esc(gameShort(g))}</span><span class="reason">${n} cards · ${money0(v)}</span></button>`;
+        }).join('') || '<span class="reason">Only Pokémon in this export so far — Refresh after adding other TCGs to PriceCharting.</span>'}</div>
+      </div>
     </div>`;
 
-  $('#arc-crank').onclick = () => arcadePull();
+  $$('.arc-gchip').forEach(b => b.onclick = () => {
+    const st = arcadeGet(); st.game = b.dataset.g || 'all'; arcadeSet(st); renderArcade();
+  });
+  $('#arc-crank').onclick = () => arcadePull('capsule');
+  $('#arc-plinko').onclick = () => arcadePlinko();
+  if ($('#arc-to-scan')) $('#arc-to-scan').onclick = () => switchView('scan');
+  if ($('#arc-to-emerald')) $('#arc-to-emerald').onclick = () => { switchView('admin'); setTimeout(() => { const t = document.getElementById('ad-emerald'); if (t) t.scrollIntoView({ behavior: 'smooth' }); }, 80); };
+  if ($('#arc-to-games')) $('#arc-to-games').onclick = () => filterCollectionToGame('all');
+  $$('.arc-wild').forEach(b => b.onclick = () => filterCollectionToGame(b.dataset.g));
   $$('#arc-shelf .arc-won').forEach(w => w.onclick = () => { const c = State.cards[+w.dataset.i]; if (c) openModal(c); });
+  buildPlinkoBoard();
+}
+function buildPlinkoBoard() {
+  const board = $('#pk-board'); if (!board) return;
+  const rows = 7, cols = 8;
+  let html = '';
+  for (let r = 0; r < rows; r++) {
+    html += `<div class="pk-row" style="padding-left:${(r % 2) * 14}px">`;
+    for (let c = 0; c < cols - (r % 2 ? 1 : 0); c++) html += '<i class="pk-peg"></i>';
+    html += '</div>';
+  }
+  board.innerHTML = html;
 }
 let _arcBusy = false;
-function arcadePull() {
+function arcadeReveal(card, tier, how) {
+  const prize = $('#arc-prize');
+  if (prize) prize.innerHTML = `
+    <div class="arc-reveal ${tier.cls}">
+      <div class="arc-glow"></div>
+      <div class="arc-card">${card.img ? `<img src="${esc(card.img)}" alt="${esc(card.name)}" onerror="this.outerHTML=phHTML(${card.i})">` : phHTML(card.i)}</div>
+      <div class="arc-badge">${tier.label}</div>
+      <div class="arc-name">${esc(card.name)}</div>
+      <div class="arc-meta">${gameIcon(card.game)} ${esc(gameShort(card.game))} · ${esc(card.set)}${card.number ? ' · #' + esc(card.number) : ''} · <b style="color:var(--gold)">${money(card.price)}</b></div>
+      <div class="arc-sparks">${'<i></i>'.repeat(8)}</div>
+      <button class="btn sm" id="arc-open">Open card ↗</button>
+    </div>`;
+  const open = $('#arc-open'); if (open) open.onclick = () => openModal(card);
+  const msg = $('#arc-msg');
+  if (msg) msg.textContent = (how === 'plinko' ? 'Plinko landed on ' : '') +
+    ((tier.key === 'legendary' || tier.key === 'epic') ? `🌟 ${tier.label}! Nice pull.` : 'Nice — added to your shelf.');
+  const shelf = $('#arc-shelf');
+  if (shelf) {
+    const t2 = arcTierOf(card);
+    const chip = `<div class="arc-won ${t2.cls}" data-i="${card.i}" title="${esc(card.name)} — ${money(card.price)}">${card.img ? `<img loading="lazy" src="${esc(card.img)}" onerror="this.outerHTML=phThumb(${card.i})">` : phThumb(card.i)}</div>`;
+    if (shelf.querySelector('.reason')) shelf.innerHTML = '';
+    shelf.insertAdjacentHTML('afterbegin', chip);
+    const first = shelf.querySelector('.arc-won'); if (first) first.onclick = () => openModal(card);
+  }
+}
+function arcadePull(how) {
   if (_arcBusy) return;
   const s = arcadeGet();
   if (s.tokens <= 0) { $('#arc-msg').textContent = 'Out of cranks — they refill tomorrow.'; return; }
-  const draw = arcadeDraw();
+  const draw = arcadeDraw(s.game);
   if (!draw) { $('#arc-msg').textContent = 'No cards to pull yet.'; return; }
   _arcBusy = true;
   const { card, tier } = draw;
-  s.tokens -= 1; s.pulls += 1; s.won.push({ i: card.i, pcId: card.pcId, at: Date.now() });
+  s.tokens -= 1; s.pulls += 1; s.won.push({ i: card.i, pcId: card.pcId, at: Date.now(), how: how || 'capsule' });
   if (s.won.length > 200) s.won = s.won.slice(-200);
   arcadeSet(s);
-  const crank = $('#arc-crank'); if (crank) crank.disabled = true;
+  const crank = $('#arc-crank'), pk = $('#arc-plinko');
+  if (crank) crank.disabled = true;
+  if (pk) pk.disabled = true;
   const stage = $('#gm-stage'), cap = $('#gm-capsule'), tok = $('#arc-tok'), msg = $('#arc-msg');
   if (tok) tok.textContent = s.tokens;
   if (stage) stage.classList.add('cranking');
   if (cap) { cap.className = 'gm-capsule drop ' + tier.cls; cap.style.display = 'block'; }
   if (msg) msg.textContent = 'Cranking…';
-  const prize = $('#arc-prize');
   setTimeout(() => {
     if (stage) stage.classList.remove('cranking');
     if (cap) cap.style.display = 'none';
-    if (prize) prize.innerHTML = `
-      <div class="arc-reveal ${tier.cls}">
-        <div class="arc-glow"></div>
-        <div class="arc-card">${card.img ? `<img src="${esc(card.img)}" alt="${esc(card.name)}" onerror="this.outerHTML=phHTML(${card.i})">` : phHTML(card.i)}</div>
-        <div class="arc-badge">${tier.label}</div>
-        <div class="arc-name">${esc(card.name)}</div>
-        <div class="arc-meta">${esc(card.set)}${card.number ? ' · #' + esc(card.number) : ''} · <b style="color:var(--gold)">${money(card.price)}</b></div>
-        <div class="arc-sparks">${'<i></i>'.repeat(8)}</div>
-        <button class="btn sm" id="arc-open">Open card ↗</button>
-      </div>`;
-    const open = $('#arc-open'); if (open) open.onclick = () => openModal(card);
-    if (msg) msg.textContent = tier.key === 'legendary' || tier.key === 'epic' ? `🌟 ${tier.label}! Nice pull.` : 'Nice — added to your shelf.';
-    // refresh the shelf strip
-    const shelf = $('#arc-shelf');
-    if (shelf) {
-      const t2 = arcTierOf(card);
-      const chip = `<div class="arc-won ${t2.cls}" data-i="${card.i}" title="${esc(card.name)} — ${money(card.price)}">${card.img ? `<img loading="lazy" src="${esc(card.img)}" onerror="this.outerHTML=phThumb(${card.i})">` : phThumb(card.i)}</div>`;
-      if (shelf.querySelector('.reason')) shelf.innerHTML = '';
-      shelf.insertAdjacentHTML('afterbegin', chip);
-      const first = shelf.querySelector('.arc-won'); if (first) first.onclick = () => openModal(card);
-    }
+    arcadeReveal(card, tier, 'capsule');
     _arcBusy = false;
-    const ck = $('#arc-crank'); if (ck) ck.disabled = s.tokens <= 0;  // re-query: may be a new button after a re-render
+    const ck = $('#arc-crank'), p2 = $('#arc-plinko');
+    if (ck) ck.disabled = s.tokens <= 0;
+    if (p2) p2.disabled = s.tokens <= 0;
   }, 1050);
+}
+function arcadePlinko() {
+  if (_arcBusy) return;
+  const s = arcadeGet();
+  if (s.tokens <= 0) { const m = $('#pk-msg'); if (m) m.textContent = 'Out of tokens — they refill tomorrow.'; return; }
+  const draw = arcadeDraw(s.game);
+  if (!draw) { const m = $('#pk-msg'); if (m) m.textContent = 'No cards in this filter.'; return; }
+  _arcBusy = true;
+  const { card, tier } = draw;
+  const tierIdx = Math.max(0, ARC_TIERS.findIndex(t => t.key === tier.key));
+  const chip = $('#pk-chip'), board = $('#pk-board'), msg = $('#pk-msg');
+  const crank = $('#arc-crank'), pk = $('#arc-plinko');
+  if (crank) crank.disabled = true;
+  if (pk) pk.disabled = true;
+  if (msg) msg.textContent = 'Dropping…';
+  // Animate chip bouncing down; final x aligns with the winning tier slot.
+  const bw = board ? board.clientWidth : 280;
+  const startX = bw * (0.35 + Math.random() * 0.3);
+  const endX = ((tierIdx + 0.5) / ARC_TIERS.length) * bw;
+  if (chip) {
+    chip.hidden = false;
+    chip.className = 'pk-chip drop ' + tier.cls;
+    chip.style.setProperty('--pk-x0', startX + 'px');
+    chip.style.setProperty('--pk-x1', endX + 'px');
+  }
+  $$('.pk-slot').forEach(el => el.classList.toggle('lit', el.dataset.tier === tier.key));
+  setTimeout(() => {
+    s.tokens -= 1; s.pulls += 1; s.plinko = (s.plinko || 0) + 1;
+    s.won.push({ i: card.i, pcId: card.pcId, at: Date.now(), how: 'plinko' });
+    if (s.won.length > 200) s.won = s.won.slice(-200);
+    arcadeSet(s);
+    const tok = $('#arc-tok'); if (tok) tok.textContent = s.tokens;
+    if (chip) chip.hidden = true;
+    arcadeReveal(card, tier, 'plinko');
+    if (msg) msg.textContent = `Landed on ${tier.label}.`;
+    _arcBusy = false;
+    const ck = $('#arc-crank'), p2 = $('#arc-plinko');
+    if (ck) ck.disabled = s.tokens <= 0;
+    if (p2) p2.disabled = s.tokens <= 0;
+  }, 1400);
 }
 window.renderArcade = renderArcade;
 
@@ -865,7 +996,9 @@ function renderDashboard() {
         ${sparkline()}
       </div>
       <div class="panel">
-        <h3>English vs Japanese</h3>
+        <h3>By game <span class="hint">— click a row to filter Collection</span></h3>
+        ${gamesBarsHTML()}
+        <h3 style="margin-top:18px">English vs Japanese <span class="hint">— Pokémon art language</span></h3>
         ${barRows([
           { l: '🇺🇸 English', v: m.byLang.en || 0, cls: 'en' },
           { l: '🇯🇵 Japanese', v: m.byLang.ja || 0, cls: 'jp' },
@@ -897,9 +1030,24 @@ function renderDashboard() {
     ${feedbackCardHTML()}`;
 
   $$('#view-dashboard .mini').forEach(el => el.onclick = () => openModal(State.cards[+el.dataset.i]));
+  $$('#view-dashboard .game-row').forEach(el => el.onclick = () => filterCollectionToGame(el.dataset.g));
   wireGamePlan();
   wireActionBoard();
   wireFeedback();
+}
+
+function gameBarsHTML() {
+  const bg = (State.meta && State.meta.byGame) || {};
+  const rows = Object.entries(bg).sort((a, b) => b[1] - a[1]);
+  if (!rows.length) return '<p class="muted" style="font-size:13px">No games yet.</p>';
+  const max = rows[0][1] || 1;
+  return `<div class="bars">${rows.map(([g, v]) => {
+    const n = countByGame(g);
+    return `<div class="bar-row game-row" data-g="${esc(g)}" title="Filter Collection to ${esc(gameShort(g))}" style="cursor:pointer">
+      <div class="bl">${gameIcon(g)} ${esc(gameShort(g))} <span class="reason">· ${n}</span></div>
+      <div class="bar-track"><div class="bar-fill ${isPokemonGame(g) ? 'gold' : ''}" style="width:${Math.max(2, v / max * 100)}%"></div></div>
+      <div class="bv">${money0(v)}</div></div>`;
+  }).join('')}</div>`;
 }
 
 /* ================= GAME PLAN (Now / Build / Invest) ================= */
@@ -1221,7 +1369,7 @@ function buildToolbar() {
     <select id="f-era">${[['all','All eras'],['modern','Modern (2020+)'],['retro','2011–2019'],['vintage','Vintage (≤2010)']].map(([v,l]) => opt(v, State.filters.era, l)).join('')}</select>
     <select id="f-set">${sets.map(s => opt(s, State.filters.set, s === 'all' ? 'All sets' : s)).join('')}</select>
     <select id="f-status">${[['all','Any status'],['forsale','For sale'],['sold','Sold'],['unmarked','Unmarked']].map(([v,l]) => opt(v, State.filters.status, l)).join('')}</select>
-    ${games.length > 2 ? `<select id="f-game">${games.map(g => opt(g, State.filters.game, g === 'all' ? 'All games' : g)).join('')}</select>` : ''}
+    ${Object.keys(State.meta.byGame || {}).length ? `<select id="f-game">${games.map(g => opt(g, State.filters.game, g === 'all' ? 'All games' : `${gameIcon(g)} ${gameShort(g)}`)).join('')}</select>` : ''}
     <span class="tlabel">$</span>
     <input id="f-min" type="number" min="0" placeholder="min" value="${State.filters.min}" style="width:74px">
     <input id="f-max" type="number" min="0" placeholder="max" value="${State.filters.max}" style="width:74px">
@@ -2135,7 +2283,7 @@ function renderAdmin() {
       <p class="reason" style="margin-top:8px">“Bake” copies your art into the project’s source <code>card-art/</code> folder so a future rebuild ships with them baked in (dev checkout only — the packaged app can’t rewrite itself, so there it just reveals the folder to back up).</p>
     </div>
 
-    <div class="panel accent-emerald" style="margin-bottom:16px">
+    <div class="panel accent-emerald" id="ad-emerald" style="margin-bottom:16px">
       <h3>🎮 Emerald Lab — build &amp; play Pokémon Emerald, no Terminal</h3>
       <p class="muted" style="font-size:13.5px;line-height:1.6">Compiles the open-source <b>pokeemerald</b> decompilation into a fresh, <b>fully legal</b> ROM right on your Mac — no downloaded ROM, no command line. ${liveOn ? '' : '<b style="color:var(--gold)">Launch via start.command / the app to enable the buttons.</b>'}</p>
       <div id="em-status" class="muted" style="font-size:13px;margin:8px 0;display:flex;gap:16px;flex-wrap:wrap">Checking…</div>
