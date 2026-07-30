@@ -91,6 +91,13 @@ Prefer **`gh release download`** so artifacts match what users get from the down
 
 **Truth:** GitHub Actions in this repo currently **ad-hoc signs**. Sequoia will still show “Not Opened” until Open Anyway / `xattr` once. That is expected without notarization.
 
+If CI fails with *“recent account payments have failed or your spending limit needs to be increased”*, macOS runners will not start. Then:
+
+1. Fix GitHub **Billing & plans** for the account that owns the repo
+2. Re-run `gh workflow run build-dmg.yml`
+3. Meanwhile publish **source zip + guide + OPEN-ANYWAY + SHA256SUMS** with `gh release upload chest-latest … --clobber`, and keep the last good DMG on the release
+4. Or build the DMG on a Mac: `./build-app.command`
+
 **Immediate (always ship):**
 
 1. Keep `OPEN-ANYWAY.command` + Gatekeeper section in `GET-POKEMON-CHEST.html` current.
