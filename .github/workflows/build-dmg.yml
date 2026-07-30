@@ -74,14 +74,17 @@ jobs:
         run: |
           VER=$(python3 -c "import json; print(json.load(open('package.json'))['version'])")
           DMG=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg | head -1)
+          # Stable asset name (spaces → dots) so download buttons + SHA256SUMS match
+          DMG_NAME=$(basename "$DMG" | tr ' ' '.')
+          cp "$DMG" "$DMG_NAME"
           SRC_HASH="PokemonChest-source-${GITHUB_SHA:0:7}.zip"
           SRC_LATEST=PokemonChest-source-latest.zip
           GUIDE=GET-POKEMON-CHEST.html
           UNLOCK=OPEN-ANYWAY.command
-          test -f "$DMG" && test -f "$SRC_HASH" && test -f "$SRC_LATEST" && test -f "$GUIDE" && test -f "$UNLOCK"
-          # SHA256 checksums — verify before trusting a download
-          shasum -a 256 "$DMG" "$SRC_HASH" "$SRC_LATEST" "$GUIDE" "$UNLOCK" > SHA256SUMS.txt
-          echo "publishing: $DMG + source + guide + unlock + checksums (v$VER)"
+          test -f "$DMG_NAME" && test -f "$SRC_HASH" && test -f "$SRC_LATEST" && test -f "$GUIDE" && test -f "$UNLOCK"
+          shasum -a 256 "$DMG_NAME" "$SRC_HASH" "$SRC_LATEST" "$GUIDE" "$UNLOCK" > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          echo "publishing: $DMG_NAME + source + guide + unlock + checksums (v$VER)"
           NOTES=$(cat <<EOF
           Pokémon Chest v${VER} — commit ${GITHUB_SHA:0:7}.
 
@@ -98,7 +101,7 @@ jobs:
           EOF
           )
           gh release delete chest-latest --cleanup-tag --yes || true
-          gh release create chest-latest "$DMG" "$SRC_HASH" "$SRC_LATEST" "$GUIDE" "$UNLOCK" SHA256SUMS.txt \
+          gh release create chest-latest "$DMG_NAME" "$SRC_HASH" "$SRC_LATEST" "$GUIDE" "$UNLOCK" SHA256SUMS.txt \
             --prerelease \
             --target "$GITHUB_SHA" \
             --title "Pokémon Chest — latest macOS build + source" \
