@@ -15,29 +15,48 @@ API keys at all**, and your collection never leaves your Mac.
 Two builds are published as rolling releases. Both are **ad-hoc signed**, not
 notarized — see [Gatekeeper](#gatekeeper-cant-be-verified) below.
 
-| Build | What it is | Download |
-|---|---|---|
-| 🏠 **Pokémon Den** | The current line — adds the 3D Den room, Scanner (single card + 9-pocket binder), Add & Sold ledger, Sets completion tracker, price alerts, per-card history, AI pre-grade, Best Sellers and Brand Lab | **[dmg-latest ›](https://github.com/Sparkey333/pokemon-chest/releases/tag/dmg-latest)** |
-| 📦 **Pokémon Chest** | The original line — collection database, Scanner with the full TCGdex codex, sell/grade guidance | **[chest-latest ›](https://github.com/Sparkey333/pokemon-chest/releases/tag/chest-latest)** |
+### 🏠 Pokémon Den — the current line
 
-Each release carries the universal macOS `.dmg` (Apple Silicon + Intel), a source
-zip of the exact commit, `OPEN-ANYWAY.command`, and `SHA256SUMS.txt`.
+The 3D Den room, Scanner (single card + 9-pocket binder page), Add & Sold
+ledger, Sets completion tracker, price alerts, per-card price history, AI
+pre-grade, Best Sellers and Brand Lab.
 
-**Prefer building it yourself?** Clone, then double-click **`build-app.command`**.
-A local build uses your own signing identity, so it opens with a clean
-double-click and skips the Gatekeeper step entirely.
+**[⬇ Download the latest Den build ›](https://github.com/Sparkey333/pokemon-chest/releases/tag/dmg-latest)**
+
+Current: **v2.3.0** — universal (Apple Silicon + Intel), commit `30cbbce`.
+Assets: `Pokemon.Den_2.3.0_universal.dmg` and `PokemonDen-source-30cbbce.zip`.
+
+```
+sha256  dc61c138a713ecc5125b4642bb0e3bbde9df00568f250aff7126339b3f40a54a
+        Pokemon.Den_2.3.0_universal.dmg
+```
+
+### 📦 Pokémon Chest — the original line
+
+Collection database, Scanner with the full TCGdex codex, sell/grade guidance.
+
+**[⬇ Download the latest Chest build ›](https://github.com/Sparkey333/pokemon-chest/releases/tag/chest-latest)**
+
+Assets: the universal `.dmg`, a source zip, `GET-POKEMON-CHEST.html`,
+`OPEN-ANYWAY.command` and `SHA256SUMS.txt`.
+
+### Build it yourself (recommended)
+
+Clone the repo, then double-click **`build-app.command`**. A local build signs
+with your own Apple identity, so it opens on a clean double-click and skips the
+Gatekeeper step entirely.
 
 ### Gatekeeper: "can't be verified"
 
-That dialog means the build is ad-hoc signed, not that the download is broken.
-Any one of these fixes it:
+That dialog means the build is ad-hoc signed — not that the download is broken.
+Any one of these clears it:
 
-1. Double-click **`OPEN-ANYWAY.command`** from the release, or
+1. Double-click **`OPEN-ANYWAY.command`** (in the repo, and on the Chest release), or
 2. System Settings → Privacy & Security → **Open Anyway**, or
 3. `xattr -cr "/Applications/Pokemon Den.app"`
 
-Real notarization needs a paid Apple Developer Program membership; when those
-credentials exist the build pipeline is ready to sign, notarize and staple.
+Real notarization needs a paid Apple Developer Program membership; the build
+pipeline is ready to sign, notarize and staple once those credentials exist.
 
 ---
 
