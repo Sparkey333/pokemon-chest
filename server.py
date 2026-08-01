@@ -32,7 +32,43 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 VERSION = "2.3.0"
 ROOT = os.path.dirname(os.path.abspath(__file__))
-HOME = os.path.abspath(os.environ.get("POKECHEST_HOME") or ROOT)
+
+# Writable-home resolution. Normally that's the project folder, but once
+# Desktop/Documents (or the whole checkout) migrate into iCloud Drive, writing
+# there is unreliable — files become cloud-only *.icloud placeholders. When the
+# project is detected inside iCloud we fall back to
+# ~/Library/Application Support/PokemonChest and seed it from the project once.
+# POKECHEST_HOME always wins if set, so every existing launcher and every test
+# harness behaves exactly as before. The import is optional: without
+# scripts/mac_paths.py the old ROOT behaviour is kept verbatim.
+sys.path.insert(0, os.path.join(ROOT, "scripts"))
+try:
+    from mac_paths import (  # noqa: E402
+        resolve_writable_home, seed_home_from_root, path_report, is_under_icloud,
+        find_pricecharting_xlsx as _find_pc_xlsx,
+    )
+except ImportError:
+    resolve_writable_home = seed_home_from_root = path_report = is_under_icloud = None
+    _find_pc_xlsx = None
+
+def _resolve_home():
+    env = (os.environ.get("POKECHEST_HOME") or "").strip()
+    if env:
+        return os.path.abspath(env), "POKECHEST_HOME env"
+    if resolve_writable_home:
+        try:
+            home, why = resolve_writable_home(ROOT)
+            if home != ROOT and seed_home_from_root:
+                seeded = seed_home_from_root(home, ROOT)
+                if seeded:
+                    print(f"  Seeded Application Support from iCloud project: {', '.join(seeded)}", flush=True)
+                os.environ["POKECHEST_HOME"] = home
+            return home, why
+        except Exception:
+            pass                                    # never let path probing stop the app
+    return ROOT, "project folder"
+
+HOME, _HOME_REASON = _resolve_home()
 SETTINGS = os.path.join(HOME, "settings.local.json")
 CARD_ART_DIR = os.path.join(HOME, "card-art")           # your live saves (writable)
 BUNDLED_ART_DIR = os.path.join(ROOT, "card-art")        # baked-in defaults (ship with the build)
@@ -1350,7 +1386,18 @@ AUTOSYNC = {"enabled": True, "running": False, "lastCheck": None, "lastImport": 
 AUTOSYNC_LOCK = threading.Lock()
 
 def _newest_export():
-    """Mirror scripts/build_data.py find_source(), but non-fatal."""
+    """Newest PriceCharting .xlsx. Prefers the iCloud-aware finder, which also
+    searches Desktop/Documents/iCloud Drive and forces cloud-only *.icloud
+    placeholders to download before reading them — without that, an export that
+    migrated into iCloud is invisible to the watcher. Falls back to the original
+    HOME/ROOT/~Downloads scan if mac_paths isn't present or errors."""
+    if _find_pc_xlsx:
+        try:
+            best, _diag = _find_pc_xlsx(ROOT, HOME)
+            if best:
+                return best
+        except Exception:
+            pass
     files = []
     seen = set()
     for d in (HOME, ROOT, os.path.expanduser("~/Downloads")):
