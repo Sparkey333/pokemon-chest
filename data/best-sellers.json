@@ -1,0 +1,132 @@
+{
+  "about": "Powers the 💰 Best Sellers tab: scoring weights for what actually moves, plus the channel matrix for auctions, live selling, and YouTube. Figures marked (est.) are compiled from public hobby sources and change often — always confirm against live sold comps.",
+  "updated": "2026-07-18",
+
+  "scoring": {
+    "note": "score = value × band × eraHeat × setHeat × langFactor (+ graded bonus). Tuned for LIQUIDITY — how fast a card sells at asking — not just raw value.",
+    "priceBands": [
+      { "min": 0,    "max": 10,   "factor": 0.25, "label": "Bulk zone",      "advice": "Don't list singly — feed these into lots, repacks, and Brand Lab packaging. Fees eat singles under $10." },
+      { "min": 10,   "max": 25,   "factor": 0.7,  "label": "Slow singles",   "advice": "Sell in themed 3–5 card lots or live streams; single listings sit." },
+      { "min": 25,   "max": 100,  "factor": 1.25, "label": "Sweet spot",     "advice": "Fastest-moving band on eBay & Whatnot — impulse-buyable, comps are tight. (est.)" },
+      { "min": 100,  "max": 400,  "factor": 1.15, "label": "Serious buyers", "advice": "Strong demand; buyers expect crisp photos and exact condition notes." },
+      { "min": 400,  "max": 99999,"factor": 0.9,  "label": "Big tickets",    "advice": "Fewer buyers, slower — but auctions with a modest start price find true market. Consider grading first." }
+    ],
+    "eraHeat": { "vintage": 1.2, "retro": 1.0, "modern": 1.05 },
+    "langFactor": { "en": 1.0, "ja": 0.95 },
+    "gradedBonus": 1.15,
+    "setHeat": [
+      { "match": "151",              "factor": 1.3, "why": "Scarlet & Violet 151 nostalgia demand keeps sell-through high. (est.)" },
+      { "match": "Evolving Skies",   "factor": 1.25, "why": "Alt-art chase set — perennially liquid. (est.)" },
+      { "match": "Crown Zenith",     "factor": 1.15, "why": "Galarian Gallery cards move fast. (est.)" },
+      { "match": "Prismatic",        "factor": 1.25, "why": "Prismatic Evolutions — Eevee demand. (est.)" },
+      { "match": "Terastal",         "factor": 1.15, "why": "Terastal Festival JP — active market. (est.)" },
+      { "match": "VSTAR Universe",   "factor": 1.15, "why": "JP alt-art staple. (est.)" },
+      { "match": "Team Rocket",      "factor": 1.2,  "why": "2025 Team Rocket revival sets run hot. (est.)" },
+      { "match": "Base Set",         "factor": 1.3,  "why": "Vintage blue-chip — always liquid." },
+      { "match": "Promo",            "factor": 0.9,  "why": "Promos vary wildly — comp each one individually." }
+    ]
+  },
+
+  "channels": [
+    {
+      "key": "ebay-auction", "name": "eBay Auctions (bidding)", "icon": "🔨",
+      "feePct": 13.25, "feeFlat": 0.30, "payout": "1–2 days after delivery",
+      "bestFor": "True price discovery on $100+ cards, hyped modern hits, graded slabs",
+      "avoid": "Sub-$25 cards (fees + low bids), anything you have a firm floor on",
+      "tips": [
+        "Start at $0.99 ONLY for cards with proven comp depth; otherwise start at ~70% of recent solds",
+        "7-day auction ending Sunday 6–9pm Pacific catches both US coasts (est.)",
+        "Batch 5–10 auctions ending the same night — bidders cross-shop your other lots",
+        "Use all 24 photo slots; the Scanner tab's saved shots drop straight in"
+      ]
+    },
+    {
+      "key": "ebay-bin", "name": "eBay Buy-It-Now", "icon": "🏷️",
+      "feePct": 13.25, "feeFlat": 0.30, "payout": "1–2 days after delivery",
+      "bestFor": "Sweet-spot singles ($25–$400) priced at comp, Best Offer on",
+      "avoid": "Rare low-pop cards where you'd leave auction upside on the table",
+      "tips": [
+        "Price at the last 3 solds' median, enable offers, auto-decline below 85%",
+        "Promoted listings at 2% is usually worth it for visibility (est.)",
+        "Refresh stale listings every 30 days — sell-similar re-indexes you"
+      ]
+    },
+    {
+      "key": "whatnot", "name": "Whatnot Live (live + bidding)", "icon": "📺",
+      "feePct": 8.0, "feeFlat": 0.30, "payout": "Weekly",
+      "bestFor": "Moving VOLUME — bulk lots, $10–$100 singles, repacks, building a following",
+      "avoid": "Your top 5 cards until your stream has regulars bidding them up",
+      "tips": [
+        "Apply as a seller first (approval takes days); category: Trading Card Games",
+        "Sudden-death auctions at $1 start move 60–100 lots in a 2-hour show (est.)",
+        "Schedule the same night weekly — repeat viewers are 80% of live sales (est.)",
+        "Point a second camera at a Den-style display shelf behind you — set dressing sells"
+      ]
+    },
+    {
+      "key": "youtube", "name": "YouTube (channel + live)", "icon": "▶️",
+      "feePct": 0, "feeFlat": 0, "payout": "n/a — funnel, not a marketplace",
+      "bestFor": "Brand building: collection tours, top-10s, grading reveals, den tours; drives buyers to your streams and listings",
+      "avoid": "Selling in comments/DMs — scams; always route to a real marketplace",
+      "tips": [
+        "Shorts of single-card showcases (the 3D Studio spin view screen-records beautifully)",
+        "PSA return reveal videos are the highest-retention card format (est.)",
+        "Link your eBay store + Whatnot schedule in every description",
+        "YouTube Live 'rip and ship' requires routing sales through a marketplace — Whatnot or eBay Live handles compliance for you"
+      ]
+    },
+    {
+      "key": "fb", "name": "Facebook Marketplace (local)", "icon": "🤝",
+      "feePct": 0, "feeFlat": 0, "payout": "Cash in hand",
+      "bestFor": "Zero-fee local deals, bulk lots, meetups at card shops",
+      "avoid": "Shipping to strangers — local pickup only unless buyer pays G&S",
+      "tips": [
+        "Meet at a card shop or police-station exchange zone, daytime",
+        "Bundle bulk into $20/$50/$100 mystery boxes for parents — fastest local mover",
+        "Cross-post to local Pokémon TCG Facebook groups the same day"
+      ]
+    },
+    {
+      "key": "tcgplayer", "name": "TCGplayer", "icon": "🃏",
+      "feePct": 10.25, "feeFlat": 0.30, "payout": "Weekly",
+      "bestFor": "Near-mint EN singles $2–$50 at scale — set-and-forget inventory",
+      "avoid": "Japanese cards (thin market there) and heavy-played condition disputes",
+      "tips": ["Condition honestly — TCGplayer buyers refund aggressively on NM claims"]
+    },
+    {
+      "key": "mercari", "name": "Mercari", "icon": "📦",
+      "feePct": 10.0, "feeFlat": 0.50, "payout": "On rating",
+      "bestFor": "Mid-range singles and small lots; casual buyers pay closer to ask",
+      "avoid": "High-value cards — buyer protection disputes favor buyers (est.)",
+      "tips": ["'Smart pricing' floor at your real floor; let it drip down to sell"]
+    }
+  ],
+
+  "auctionNight": {
+    "title": "Auction Night playbook (bidding, done right)",
+    "steps": [
+      "Pick 8–12 cards from the Best-Sell board below — mix one anchor ($150+), five sweet-spot, and a few lots",
+      "Shoot every card in 📷 Scanner first — front, back, corners; photos auto-attach to the card file",
+      "List all as 7-day auctions ending the same Sunday evening, 2 minutes apart",
+      "Share the auction batch link to your YouTube community tab + FB groups on Thursday",
+      "Ship Monday in one batch run; save tracking against each card's note"
+    ]
+  },
+
+  "livePlaybook": {
+    "title": "Going live (Whatnot / eBay Live / YouTube)",
+    "steps": [
+      "Apply for Whatnot seller status now — approval lead time is the bottleneck",
+      "Build a backdrop: Den-style shelf, ring light, phone on the GradeStage rig",
+      "First 3 shows: $1-start bulk + sweet-spot singles to build ratings; no anchors",
+      "Announce a recurring slot (e.g. 'Chest Night — Thursdays 7pm MT')",
+      "Stream the show simultaneously to YouTube for discovery; sales stay on Whatnot"
+    ]
+  },
+
+  "notes": [
+    "Fees above are headline rates (est.) — category promos and store subscriptions change them.",
+    "Every venue's real net for a specific card is in that card's sell panel — this tab is for choosing WHAT to sell and WHERE.",
+    "Not financial advice. Check live sold comps before committing an anchor card."
+  ]
+}

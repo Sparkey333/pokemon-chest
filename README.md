@@ -1,4 +1,4 @@
-# Pokémon Den / Pokémon Chest 🔴⚪
+# Pokémon Den 🔴⚪
 
 A **free, 100% local** database and sell/grade advisor for your Pokémon card
 collection — built from your PriceCharting export. English **and** Japanese, real
@@ -23,13 +23,15 @@ pre-grade, Best Sellers and Brand Lab.
 
 **[⬇ Download the latest Den build ›](https://github.com/Sparkey333/pokemon-chest/releases/tag/dmg-latest)**
 
-Current: **v2.3.0** — universal (Apple Silicon + Intel), commit `30cbbce`.
-Assets: `Pokemon.Den_2.3.0_universal.dmg` and `PokemonDen-source-30cbbce.zip`.
+Current: **v2.3.0** — universal (Apple Silicon + Intel), commit `770315e`.
+Assets: `Pokemon.Den_2.3.0_universal.dmg` and `PokemonDen-source-770315e.zip`.
 
 ```
-sha256  dc61c138a713ecc5125b4642bb0e3bbde9df00568f250aff7126339b3f40a54a
+sha256  f08a02672129bf2e038128dbd521f7bbb4b89b5279d2d451d1cddedfd845e124
         Pokemon.Den_2.3.0_universal.dmg
 ```
+
+Every push rebuilds it — `dmg-latest` is always the newest build.
 
 ### 📦 Pokémon Chest — the original line
 
@@ -42,9 +44,11 @@ Assets: the universal `.dmg`, a source zip, `GET-POKEMON-CHEST.html`,
 
 ### Build it yourself (recommended)
 
-Clone the repo, then double-click **`build-app.command`**. A local build signs
-with your own Apple identity, so it opens on a clean double-click and skips the
-Gatekeeper step entirely.
+Clone the repo, then double-click **`build-app.command`**. It regenerates the
+full icon set from `icon-source.png` and produces `Pokemon Den.app` plus a
+styled `.dmg` in `src-tauri/target/release/bundle`. A local build signs with
+your own Apple identity, so it opens on a clean double-click and skips the
+Gatekeeper step entirely. (By hand: `cd src-tauri && cargo tauri build`.)
 
 ### Gatekeeper: "can't be verified"
 
@@ -68,42 +72,114 @@ The app is a tiny Python-stdlib server plus a static front end — no build step
 ./start.command          # then open http://localhost:8787
 ```
 
+Keep the little Terminal window open while you browse; close it (or Ctrl-C) to
+stop.
+
+> Don't just double-click `index.html` — browsers block `file://` pages from
+> reading local data, so the collection won't load. Use the launcher or the app.
+
 📱 **On your iPhone:** in the app, go to **📷 Scanner → Phone mode**, scan the QR
 with your phone, and the full app opens there — camera scanning included, with
-photos saved onto the matching card's file on your Mac. Same Wi-Fi, no App Store.
+photos saved onto the matching card's file on your Mac. HTTPS via a locally
+generated self-signed certificate when `openssl` is available (accept the
+one-time warning; it's your own Mac). Same Wi-Fi, no App Store. Home networks
+only — turn it off when you're done.
+
+☁️ **Moved your files into iCloud Drive?** Run **`fix-icloud.command`**. The app
+detects a project living inside iCloud, routes writable state to
+`~/Library/Application Support/PokemonChest`, and forces cloud-only `.icloud`
+placeholder exports to download before reading them.
 
 ---
 
-## What's inside
+## The views
 
-- **Collection** — every card with art, filters by language / set / era / grade,
-  portfolio value and P/L
-- **🧩 Sets** — completion progress per set with missing-card lists and
-  cost-to-complete, powered by a bundled 31,603-card TCGdex codex that works
-  offline with no API key
-- **📷 Scanner** — Mac camera or iPhone capture; AI card identify; 9-pocket
-  binder-page scanning that reads all nine cards from one photo
-- **➕ Add & Sold** — add cards, record sales, archive sold cards to a permanent
-  Sold Shelf; imports an eBay orders CSV or a pasted sale email
-- **🏠 The Den** — your collection as a walk-in 3D room with auto-built shelves
-- **🧪 Grade Lab** — centering calculator, flaw checklist, AI photo pre-grade, and
-  grade-ROI break-even math
-- **💰 Best Sellers / 🏷 Brand Lab** — what to sell now, and packaging/brand plans
+| View | What it does |
+|------|--------------|
+| **Dashboard** | Your action board: portfolio value, cost basis, unrealized P/L, EN‑vs‑JP & raw‑vs‑graded splits, top sets, most valuable cards, a value‑over‑time chart, and a **feedback card**. |
+| **Collection** | Every entry with card art. Search + filter by language, set, era, graded/raw, status, and price; sort by value, profit, return %, name, or date added. |
+| **🧩 Sets** | Set-completion progress against each set's real size, with the missing-card list, an official/master-set toggle, and a PriceCharting cost-to-complete. Runs off a bundled 31,603-card codex — no API key, works offline. |
+| **➕ Add & Sold** | The ledger: **add cards in‑app** (typed or scanned), **record every sale** (price/fees/venue/date), and **archive** sold cards — kept forever with their photos & sale data on the **Sold Shelf**. Imports an eBay orders CSV or a pasted sale email. Exports a sales CSV. |
+| **📷 Scanner** | Camera capture: hold a card up to your Mac camera (or iPhone via Continuity), snap it, and the photo is **stored with that card's file**. Reads a whole **9-pocket binder page** from one photo. Searches in three tiers — your collection, the bundled codex, then the live PriceCharting catalog. |
+| **🏠 The Den** | Your collection as a walk‑in 3D display room: trophy wall, slab shelf, side gallery, spinning pedestal card, live value ticker, auto-built shelves and a **💸 Sold Shelf**. Drag to look, scroll to walk, click any card. |
+| **🧊 3D Studio** | Turn any card into a 3D visual asset — drag/auto‑spin viewer with a holo‑foil effect and a fullscreen **Showcase mode** — plus **3D‑print STL exports** sized to raw / toploader / slab. |
+| **🧪 Grade Lab** | Centering calculator, flaw checklist, **AI photo pre-grade**, and grade-ROI break-even math against the card's grade ladder. |
+| **💰 Best Sellers** | What to sell *right now*: liquidity scoring, the top‑25 **Best‑Sell Board** with fee‑adjusted nets, and playbooks for **eBay auctions, Whatnot live, YouTube, Facebook, TCGplayer, Mercari**. |
+| **🏷 Brand Lab** | Brand build‑out for bulk cards: IP‑safe name/logo directions, packaging product lines, AI art prompts, print‑cost tables, and a phased roadmap. |
+| **Sell Hub** | Cards ranked for selling with fee‑adjusted **net estimates**, one‑click **sold comps**, a **Grading Candidates** list with break‑even math, and your **For‑sale** worklist. |
+| **Sell & Grade Guide** | Current grading tiers & costs, when to grade vs. not, grade‑value multiples, marketplace fees, and the best venue per card type — with sources. |
+| **📋 Parity** | The live feature ledger from `data/parity.json` — every feature with status, spec, acceptance criteria and file pointers. |
 
-Full feature ledger with status and specs: **`data/parity.json`**, rendered live
-in the app's 📋 Parity tab.
+Every card also gets a tailored grade/sell recommendation, direct live‑comp
+searches, sell math, price history, price alerts, and a private note.
+
+---
+
+## Keeping inventory current — automatic
+
+1. On **PriceCharting.com**: Collection → **Download** (Excel).
+2. Leave the `.xlsx` anywhere the app looks — `~/Downloads`, Desktop, Documents,
+   the project folder, or iCloud Drive (any name containing "PriceCharting").
+   **That's it** — the app pulls new cards + prices in on its own within ~20
+   seconds. ↻ Refresh is the manual trigger.
+3. One-off adds without an export: **➕ Add & Sold → search the PriceCharting
+   catalog** and add any card with one click.
+
+---
+
+## Optional live data & AI (BYOK)
+
+Pokémon Den is fully usable with zero keys. To add live data, open **⚙ Live**
+in-app and paste your own:
+
+| Key | Unlocks |
+|-----|---------|
+| **PriceCharting token** | Live prices straight from PriceCharting's API — including **one-click bulk sync** that re-prices the whole collection (raw + graded tiers), plus catalog search and set cost-to-complete. |
+| **Comps API key** | Live sold comps (eBay / TCGplayer / JP marketplaces) without leaving the app. |
+| **Claude or OpenAI key** | AI card identify, binder-page reading, condition pre-grade, and sell/grade recommendations. |
+
+Keys are stored **only** in `settings.local.json` — gitignored, never uploaded,
+never bundled into a shipped build. The local server proxies your requests
+straight to each provider; nothing passes through any third party.
 
 ---
 
 ## Privacy
 
-No accounts, no analytics, no tracking. Your collection, notes, sales and photos
-stay on your machine. The only network calls are card art from
-[TCGdex](https://tcgdex.dev), links you click, and — only if you add your own key
-— requests sent straight from your Mac to that one provider. Bring-your-own-key
-credentials live in a gitignored `settings.local.json` and are never bundled.
+No accounts, no analytics, no tracking. Your collection, prices, notes, sales
+and photos never leave your Mac. The only network calls are card art from
+[TCGdex](https://tcgdex.dev), the comp links *you* click, and — only if you add
+keys — the BYOK APIs above. An optional local-only error log (off by default,
+⚙ Live) is never transmitted anywhere automatically.
 
 Details: [`LEGAL.md`](LEGAL.md), also readable in-app from the About panel.
+
+---
+
+## Files
+
+```
+Pokemon Den/
+├─ PriceCharting-collection.xlsx   your export (the source of truth)
+├─ index.html                      the app UI
+├─ assets/    app.js, revamp.js, styles.css, revamp.css
+├─ data/      collection.json      built from your xlsx (prices, images, links)
+│             codex.json           395 sets / 31,603 EN+JA cards (TCGdex)
+│             parity.json          the live feature ledger
+│             selling-intel.json   grading/fee/venue guidance
+│             build-flags.json     build profile (publicArt, shipBuild)
+├─ scripts/   build_data.py        xlsx → collection.json (+ image matching)
+│             build_codex.py       rebuilds the card codex from TCGdex
+│             mac_paths.py         iCloud/Drive path resolution
+├─ server.py                       local server + optional BYOK API proxy
+├─ src-tauri/                      native macOS shell ("Pokémon Den.app")
+├─ settings.local.json             your BYOK keys (gitignored — never commit)
+├─ start.command                   ▶ launch in the browser
+├─ build-app.command               🔨 build the .app + .dmg
+├─ fix-icloud.command              ☁️ repair paths after an iCloud migration
+├─ OPEN-ANYWAY.command             🔓 clear quarantine + launch
+└─ README.md
+```
 
 ---
 

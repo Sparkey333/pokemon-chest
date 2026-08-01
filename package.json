@@ -1,8 +1,8 @@
 {
   "name": "pokemon-chest",
   "private": true,
-  "version": "1.13.0",
-  "description": "Pokémon Chest — your card collection, live comps, and sell & grade intelligence. © 2026 DarkHearts",
+  "version": "2.3.0",
+  "description": "Pokémon Den — your card collection, live comps, and sell & grade intelligence. © 2026 DarkHearts",
   "scripts": {
     "tauri": "tauri",
     "tauri:dev": "tauri dev",

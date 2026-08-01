@@ -1,7 +1,7 @@
-/* ===================== Pokémon Chest ===================== */
+/* ===================== Pokémon Den ===================== */
 'use strict';
 
-const APP_VERSION = '1.13.0';
+const APP_VERSION = '2.3.0';
 const APP_REPO = 'https://github.com/Sparkey333/pokemon-chest';
 
 /* ---------- tiny helpers ---------- */
@@ -21,6 +21,9 @@ const LS_CASE = 'pokechest.case.v1';          // display-case picks: {pcId:{tier
 const LS_CARDSNAP = 'pokechest.cardsnaps.v1'; // per-card price history for case cards
 const LS_ONBOARD = 'pokechest.onboarded.v2';  // first-run walkthrough seen
 const LS_ARCADE = 'pokechest.arcade.v1';      // capsule-machine tokens, pulls, won cards
+const LS_ERRLOG = 'pokechest.errlog.v1';      // opt-in local crash/error log — never sent automatically
+const LS_ERRCONSENT = 'pokechest.errconsent.v1'; // 'on'/'off', default off
+const LS_ALERTS = 'pokechest.alerts.v1';       // { thresholds:{pcId:{above,below,added}}, events:[...], seenAt }
 
 // One-time migration from the PokéVault era — keeps existing snapshots & notes.
 (function migrateLegacyKeys() {
@@ -51,12 +54,75 @@ function saveUser() { localStorage.setItem(LS_USER, JSON.stringify(State.user));
 function uget(c) { return State.user[c.pcId] || {}; }
 function uset(c, patch) { State.user[c.pcId] = Object.assign({}, uget(c), patch); saveUser(); }
 
+/* ---------- inventory qty adjustments (persist across refreshes) ----------
+   The export is the base truth; a per-card qtyAdj in LS_USER layers your
+   in-app +/- on top, and value/P&L re-derive from the adjusted qty. */
+function baseQty(c) { if (c._baseQty === undefined) c._baseQty = c.qty || 1; return c._baseQty; }
+function applyQtyAdjust(c) {
+  const q = Math.max(0, baseQty(c) + (uget(c).qtyAdj || 0));
+  c.qty = q;
+  c.value = Math.round((c.price || 0) * q * 100) / 100;
+  const cost = (c.cost || 0) * q;
+  c.pl = Math.round((c.value - cost) * 100) / 100;
+  c.plPct = cost ? Math.round(c.pl / cost * 1000) / 10 : null;
+}
+function adjustQty(c, delta) {
+  const adj = (uget(c).qtyAdj || 0) + delta;
+  if (baseQty(c) + adj < 0) return false;
+  if (adj === 0) { const u = uget(c); delete u.qtyAdj; State.user[c.pcId] = u; saveUser(); }
+  else uset(c, { qtyAdj: adj });
+  applyQtyAdjust(c);
+  return true;
+}
+function applyAllQtyAdjusts() {
+  for (const c of State.cards) if (uget(c).qtyAdj) applyQtyAdjust(c);
+}
+
+/* ---------- opt-in local error log ----------
+   Off by default. Nothing is ever transmitted automatically — this only
+   writes to localStorage, and only once you've explicitly turned it on in
+   ⚙ Live. No fetch/XHR happens in this handler under any circumstance. */
+function errLogConsent() { return localStorage.getItem(LS_ERRCONSENT) === 'on'; }
+function logError(entry) {
+  if (!errLogConsent()) return;
+  try {
+    const log = loadJSON(LS_ERRLOG, []);
+    log.unshift(Object.assign({ ts: new Date().toISOString(), view: State.view, version: APP_VERSION, ua: navigator.userAgent }, entry));
+    localStorage.setItem(LS_ERRLOG, JSON.stringify(log.slice(0, 100)));
+  } catch { /* storage unavailable — nothing to do */ }
+}
+window.addEventListener('error', e => {
+  logError({ msg: e.message || 'Unknown error', stack: (e.error && e.error.stack || '').slice(0, 800) });
+});
+window.addEventListener('unhandledrejection', e => {
+  const r = e.reason;
+  logError({ msg: 'Unhandled promise rejection: ' + (r && r.message || String(r)), stack: (r && r.stack || '').slice(0, 800) });
+});
+// Repaints the Admin tab's error-log list — called on initial render AND every
+// time the tab is re-entered (switchView only toggles CSS visibility, it
+// doesn't re-render), so a fresh error since the last visit always shows.
+function errlogRefresh() {
+  const box = $('#errlog-list'); if (!box) return;
+  const log = loadJSON(LS_ERRLOG, []);
+  const on = errLogConsent();
+  box.innerHTML = (on ? '' : '<p class="reason">Off — enable it in ⚙ Live to start capturing.</p>') +
+    (log.length ? `<div style="max-height:220px;overflow:auto;margin-top:6px">${log.slice(0, 30).map(e => `
+      <div style="padding:5px 0;border-top:1px solid #1f2a40">
+        <span class="reason">${esc((e.ts || '').slice(0, 19).replace('T', ' '))} · ${esc(e.view || '?')}</span><br>
+        <span style="font-size:12.5px">${esc(e.msg || '')}</span>
+      </div>`).join('')}</div>` : (on ? '<p class="reason" style="margin-top:6px">No errors logged yet — good sign.</p>' : ''));
+}
+function errlogReport() {
+  const log = loadJSON(LS_ERRLOG, []);
+  return feedbackBody() + `\n## Error log (${log.length} entries)\n\`\`\`\n${log.map(e => `${e.ts} · ${e.view} · ${e.msg}`).join('\n')}\n\`\`\`\n`;
+}
+
 /* ---------- boot ---------- */
 init();
 async function init() {
   try {
     const grab = (u) => fetch(u + '?_=' + Date.now()).then(r => r.ok ? r.json() : null).catch(() => null);
-    const [col, intel, gintel, merch, lab, submit, sellerbiz, plan, venues] = await Promise.all([
+    const [col, intel, gintel, merch, lab, submit, sellerbiz, plan, venues, flags] = await Promise.all([
       fetch('data/collection.json?_=' + Date.now()).then(r => r.json()),
       fetch('data/selling-intel.json?_=' + Date.now()).then(r => r.json()),
       grab('data/grade-intel.json'),   // grade ratios / pop intel (research-verified)
@@ -66,9 +132,13 @@ async function init() {
       grab('data/seller-biz.json'),    // FB Marketplace setup + LLC/business playbook
       grab('data/game-plan.json'),     // LLC concept + invest picks + big ideas (research-verified)
       grab('data/local-venues.json'),  // Colorado Springs local venues + automation/photo guidance
+      grab('data/build-flags.json'),   // build profile (e.g. publicArt: suppress catalog card art)
     ]);
     State.cards = col.cards;
+    State.flags = flags || {};
+    applyPublicArtMode();         // public/ship builds: drop external catalog art before it's memoized
     applyImgOverrides();          // your saved card-art (localStorage) wins over the catalog art
+    applyAllQtyAdjusts();         // your in-app inventory +/- layers on top of the export
     State.meta = col.meta;
     State.intel = intel;
     State.gintel = gintel;
@@ -80,13 +150,14 @@ async function init() {
     State.venues = venues;
     recordSnapshot(col.meta.totalValue);
     recordCardSnaps();
+    checkPriceAlerts();
     State.live = await loadLiveConfig();
     await hydrateServerArt();     // merge card-art saved as real files (survives a localStorage wipe)
     updateLiveBtn();
     $('#vpValue').textContent = money0(col.meta.totalValue);
     $('#search').placeholder = `Search ${col.meta.totalEntries.toLocaleString()} cards — name, set, number…`;
     $('#footMeta').textContent =
-      `Pokémon Chest v${APP_VERSION} · ${col.meta.totalEntries.toLocaleString()} entries · ${col.meta.totalCards.toLocaleString()} cards · ${col.meta.imagesMatched.toLocaleString()} with art · generated ${col.generatedAt.slice(0, 10)} from ${col.source}`;
+      `Pokémon Den v${APP_VERSION} · ${col.meta.totalEntries.toLocaleString()} entries · ${col.meta.totalCards.toLocaleString()} cards · ${col.meta.imagesMatched.toLocaleString()} with art · generated ${col.generatedAt.slice(0, 10)} from ${col.source}`;
     wireChrome();
     renderDashboard();
     renderCollection(true);
@@ -100,6 +171,7 @@ async function init() {
     renderArcade();
     maybeOnboard();
   } catch (e) {
+    logError({ msg: 'Boot failed: ' + e.message, stack: (e.stack || '').slice(0, 800) });
     $('#main').innerHTML = `<div class="panel" style="margin-top:30px"><h3>Couldn’t load your collection</h3>
       <p class="muted">Open this page through the <b>start.command</b> launcher (a local server), not by double-clicking index.html — browsers block data files on <code>file://</code>.</p>
       <pre style="color:var(--red);font-size:12px;white-space:pre-wrap">${esc(e.message)}</pre></div>`;
@@ -118,6 +190,93 @@ function snapshotSeries() {
   return Object.entries(snaps).sort((a, b) => a[0] < b[0] ? -1 : 1);
 }
 
+/* ---------- price alerts (thresholds + bell panel) ---------- */
+function alertsAll() { return loadJSON(LS_ALERTS, { thresholds: {}, events: [], seenAt: null }); }
+function alertsSave(a) { localStorage.setItem(LS_ALERTS, JSON.stringify(a)); }
+function alertGet(c) { return alertsAll().thresholds[String(c.pcId)] || null; }
+function alertSet(c, { above, below }) {
+  const a = alertsAll();
+  const key = String(c.pcId);
+  if (above == null && below == null) delete a.thresholds[key];
+  else a.thresholds[key] = { above: above ?? null, below: below ?? null, added: (a.thresholds[key] && a.thresholds[key].added) || new Date().toISOString().slice(0, 10) };
+  alertsSave(a);
+  updateAlertsBadge();
+}
+function updateAlertsBadge() {
+  const badge = $('#alertsBadge'); if (!badge) return;
+  const a = alertsAll();
+  const n = a.events.filter(e => !a.seenAt || (e.ts || e.at) > a.seenAt).length;
+  badge.textContent = n > 0 ? String(n) : '';
+  badge.style.display = n > 0 ? '' : 'none';
+}
+function checkPriceAlerts() {
+  const a = alertsAll();
+  const today = new Date().toISOString().slice(0, 10);
+  const fired = [];
+  for (const key in a.thresholds) {
+    const t = a.thresholds[key];
+    const c = State.cards.find(x => String(x.pcId) === key);
+    if (!c || c.price == null) continue;
+    const fire = (dir, threshold, hit) => {
+      if (threshold == null || !hit) return;
+      if (a.events.some(e => String(e.pcId) === key && e.dir === dir && e.at === today)) return;
+      const ev = { pcId: c.pcId, name: c.name, dir, threshold, price: c.price, at: today, ts: new Date().toISOString() };
+      a.events.unshift(ev);
+      fired.push(ev);
+    };
+    fire('above', t.above, t.above != null && c.price >= t.above);
+    fire('below', t.below, t.below != null && c.price <= t.below);
+  }
+  if (a.events.length > 100) a.events = a.events.slice(0, 100);
+  if (fired.length) {
+    alertsSave(a);
+    toast(fired.length === 1
+      ? `🔔 ${fired[0].name} hit ${money(fired[0].price)} — alert was ${fired[0].dir} ${money(fired[0].threshold)}`
+      : `🔔 ${fired.length} price alerts triggered — check the bell`);
+  }
+  updateAlertsBadge();
+}
+function openAlertsPanel() {
+  const a = alertsAll();
+  const keys = Object.keys(a.thresholds);
+  const rows = keys.map(key => {
+    const t = a.thresholds[key];
+    const c = State.cards.find(x => String(x.pcId) === key);
+    const name = c ? c.name : `Card #${key}`;
+    const priceTxt = c ? money(c.price) : '—';
+    return `<div class="rv-row" style="align-items:center;border-top:1px solid #1f2a40;padding:8px 0;flex-wrap:wrap">
+      <span style="flex:1;min-width:160px"><b>${esc(name)}</b><br><span class="reason">now ${priceTxt}${t.above != null ? ` · above ${money(t.above)}` : ''}${t.below != null ? ` · below ${money(t.below)}` : ''}</span></span>
+      <button class="minilink" data-al-rm="${esc(key)}">✕ remove</button>
+    </div>`;
+  }).join('') || '<p class="reason">No alerts armed yet — open any card and tap 🔔 Alert.</p>';
+  const events = a.events.slice(0, 40).map(e => `<div class="rv-row" style="border-top:1px solid #1f2a40;padding:6px 0">
+    <span class="reason" style="min-width:150px">${esc((e.ts || e.at || '').slice(0, 19).replace('T', ' '))}</span>
+    <span>${esc(e.name)} hit ${money(e.price)} <span class="reason">(${e.dir} ${money(e.threshold)})</span></span>
+  </div>`).join('') || '<p class="reason">No alerts fired yet.</p>';
+  $('#modalRoot').innerHTML = `<div class="modal-bg" id="modalBg"><div class="modal" style="max-width:560px">
+    <button class="close-x" id="modalClose">×</button>
+    <div class="modal-body" style="padding:26px">
+      <h2 style="font-size:20px;margin-bottom:10px">🔔 Price alerts</h2>
+      <div class="subhead">Armed thresholds</div>
+      <div id="al-thresholds">${rows}</div>
+      <div class="subhead" style="margin-top:16px">Recent events</div>
+      <div id="al-events">${events}</div>
+    </div></div></div>`;
+  $('#modalClose').onclick = closeModal;
+  $('#modalBg').onclick = e => { if (e.target.id === 'modalBg') closeModal(); };
+  $$('[data-al-rm]').forEach(b => b.onclick = () => {
+    const key = b.dataset.alRm;
+    const c = State.cards.find(x => String(x.pcId) === key);
+    if (c) alertSet(c, { above: null, below: null });
+    else { const aa = alertsAll(); delete aa.thresholds[key]; alertsSave(aa); }
+    openAlertsPanel();
+  });
+  const aa = alertsAll();
+  aa.seenAt = new Date().toISOString();
+  alertsSave(aa);
+  updateAlertsBadge();
+}
+
 /* ---------- chrome / routing ---------- */
 function wireChrome() {
   $$('#tabs .tab').forEach(t => t.onclick = () => switchView(t.dataset.view));
@@ -132,6 +291,8 @@ function wireChrome() {
   $('#refreshBtn').onclick = refreshData;
   if ($('#helpBtn')) $('#helpBtn').onclick = () => openWalkthrough(0);
   $('#settingsBtn').onclick = openSettings;
+  if ($('#alertsBtn')) $('#alertsBtn').onclick = openAlertsPanel;
+  if ($('#aboutBtn')) $('#aboutBtn').onclick = openAbout;
   document.onkeydown = e => {
     if (e.key === 'Escape') closeModal();
     if (e.key === '/' && document.activeElement !== $('#search')) { e.preventDefault(); $('#search').focus(); }
@@ -142,6 +303,7 @@ function switchView(v) {
   $$('#tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.view === v));
   $$('.view').forEach(s => s.classList.toggle('active', s.id === 'view-' + v));
   if (v === 'arcade') renderArcade();   // refresh daily tokens / shelf on entry
+  if (v === 'admin') errlogRefresh();   // refresh the error-log list on entry (renderAdmin only paints once at boot)
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -343,6 +505,25 @@ function applyImgOverrides() {
     c.img = (o && o.imgOverride) ? o.imgOverride : (c._catalogImg || null);
   }
 }
+/* Public/ship builds (data/build-flags.json → publicArt:true) must not display
+   external catalog card art (TCGdex etc.) — only art the user scanned/saved.
+   Runs BEFORE applyImgOverrides so the nulled catalog art is what gets memoized
+   into c._catalogImg; user art (imgOverride, /card-art/ files, data: URLs) is
+   non-external and survives. Personal builds (publicArt:false) are unaffected. */
+function applyPublicArtMode() {
+  if (!State.flags || !State.flags.publicArt) return;
+  for (const c of State.cards) {
+    if (/^https?:\/\//i.test(c.img || '')) c.img = null;
+  }
+}
+/* Store/ship builds (data/build-flags.json → shipBuild:true) drop the Emerald
+   Lab entirely. It compiles the pokeemerald decompilation and runs it in an
+   emulator, which is an automatic App Store rejection (guideline 2.5.2
+   executable code / 4.7 emulators) and isn't defensible in a product that's
+   sold. Personal builds (shipBuild:false, the default) keep it. The server
+   refuses the /api/emerald/* routes under the same flag, so hiding the panel
+   isn't the only thing standing between a ship build and that code path. */
+function shipBuild() { return !!(State.flags && State.flags.shipBuild); }
 async function hydrateServerArt() {
   // Fold in any card-art files saved on disk that this browser has no local
   // override for (e.g. a fresh install, or images set from another device),
@@ -417,7 +598,7 @@ function openImageEditor(c, backTo) {
         <div class="reason" style="flex:1;line-height:1.55">
           <b>1.</b> Find the card art →
           <div class="sr-links" style="margin:6px 0">
-            <a class="minilink" href="${googleImgUrl(c)}" target="_blank" rel="noopener">🔍 Google Images</a>
+            ${State.flags && State.flags.publicArt ? '' : `<a class="minilink" href="${googleImgUrl(c)}" target="_blank" rel="noopener">🔍 Google Images</a>`}
             <a class="minilink" href="https://www.bing.com/images/search?q=${enc((c.fullName || c.name) + ' ' + c.set + ' pokemon card')}" target="_blank" rel="noopener">Bing</a>
             <a class="minilink" href="https://www.tcgplayer.com/search/pokemon/product?q=${enc((c.name || '') + ' ' + (c.number || ''))}" target="_blank" rel="noopener">TCGplayer</a>
           </div>
@@ -658,6 +839,7 @@ function openWalkthrough(step) {
   $$('#modalRoot .wt-dot').forEach(d => d.onclick = () => openWalkthrough(+d.dataset.step));
 }
 function maybeOnboard() {
+  if (!State.cards.length) return;   // the first-run welcome panel replaces the walkthrough
   try { if (localStorage.getItem(LS_ONBOARD)) return; } catch { return; }
   openWalkthrough(0);
 }
@@ -821,6 +1003,7 @@ window.renderArcade = renderArcade;
 
 /* ================= DASHBOARD ================= */
 function renderDashboard() {
+  if (!State.cards.length) return renderFirstRun();
   const m = State.meta, c = State.cards;
   const graded = c.filter(x => x.graded), gradedVal = sum(graded.map(x => x.value));
   const rawVal = m.totalValue - gradedVal;
@@ -885,6 +1068,60 @@ function renderDashboard() {
   wireGamePlan();
   wireActionBoard();
   wireFeedback();
+}
+
+/* ---------- first-run welcome (empty collection — no export loaded yet) ---------- */
+function renderFirstRun() {
+  const live = !!State.live;
+  const disabledNote = live ? '' : ' <span class="reason" style="color:var(--gold)">requires the desktop app</span>';
+  $('#view-dashboard').innerHTML = `
+    <div class="panel" style="margin-top:10px;text-align:center;padding:34px 24px">
+      <div style="font-size:40px;line-height:1">🏠</div>
+      <h2 style="font-size:22px;margin:10px 0 4px">Let's fill your Den</h2>
+      <p class="muted" style="max-width:520px;margin:0 auto">No cards yet — pick how you'd like to start. You can always add more later from any of these paths.</p>
+    </div>
+    <div class="cols two" style="margin-top:14px">
+      <div class="panel fr-path">
+        <h3>📥 Import your PriceCharting export</h3>
+        <p class="muted" style="font-size:13px">Upload the .xlsx you downloaded from PriceCharting.com → Collection → Download.${disabledNote}</p>
+        <label class="btn primary sm" style="cursor:pointer;${live ? '' : 'opacity:.5;pointer-events:none'}">Choose file…
+          <input id="fr-file" type="file" accept=".xlsx" style="display:none" ${live ? '' : 'disabled'}>
+        </label>
+        <p class="reason" id="fr-status" style="margin-top:8px"></p>
+      </div>
+      <div class="panel fr-path">
+        <h3>⚡ Connect PriceCharting live</h3>
+        <p class="muted" style="font-size:13px">Paste your PriceCharting API token and pull your collection straight from your account.${disabledNote}</p>
+        <button class="btn sm" id="fr-connect" ${live ? '' : 'disabled'} style="${live ? '' : 'opacity:.5'}">⚙ Open Settings</button>
+      </div>
+    </div>
+    <div class="panel fr-path" style="margin-top:14px">
+      <h3>✍️ Add cards by hand</h3>
+      <p class="muted" style="font-size:13px">No export yet? Start with a handful of cards — search-and-add or type them in from the ➕ Add &amp; Sold tab.</p>
+      <button class="btn sm" id="fr-manual">Add a card →</button>
+    </div>`;
+
+  if ($('#fr-file')) $('#fr-file').onchange = async e => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    const status = $('#fr-status');
+    status.textContent = 'Uploading…';
+    try {
+      const dataB64 = (await blobToDataUrl(f)).split(',').pop();
+      const j = await (await fetch('/api/import', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: f.name, dataB64 })
+      })).json();
+      if (j.ok) {
+        const r = j.report || {};
+        toast(`Imported ${(r.cards ?? 0).toLocaleString()} cards · ${money0(r.value)}`);
+        await init();
+      } else {
+        status.textContent = '✕ ' + (j.error || 'Import failed.');
+      }
+    } catch (err) { status.textContent = '✕ ' + err.message; }
+  };
+  if ($('#fr-connect')) $('#fr-connect').onclick = openSettings;
+  if ($('#fr-manual')) $('#fr-manual').onclick = () => { switchView('ledger'); setTimeout(() => { const n = $('#lg-name'); if (n) n.focus(); }, 60); };
 }
 
 /* ================= GAME PLAN (Now / Build / Invest) ================= */
@@ -1117,7 +1354,7 @@ function wireActionBoard() {
 function diagnostics() {
   const m = State.meta || {};
   return [
-    `Pokémon Chest v${APP_VERSION}`,
+    `Pokémon Den v${APP_VERSION}`,
     `Platform: ${navigator.userAgent}`,
     `Collection: ${m.totalEntries != null ? m.totalEntries.toLocaleString() : '?'} entries · ${m.totalCards != null ? m.totalCards.toLocaleString() : '?'} cards`,
     `Live backend: ${State.live ? 'connected' : 'not running'}`,
@@ -1137,7 +1374,7 @@ function feedbackCardHTML() {
   </div>`;
 }
 function wireFeedback() {
-  const title = `[Bug] Pokémon Chest v${APP_VERSION}`;
+  const title = `[Bug] Pokémon Den v${APP_VERSION}`;
   const gh = $('#fbGithub'), em = $('#fbEmail'), cp = $('#fbCopy');
   if (gh) gh.onclick = () => window.open(`${APP_REPO}/issues/new?title=${enc(title)}&body=${enc(feedbackBody())}`, '_blank', 'noopener');
   if (em) em.onclick = () => { location.href = `mailto:brandonlbarkey@gmail.com?subject=${enc(title)}&body=${enc(feedbackBody())}`; };
@@ -1169,7 +1406,7 @@ function barRows(rows, maxBase) {
 function sparkline() {
   const data = snapshotSeries();
   if (data.length < 2) {
-    return `<div class="spark-empty">Tracking started today (${money(data[0] ? data[0][1] : State.meta.totalValue)}).<br>Open or refresh Pokémon Chest on future days to build your value history.</div>`;
+    return `<div class="spark-empty">Tracking started today (${money(data[0] ? data[0][1] : State.meta.totalValue)}).<br>Open or refresh Pokémon Den on future days to build your value history.</div>`;
   }
   const vals = data.map(d => d[1]);
   const min = Math.min(...vals), max = Math.max(...vals), W = 600, H = 110, pad = 8;
@@ -1233,8 +1470,12 @@ function applyFilters() {
   const min = f.min === '' ? -Infinity : +f.min, max = f.max === '' ? Infinity : +f.max;
   let arr = State.cards.filter(c => {
     if (f.q) {
-      const hay = (c.name + ' ' + c.set + ' ' + (c.number || '') + ' ' + c.setRaw).toLowerCase();
-      if (!hay.includes(f.q)) return false;
+      // token-AND search: every word must hit somewhere ("charizard 151",
+      // "japanese mewtwo", "psa moonbreon" all just work)
+      const hay = (c.name + ' ' + c.set + ' ' + (c.number || '') + ' ' + c.setRaw + ' '
+        + (c.game || '') + ' ' + (c.lang === 'ja' ? 'japanese jp' : 'english en') + ' '
+        + (c.graded ? (c.grader || '') + ' ' + (c.grade || '') + ' graded slab' : 'raw')).toLowerCase();
+      if (!f.q.split(/\s+/).every(t => hay.includes(t))) return false;
     }
     if (f.lang !== 'all' && c.lang !== f.lang) return false;
     if (f.graded === 'raw' && c.graded) return false;
@@ -1619,20 +1860,80 @@ function caseSet(c, patch) {
 }
 function caseRemove(c) { const all = caseAll(); delete all[c.pcId]; localStorage.setItem(LS_CASE, JSON.stringify(all)); }
 
+const CARDSNAP_MAX = 120;               // newest dated points kept per card
+
+/* History key for one card. A raw copy and a graded copy of the same card
+   share a PriceCharting id but are worth wildly different amounts (a raw
+   Charmander at $3.35 vs the PSA 8 at $30.75), so graded copies get their own
+   series. Ungraded cards keep the plain pcId key, which is exactly what the
+   Display Case has always written — so existing history carries over intact.
+   Two ungraded copies of the same card still share a series on purpose: same
+   product, and the cent-level export differences are noise. */
+function snapKey(c) {
+  return c.graded ? `${c.pcId}#${(c.grader || 'G')}${c.grade != null ? c.grade : ''}` : String(c.pcId);
+}
+
 function recordCardSnaps() {
-  // record today's price for every card currently on display (small footprint)
+  // Record today's price for EVERY priced card (not just Display Case picks),
+  // so any card's modal can chart its own history. Kept small by two rules:
+  // only write when the price actually moved since that card's last recorded
+  // point, and prune each card to its newest CARDSNAP_MAX entries. The key and
+  // shape are unchanged (LS_CARDSNAP: {pcId: {'YYYY-MM-DD': price}}), so
+  // existing Display Case history carries straight over, and history for cards
+  // that later leave the export is left in place rather than deleted.
   const snaps = loadJSON(LS_CARDSNAP, {});
   const today = new Date().toISOString().slice(0, 10);
-  const byId = {}; (State.cards || []).forEach(c => byId[c.pcId] = c);
-  Object.keys(caseAll()).forEach(pcId => {
-    const c = byId[pcId]; if (!c || c.price == null) return;
-    (snaps[pcId] = snaps[pcId] || {})[today] = Math.round(c.price * 100) / 100;
-  });
+  for (const c of (State.cards || [])) {
+    if (c.price == null || !isFinite(c.price)) continue;
+    const price = Math.round(c.price * 100) / 100;
+    const key = snapKey(c);
+    const hist = snaps[key] = snaps[key] || {};
+    const dates = Object.keys(hist).sort();
+    if (dates.length && hist[dates[dates.length - 1]] === price && hist[today] === undefined) continue;
+    hist[today] = price;
+    if (dates.length + 1 > CARDSNAP_MAX) {
+      const keep = Object.keys(hist).sort().slice(-CARDSNAP_MAX);
+      snaps[key] = Object.fromEntries(keep.map(d => [d, hist[d]]));
+    }
+  }
   localStorage.setItem(LS_CARDSNAP, JSON.stringify(snaps));
 }
 
+/* Full-width price-history chart for a single card's modal — same visual
+   language as the dashboard sparkline(), but fed a per-card series. */
+function cardHistoryChart(series) {
+  const vals = series.map(s => s[1]);
+  const min = Math.min(...vals), max = Math.max(...vals), W = 600, H = 110, pad = 8;
+  const x = i => pad + i * (W - 2 * pad) / (series.length - 1);
+  const y = v => H - pad - (max === min ? 0.5 : (v - min) / (max - min)) * (H - 2 * pad);
+  const pts = series.map((s, i) => `${x(i).toFixed(1)},${y(s[1]).toFixed(1)}`).join(' ');
+  const area = `${pad},${H - pad} ${pts} ${W - pad},${H - pad}`;
+  const first = vals[0], last = vals[vals.length - 1];
+  const delta = Math.round((last - first) * 100) / 100;
+  const pct = first ? (last - first) / first * 100 : 0;
+  const up = delta >= 0, col = up ? 'var(--green)' : 'var(--red)', sign = up ? '+' : '-';
+  const gid = 'chg' + Math.random().toString(36).slice(2, 8);
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    <defs><linearGradient id="${gid}" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#4cc2ff" stop-opacity=".35"/><stop offset="1" stop-color="#4cc2ff" stop-opacity="0"/></linearGradient></defs>
+    <polygon points="${area}" fill="url(#${gid})"/>
+    <polyline points="${pts}" fill="none" stroke="#4cc2ff" stroke-width="2.5" stroke-linejoin="round"/>
+    <circle cx="${x(series.length - 1)}" cy="${y(last)}" r="3.5" fill="#ffce4d"/>
+  </svg>
+  <div class="muted" style="font-size:12px;margin-top:6px">${series.length} points · ${money(first)} → ${money(last)}
+    <b style="color:${col}">(${sign}${money(Math.abs(delta))}, ${sign}${Math.abs(pct).toFixed(1)}%)</b></div>`;
+}
+function cardHistoryHTML(c) {
+  const t = cardTrend(c);
+  const body = (t.series && t.series.length >= 2)
+    ? cardHistoryChart(t.series)
+    : `<div class="spark-empty">Tracking started ${new Date().toISOString().slice(0, 10)} at ${money(c.price)} — history builds with every sync and refresh.</div>`;
+  return `<div class="subhead">Price history</div>${body}`;
+}
+
 function cardTrend(c) {
-  const hist = loadJSON(LS_CARDSNAP, {})[c.pcId] || {};
+  const all = loadJSON(LS_CARDSNAP, {});
+  const hist = all[snapKey(c)] || (c.graded ? {} : all[c.pcId]) || {};
   const series = Object.entries(hist).sort((a, b) => a[0] < b[0] ? -1 : 1);
   if (series.length >= 2) {
     const first = series[0][1], last = series[series.length - 1][1];
@@ -1953,6 +2254,11 @@ function labPregradeHTML() {
           <input id="pg-bottom" type="number" step="0.1" min="0" placeholder="Bottom" style="width:74px">
         </div>
         <div id="pg-centering" class="rb muted" style="font-size:13px;margin-top:8px">Enter borders to compute centering.</div>
+        ${State.live && State.live.ai && State.live.ai.enabled ? `
+        <div style="margin-top:10px">
+          <label class="btn sm" style="cursor:pointer">📷 AI pre-grade from a photo<input id="pg-photo" type="file" accept="image/*" style="display:none"></label>
+          <span id="pg-ai" class="reason"></span>
+        </div>` : ''}
       </div>
     </div>
     <div class="panel" style="margin-top:16px"><h3>3 · Flaw checklist <span class="hint">— check anything you can see using the listed light technique</span></h3>
@@ -1968,6 +2274,7 @@ function labPregradeHTML() {
 
 function wirePregrade() {
   let current = null;
+  let aiEst = null, aiRec = null;
   const saved = pregradeAll();
   const findCard = (val) => {
     const opt = [...$('#pg-list').options].find(o => o.value === val);
@@ -1984,6 +2291,12 @@ function wirePregrade() {
       centCeil = ceil ? ceil.g : 6;
       const w = Math.round(worst);
       centTxt = `L/R <b>${lr ? lr.label : '—'}</b> · T/B <b>${tb ? tb.label : '—'}</b> → worst axis <b>${w}/${100 - w}</b> → centering supports <b style="color:var(--gold)">${ceil ? esc(ceil.row.grade) : 'below PSA 7'}</b>`;
+    } else if (aiRec && aiRec.centering && typeof aiRec.centering.worstPct === 'number') {
+      const worst = aiRec.centering.worstPct;
+      const ceil = centeringCeiling(worst);
+      centCeil = ceil ? ceil.g : 6;
+      const w = Math.round(worst);
+      centTxt = `AI-read centering: worst axis <b>${w}/${100 - w}</b> → centering supports <b style="color:var(--gold)">${ceil ? esc(ceil.row.grade) : 'below PSA 7'}</b> <span class="reason">(from the photo — measure manually to override)</span>`;
     }
     $('#pg-centering').innerHTML = centTxt;
     const dg = labDowngraders();
@@ -1991,12 +2304,12 @@ function wirePregrade() {
     $$('#pg-checks input:checked').forEach(cb => {
       checkCeil = Math.min(checkCeil, parseDropCap(dg[+cb.dataset.di].dropsTo));
     });
-    const est = Math.min(centCeil == null ? 10 : centCeil, checkCeil);
+    const est = Math.min(centCeil == null ? 10 : centCeil, checkCeil, aiEst == null ? 10 : aiEst);
     const box = $('#pg-verdict');
-    if (centCeil == null && checkCeil === 10 && !current) return;
+    if (centCeil == null && checkCeil === 10 && aiEst == null && !current) return;
     let cls = est >= 10 ? 'strong' : est >= 9 ? 'maybe' : 'no';
     let head = est >= 10 ? '★ Looks like a 10 candidate' : est >= 9 ? `◐ Tops out around PSA ${est}` : `○ Caps at PSA ${est} — think raw`;
-    let body = `Centering ceiling: <b>${centCeil == null ? 'not measured' : 'PSA ' + centCeil}</b> · flaw ceiling: <b>PSA ${checkCeil}</b>.`;
+    let body = `Centering ceiling: <b>${centCeil == null ? 'not measured' : 'PSA ' + centCeil}</b> · flaw ceiling: <b>PSA ${checkCeil}</b>${aiEst != null ? ` · AI estimate: <b>PSA ${aiEst}</b>` : ''}.`;
     if (current) {
       const lad = gradeLadder(current);
       const vals = { 10: lad.psa10, 9: lad.psa9, 8: lad.psa8 };
@@ -2004,7 +2317,7 @@ function wirePregrade() {
       const net = est$ * (1 - 0.136) - (State.intel.thresholds.allInGradingCost || 35);
       const beats = net > (current.price || 0);
       body += ` For <b>${esc(current.name)}</b>: a PSA ${est} ≈ <b>${money(est$)}</b>, netting ≈ ${money(net)} after fees+grading vs <b>${money(current.price)}</b> raw → <b style="color:${beats ? 'var(--green)' : 'var(--red)'}">${beats ? 'grading still wins at this grade' : 'sell raw unless it grades higher'}</b>.`;
-      pregradeSet(current.pcId, { est, centering: centCeil, flaws: $$('#pg-checks input:checked').length, date: new Date().toISOString().slice(0, 10) });
+      pregradeSet(current.pcId, { est, centering: centCeil, flaws: $$('#pg-checks input:checked').length, date: new Date().toISOString().slice(0, 10), ai: aiRec });
     }
     box.className = 'rec-box ' + cls;
     box.innerHTML = `<div class="rh">${head}</div><div class="rb">${body}</div>`;
@@ -2020,6 +2333,22 @@ function wirePregrade() {
   };
   ['pg-left', 'pg-right', 'pg-top', 'pg-bottom'].forEach(id => $('#' + id).oninput = update);
   $$('#pg-checks input').forEach(cb => cb.onchange = update);
+  if ($('#pg-photo')) $('#pg-photo').onchange = async e => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    e.target.value = '';
+    const ai = $('#pg-ai');
+    if (ai) ai.textContent = 'Reading the card…';
+    try {
+      const dataUrl = await blobToDataUrl(f);
+      const j = await (await fetch('/api/ai/grade', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ dataUrl }) })).json();
+      if (!j.ok) { if (ai) ai.textContent = '✕ ' + (j.error || 'could not pre-grade'); return; }
+      const g = j.grade || {};
+      aiRec = g; aiEst = +g.estGrade || null;
+      const centBit = g.centering && (g.centering.lr || g.centering.tb) ? `centering ${g.centering.lr || '?'} / ${g.centering.tb || '?'} · ` : '';
+      if (ai) ai.innerHTML = `AI: ${centBit}corners ${g.corners ?? '?'} · edges ${g.edges ?? '?'} · surface ${g.surface ?? '?'} → est PSA ${g.estGrade ?? '?'}${g.confidence != null ? ` · ${Math.round(g.confidence * 100)}% sure` : ''}`;
+      update();
+    } catch (err) { if (ai) ai.textContent = '✕ ' + err.message; }
+  };
 }
 
 function labStandardsHTML(L) {
@@ -2120,7 +2449,7 @@ function renderAdmin() {
       <p class="reason" style="margin-top:8px">“Bake” copies your art into the project’s source <code>card-art/</code> folder so a future rebuild ships with them baked in (dev checkout only — the packaged app can’t rewrite itself, so there it just reveals the folder to back up).</p>
     </div>
 
-    <div class="panel accent-emerald" style="margin-bottom:16px">
+    ${shipBuild() ? '' : `<div class="panel accent-emerald" style="margin-bottom:16px">
       <h3>🎮 Emerald Lab — build &amp; play Pokémon Emerald, no Terminal</h3>
       <p class="muted" style="font-size:13.5px;line-height:1.6">Compiles the open-source <b>pokeemerald</b> decompilation into a fresh, <b>fully legal</b> ROM right on your Mac — no downloaded ROM, no command line. ${liveOn ? '' : '<b style="color:var(--gold)">Launch via start.command / the app to enable the buttons.</b>'}</p>
       <div id="em-status" class="muted" style="font-size:13px;margin:8px 0;display:flex;gap:16px;flex-wrap:wrap">Checking…</div>
@@ -2136,7 +2465,7 @@ function renderAdmin() {
       </div>
       <p class="reason" style="margin-top:8px">🔒 The one-time toolchain install is the only step that needs your Mac password — and macOS itself asks for it (one click, never stored here). Build &amp; Play need no password. Nothing is downloaded except the free open-source build tools.</p>
       <pre id="em-log" style="display:none;background:#0a0e16;border:1px solid #1f2a40;border-radius:8px;padding:10px;max-height:280px;overflow:auto;font-size:11.5px;line-height:1.5;white-space:pre-wrap;margin-top:8px"></pre>
-    </div>
+    </div>`}
 
     <div class="panel" style="margin-bottom:16px">
       <h3>🔐 Secure Inputs — saved in your macOS Keychain</h3>
@@ -2151,7 +2480,7 @@ function renderAdmin() {
     </div>
 
     <div class="panel accent-sapphire" style="margin-bottom:16px"><h3>📱 iPhone app — Swipe Deck &amp; 3D Battle</h3>
-      <p class="muted" style="font-size:13.5px;line-height:1.6">A self-contained mobile app — <code>Pokémon Chest — Deck.html</code> — you AirDrop / iCloud / email to your iPhone and <b>Add to Home Screen</b> (full-screen, offline, its own icon). Swipe your deck, build a battle deck, and a 3D swirling-stadium battle buildup. <b>Only cards you’ve caught with a real photo</b> (📸 Photo Studio) are battle-playable — the rest show as “wild, go catch it.” ${liveOn ? '' : '<b style="color:var(--gold)">Launch via the app to build it.</b>'}</p>
+      <p class="muted" style="font-size:13.5px;line-height:1.6">A self-contained mobile app — <code>Pokémon Den — Deck.html</code> — you AirDrop / iCloud / email to your iPhone and <b>Add to Home Screen</b> (full-screen, offline, its own icon). Swipe your deck, build a battle deck, and a 3D swirling-stadium battle buildup. <b>Only cards you’ve caught with a real photo</b> (📸 Photo Studio) are battle-playable — the rest show as “wild, go catch it.” ${liveOn ? '' : '<b style="color:var(--gold)">Launch via the app to build it.</b>'}</p>
       <div id="mob-stat" class="muted" style="font-size:13px;margin:6px 0"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px">
         <button class="btn-lightblue sm" id="mob-build" ${liveOn ? '' : 'disabled'}>📱 Build iPhone app</button>
@@ -2164,9 +2493,9 @@ function renderAdmin() {
     </div>
 
     <div class="panel" style="margin-bottom:16px"><h3>📱 Take it with you — iPhone Pocket Edition</h3>
-      <p class="muted" style="font-size:13.5px;line-height:1.6">A single self-contained file — <code>Pokémon Chest — Pocket.html</code> in your project folder — with your whole collection, the Game Plan, and tap-to-open comp links baked in. Works offline; no app store, no account.</p>
+      <p class="muted" style="font-size:13.5px;line-height:1.6">A single self-contained file — <code>Pokémon Den — Pocket.html</code> in your project folder — with your whole collection, the Game Plan, and tap-to-open comp links baked in. Works offline; no app store, no account.</p>
       <ol class="bullets" style="padding-left:20px">
-        <li><b>AirDrop</b> <code>Pokémon Chest — Pocket.html</code> from the project folder to your iPhone (or email it to yourself).</li>
+        <li><b>AirDrop</b> <code>Pokémon Den — Pocket.html</code> from the project folder to your iPhone (or email it to yourself).</li>
         <li>Open it in <b>Safari</b> → Share → <b>Add to Home Screen</b>. It gets the chest icon and launches full-screen like an app.</li>
         <li>It’s a <b>snapshot</b> — tap <b>Regenerate</b> below (or refresh prices) after you update your collection, then re-AirDrop.</li>
       </ol>
@@ -2177,11 +2506,22 @@ function renderAdmin() {
       </div>
     </div>
 
+    <div class="panel" style="margin-bottom:16px">
+      <h3>🐛 Error log <span class="reason">— off by default. Never sent automatically.</span></h3>
+      <p class="muted" style="font-size:13.5px;line-height:1.6">Turn this on in <b>⚙ Live</b> and JS errors save locally (last 100) to help fix bugs — nothing leaves this computer unless you click Send.</p>
+      <div id="errlog-list" class="muted" style="font-size:13px"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px">
+        <button class="btn sm" id="errlog-copy">📋 Copy report</button>
+        <button class="btn sm" id="errlog-send">✉ Send</button>
+        <button class="btn ghost sm" id="errlog-clear">🗑 Clear</button>
+      </div>
+    </div>
+
     <div class="cols side">
       <div class="panel"><h3>Product brief</h3>
         <p class="muted" style="font-size:13.5px;line-height:1.6">
         <b style="color:var(--text)">GradeStage</b> is a printable stage that makes card photos <i>repeatable</i>: a recessed bay holds a raw card, penny sleeve, or Card Saver 1 dead-center under engraved crosshairs; snap-in LED bars give <b>20° raking light</b> (the angle that exposes print lines and holo scratches — the stuff that turns a 10 into a 9) and <b>45° even light</b> (true color + centering shots); a stacking tower holds the phone at a fixed height so every card is framed identically — which is exactly what the in-app centering calculator wants.</p>
-        <p class="muted" style="font-size:13.5px;line-height:1.6">Sell as: <b>STL files + BOM + guide</b> (digital, ~$12-19), or <b>printed kit with LEDs + polarizer film</b> (~$49-69). Companion app angle: Pokémon Chest's Grade Lab is the software half.</p>
+        <p class="muted" style="font-size:13.5px;line-height:1.6">Sell as: <b>STL files + BOM + guide</b> (digital, ~$12-19), or <b>printed kit with LEDs + polarizer film</b> (~$49-69). Companion app angle: Pokémon Den's Grade Lab is the software half.</p>
         <div class="subhead">Print files (in repo: hardware/gradestage/)</div>
         <ul class="bullets">
           <li><code>gradestage.scad</code> — parametric source (OpenSCAD, free)</li>
@@ -2362,6 +2702,17 @@ function renderAdmin() {
     if (j.ok) { $('#sec-label').value = ''; $('#sec-value').value = ''; toast('Saved to Keychain 🔐'); secRefresh(); }
     else toast(j.error || 'Could not save.');
   };
+  /* ---- 🐛 Error log ---- */
+  errlogRefresh();
+  if ($('#errlog-copy')) $('#errlog-copy').onclick = async () => {
+    try { await navigator.clipboard.writeText(errlogReport()); toast('Report + error log copied to clipboard.'); }
+    catch { toast('Couldn’t copy automatically.'); }
+  };
+  if ($('#errlog-send')) $('#errlog-send').onclick = () => {
+    window.open(`${APP_REPO}/issues/new?title=${enc(`[Bug] Pokémon Den v${APP_VERSION}`)}&body=${enc(errlogReport())}`, '_blank', 'noopener');
+  };
+  if ($('#errlog-clear')) $('#errlog-clear').onclick = () => { localStorage.removeItem(LS_ERRLOG); toast('Error log cleared.'); errlogRefresh(); };
+
   emRefreshStatus(); secRefresh();
   // Resume a live log if a build/install is already running when this tab renders.
   fetch('/api/emerald/log?since=0').then(r => r.json()).then(j => {
@@ -2610,10 +2961,14 @@ function openModal(c) {
           <span class="chip ${c.lang}">${c.lang === 'ja' ? '🇯🇵 Japanese' : '🇺🇸 English'}</span>
           ${c.graded ? `<span class="chip gold">${esc(c.grader || 'Graded')} ${c.grade || ''}</span>` : `<span class="chip">Raw · ${esc(c.condition)}</span>`}
           ${c.setYear ? `<span class="chip">${c.setYear} · ${esc(c.era)}</span>` : ''}
-          ${c.qty > 1 ? `<span class="chip">×${c.qty}</span>` : ''}
+          <span class="chip qty-chip" title="Inventory on hand — +/- persists across refreshes (layered on your export)">
+            <button class="qty-btn" id="mk-qminus">−</button>
+            <b id="mk-qval" ${c.qty === 0 ? 'style="color:var(--red)"' : ''}>×${c.qty}</b>
+            <button class="qty-btn" id="mk-qplus">+</button>
+          </span>
         </div>
         <div class="stat-grid">
-          ${statBox('Market', money(c.price), 'var(--gold)')}
+          ${statBox('Market', money(c.price) + trendSpark((cardTrend(c) || {}).series), 'var(--gold)')}
           ${statBox('Cost', money(c.cost))}
           ${statBox('P/L', c.pl == null ? '—' : (c.pl >= 0 ? '+' : '') + money(c.pl), plColor)}
         </div>
@@ -2621,10 +2976,12 @@ function openModal(c) {
           <button class="btn primary sm" id="mk-list">📤 List for sale</button>
           <button class="btn-lightblue sm" id="mk-photos">📸 Add my photos</button>
           <button class="btn ${caseGet(c) ? 'gold' : ''} sm" id="mk-case">${caseGet(c) ? '★ In case' : '★ Display Case'}</button>
+          <button class="btn ${alertGet(c) ? 'gold' : ''} sm" id="mk-alert">🔔 Alert</button>
           <button class="btn ${u.status === 'forsale' ? 'gold' : ''} sm" id="mk-fs">${u.status === 'forsale' ? '✓ For sale' : 'Mark “For sale”'}</button>
           <button class="btn ${u.status === 'sold' ? 'primary' : ''} sm" id="mk-sold">${u.status === 'sold' ? '✓ Sold' : 'Mark “Sold”'}</button>
           ${u.status ? `<button class="btn ghost sm" id="mk-clear">Clear</button>` : ''}
         </div>
+        <div id="mk-alertbox"></div>
       </div>
     </div>
     <div class="modal-body">
@@ -2652,6 +3009,8 @@ function openModal(c) {
       <div class="subhead">Sell math</div>
       <div class="rb muted" style="font-size:13px">At <b style="color:var(--gold)">${money(c.value)}</b>${c.qty > 1 ? ` (×${c.qty})` : ''}, a sale nets ≈ <b style="color:var(--green)">${money(s.net)}</b> after ~${s.feePct}% fees on ${c.graded || c.lang === 'ja' || c.value > 100 ? 'eBay' : 'a low-fee venue'}. ${c.datePurchased ? `Bought ${c.datePurchased}.` : ''} Added ${c.dateAdded || '—'}.</div>
 
+      ${cardHistoryHTML(c)}
+
       ${liveZoneHTML(c)}
 
       <div class="subhead">Private note</div>
@@ -2666,12 +3025,107 @@ function openModal(c) {
   if ($('#mk-photos')) $('#mk-photos').onclick = () => openPhotoStudio(c, false);
   if ($('#mk-imgedit')) $('#mk-imgedit').onclick = () => openImageEditor(c, true);
   $('#mk-case').onclick = () => openCasePicker(c);
+  $('#mk-alert').onclick = () => {
+    const box = $('#mk-alertbox');
+    if (box.dataset.open === '1') { box.innerHTML = ''; box.dataset.open = ''; return; }
+    box.dataset.open = '1';
+    const t = alertGet(c) || {};
+    box.innerHTML = `<div class="rv-row" style="margin-top:8px;align-items:center;flex-wrap:wrap">
+      <input id="al-above" class="s-inp" type="number" min="0" step="0.01" placeholder="Alert above $" value="${t.above ?? ''}" style="width:140px">
+      <input id="al-below" class="s-inp" type="number" min="0" step="0.01" placeholder="Alert below $" value="${t.below ?? ''}" style="width:140px">
+      <button class="btn primary sm" id="al-save">Save</button>
+      <button class="btn ghost sm" id="al-remove">Remove</button>
+    </div>`;
+    $('#al-save').onclick = () => {
+      const above = $('#al-above').value === '' ? null : +$('#al-above').value;
+      const below = $('#al-below').value === '' ? null : +$('#al-below').value;
+      alertSet(c, { above, below });
+      toast('Alert armed.');
+      openModal(c);
+    };
+    $('#al-remove').onclick = () => {
+      alertSet(c, { above: null, below: null });
+      toast('Alert removed.');
+      openModal(c);
+    };
+  };
   $('#mk-fs').onclick = () => { uset(c, { status: uget(c).status === 'forsale' ? '' : 'forsale' }); openModal(c); refreshAfterUser(); };
   $('#mk-sold').onclick = () => { uset(c, { status: uget(c).status === 'sold' ? '' : 'sold' }); openModal(c); refreshAfterUser(); };
   if ($('#mk-clear')) $('#mk-clear').onclick = () => { uset(c, { status: '' }); openModal(c); refreshAfterUser(); };
   $('#mk-note').onchange = e => uset(c, { note: e.target.value });
+  const qtyStep = d => () => {
+    if (!adjustQty(c, d)) return;
+    const v = $('#mk-qval');
+    if (v) { v.textContent = '×' + c.qty; v.style.color = c.qty === 0 ? 'var(--red)' : ''; }
+    if (typeof rvRecalcMeta === 'function') rvRecalcMeta();
+    renderCollection(true);
+    toast(`${c.name}: ×${c.qty} in inventory · ${money(c.value)}`);
+  };
+  $('#mk-qminus').onclick = qtyStep(-1);
+  $('#mk-qplus').onclick = qtyStep(+1);
 }
 function closeModal() { $('#modalRoot').innerHTML = ''; }
+
+/* ---------- About & Legal (surfaces LEGAL.md in-app) ---------- */
+const LEGAL_FALLBACK = `# Legal & Credits
+
+Pokémon Den is an unofficial, fan-made tool for cataloging, valuing, and selling
+trading cards **you personally own**. It is **not affiliated** with, endorsed, sponsored, or
+approved by Nintendo, The Pokémon Company, Creatures Inc., GAME FREAK inc., or PriceCharting.
+
+**Pokémon © Nintendo / Creatures Inc. / GAME FREAK inc.** Pokémon and all respective
+character names, card artwork, and logos are trademarks and copyrights of Nintendo /
+The Pokémon Company. Card images are loaded from [TCGdex](https://tcgdex.dev) and belong
+to their respective owners.
+
+## Privacy
+
+No accounts, no analytics, no tracking. Your collection data never leaves this
+computer. The only network calls are card art from TCGdex, links you click,
+and — only if you add your own key in ⚙ Live — requests straight from your
+machine to that one provider. An optional local-only error log (off by
+default) is never sent anywhere automatically.`;
+
+// Minimal Markdown → HTML: #/## headings, **bold**, [text](url), '- ' bullets.
+function mdToHtml(md) {
+  const lines = String(md).split('\n');
+  const out = [];
+  let inList = false;
+  const fmt = s => esc(s)
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, (_, t, u) => `<a href="${u}" target="_blank" rel="noopener">${t}</a>`);
+  const closeList = () => { if (inList) { out.push('</ul>'); inList = false; } };
+  for (let raw of lines) {
+    const line = raw.replace(/\s+$/, '');
+    if (/^##\s+/.test(line)) { closeList(); out.push('<h2>' + fmt(line.replace(/^##\s+/, '')) + '</h2>'); }
+    else if (/^#\s+/.test(line)) { closeList(); out.push('<h1>' + fmt(line.replace(/^#\s+/, '')) + '</h1>'); }
+    else if (/^-\s+/.test(line)) { if (!inList) { out.push('<ul>'); inList = true; } out.push('<li>' + fmt(line.replace(/^-\s+/, '')) + '</li>'); }
+    else if (line.trim() === '') { closeList(); }
+    else { closeList(); out.push('<p>' + fmt(line) + '</p>'); }
+  }
+  closeList();
+  return out.join('\n');
+}
+
+async function openAbout() {
+  let md = LEGAL_FALLBACK;
+  try {
+    const r = await fetch('LEGAL.md?_=' + Date.now());
+    if (r.ok) { const t = await r.text(); if (t && t.trim()) md = t; }
+  } catch { /* file:// or missing — use the fallback disclaimer */ }
+  $('#modalRoot').innerHTML = `<div class="modal-bg" id="modalBg"><div class="modal accent-gold" style="max-width:640px">
+    <button class="close-x" id="aboutClose">×</button>
+    <div class="modal-body" style="padding:28px 30px 26px">
+      <div class="about-head">
+        <div class="about-title">Pokémon <span>Den</span></div>
+        <div class="about-meta">Version ${esc(APP_VERSION)} · <a href="${esc(APP_REPO)}" target="_blank" rel="noopener">source</a></div>
+        <div class="about-credits">Card images: <a href="https://tcgdex.dev" target="_blank" rel="noopener">TCGdex</a> · Prices: your PriceCharting export · Built by DarkHearts</div>
+      </div>
+      <div class="about-legal">${mdToHtml(md)}</div>
+    </div></div></div>`;
+  $('#aboutClose').onclick = closeModal;
+  $('#modalBg').onclick = e => { if (e.target.id === 'modalBg') closeModal(); };
+}
 function refreshAfterUser() { if (State.view === 'collection') renderCollection(true); if (State.view === 'sell') renderSell(); }
 
 /* ================= LIVE (BYOK backend) ================= */
@@ -2694,7 +3148,7 @@ function updateLiveBtn() {
 function openSettings() {
   const L = State.live;
   if (!L) {
-    toast('Open Pokémon Chest via start.command to connect live data.');
+    toast('Open Pokémon Den via start.command to connect live data.');
   }
   const v = (id) => document.getElementById(id)?.value?.trim() || '';
   const enabled = (b) => b ? '<span class="chip gold">connected</span>' : '<span class="chip">not set</span>';
@@ -2702,8 +3156,8 @@ function openSettings() {
     <button class="close-x" id="modalClose">×</button>
     <div class="modal-body" style="padding:26px">
       <h2 style="font-size:20px;margin-bottom:4px">⚡ Connect live data &amp; AI</h2>
-      <p class="muted" style="font-size:13px;margin-bottom:6px">All optional and bring-your-own-key. Keys are stored locally in <code>settings.local.json</code> (gitignored) and sent only to that provider — never bundled, never shared. With nothing set, Pokémon Chest runs on your export + free TCGdex images + deep-links.</p>
-      ${!L ? `<div class="rec-box no" style="margin:10px 0"><div class="rb">⚠️ The live backend isn’t running. Launch Pokémon Chest with <b>start.command</b> (not by opening index.html) to save keys.</div></div>` : ''}
+      <p class="muted" style="font-size:13px;margin-bottom:6px">All optional and bring-your-own-key. Keys are stored locally in <code>settings.local.json</code> (gitignored) and sent only to that provider — never bundled, never shared. With nothing set, Pokémon Den runs on your export + free TCGdex images + deep-links.</p>
+      ${!L ? `<div class="rec-box no" style="margin:10px 0"><div class="rb">⚠️ The live backend isn’t running. Launch Pokémon Den with <b>start.command</b> (not by opening index.html) to save keys.</div></div>` : ''}
 
       <div class="subhead">PriceCharting API — accurate prices (ungraded + graded) ${L ? enabled(L.priceCharting) : ''}</div>
       <input id="s-pc" class="s-inp" type="password" placeholder="40-char API token from your PriceCharting subscription" />
@@ -2724,6 +3178,11 @@ function openSettings() {
       <input id="s-ai-model" class="s-inp" type="text" placeholder="Model (default claude-sonnet-4-6 / gpt-4o)" />
       <input id="s-ai" class="s-inp" type="password" placeholder="AI API key ${L && L.ai?.enabled ? '(connected — leave blank to keep)' : ''}" />
 
+      <div class="subhead">Diagnostics</div>
+      <label class="rv-check" style="display:flex;gap:8px;align-items:center;font-size:13px">
+        <input type="checkbox" id="s-errlog"> Keep a local error log to help fix bugs (stays on this computer, never sent automatically)
+      </label>
+
       <div style="display:flex;gap:10px;margin-top:18px">
         <button class="btn primary" id="s-save">Save &amp; connect</button>
         <button class="btn ghost" id="s-cancel">Close</button>
@@ -2735,6 +3194,8 @@ function openSettings() {
     if (L.comps?.provider) $('#s-comps-provider').value = L.comps.provider;
     if (L.ai?.provider) $('#s-ai-provider').value = L.ai.provider;
   }
+  $('#s-errlog').checked = errLogConsent();
+  $('#s-errlog').onchange = e => { localStorage.setItem(LS_ERRCONSENT, e.target.checked ? 'on' : 'off'); toast(e.target.checked ? 'Local error log on.' : 'Local error log off.'); };
   $('#modalClose').onclick = closeModal; $('#s-cancel').onclick = closeModal;
   $('#modalBg').onclick = e => { if (e.target.id === 'modalBg') closeModal(); };
   $('#s-save').onclick = async () => {
