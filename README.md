@@ -23,11 +23,11 @@ pre-grade, Best Sellers and Brand Lab.
 
 **[⬇ Download the latest Den build ›](https://github.com/Sparkey333/pokemon-chest/releases/tag/dmg-latest)**
 
-Current: **v2.3.0** — universal (Apple Silicon + Intel), commit `770315e`.
-Assets: `Pokemon.Den_2.3.0_universal.dmg` and `PokemonDen-source-770315e.zip`.
+Current: **v2.3.0** — universal (Apple Silicon + Intel), commit `8b5ee95`.
+Assets: `Pokemon.Den_2.3.0_universal.dmg` and `PokemonDen-source-8b5ee95.zip`.
 
 ```
-sha256  f08a02672129bf2e038128dbd521f7bbb4b89b5279d2d451d1cddedfd845e124
+sha256  5efba33fa6fd133728fdba574e3104ba7ced041f26b29ce312a2aa063d83f615
         Pokemon.Den_2.3.0_universal.dmg
 ```
 
