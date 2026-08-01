@@ -14,20 +14,42 @@ naming, store paths, and the open questions that need Brandon's answers.
 ## 1 · Naming
 
 "Pokémon" in a public product name will be refused by Apple/Google review and
-invites a Nintendo C&D. Personal build keeps **Pokémon Den**; for shipping, the
-strongest safe candidates (all keep the Den/3D identity):
+invites a Nintendo C&D. Personal build keeps **Pokémon Den**; the shipped build
+needs an original name with no "Pokémon"/"Poké" in it, and no collision with
+Collectr, Dex, Shiny, PullVault, PokéVault, CollectorVault, CollX, pkmn.gg,
+Slabfy or Pokellector.
 
-| Name | Why it works | Check before committing |
-|------|--------------|------------------------|
-| **Card Den** ⭐ recommended | Short, ownable, ties the 3D Den + multi-TCG future (Magic/sports already in your export) | USPTO + App Store search, carddow?.com/cardden.app domain |
-| **The Amber Den** | Your own DarkHearts world — real brand equity, zero IP risk | You already own the concept; check app-store name collision |
-| **DenKeeper** | One word, verb-y, "keeper of the den/collection" | Domain + trademark |
-| **Collector's Den** | Instantly clear to shoppers | More generic, harder to trademark |
-| **Vaulted** / **Chestbound** | Punchy backups from Brand Lab | Both need clearance |
+### The shortlist — three angles, one pick each
 
-Mechanics: the display name is a plain string everywhere (one `sed` swap —
-internal ids stay `pokechest.*` forever for data compatibility). Ship builds can
-rename in one commit.
+| Name | The read | Why it's the pick for its angle |
+|------|----------|--------------------------------|
+| **Vitrine** ⭐ | *The 3D room.* A vitrine is the actual word for a glass display cabinet. | Real word, upscale, zero hobby cliché, and it literally names what the Den tab already is. Reads as a product, not a utility. Cross-hobby by default. |
+| **Longbox** ⭐ | *The collector.* The comics/sports storage box everyone in the hobby knows. | Warm, concrete, instantly signals "collector" without naming a game. Trivial logo (a box). Carries the multi-TCG plan for free. |
+| **Compsheet** ⭐ | *The advisor.* Sold comps + fee-adjusted net + grade break-even — the thing the app actually does that others don't. | Names the differentiator instead of the container. Best fit if v1 targets sellers. Plain `Comps` is stronger but far harder to clear. |
+
+### The full batch
+
+| Name | Read | Notes |
+|------|------|-------|
+| **Vitrine** | display cabinet | Shortlist. Check `vitrine.app` — `.com` is likely gone. |
+| **Longbox** | collector storage | Shortlist. Comics-adjacent goodwill; check for comics-app collisions. |
+| **Compsheet** | sold comps + net math | Shortlist. Descriptive, so a weaker trademark — pair with a distinct logo. |
+| **Curio** | cabinet of curiosities | Warm, one word. Common product word — clearance risk is real. |
+| **Backroom** | where the good stuff is kept | Insider, a little cheeky. Reads slightly retail-inventory. |
+| **Atrium** | the walk-in room | Calm and architectural; fits the Den's scale. Generic-ish. |
+| **Under Glass** | slabs, literally | Most evocative of the batch. Two words hurt as an app name. |
+| **Sleeved** | every card goes in one | Short, hobby-native, verb-y. May read too niche outside TCG. |
+| **Mintwright** | maker + "mint" | Same craft feel you liked in *Cardwright*, but hobby-native. |
+| **Hoardly** | affectionate hoarding | Playful, modern-SaaS shape, easy to clear. Less premium. |
+| **Denwright** | keeps the Den lineage | Bridge if you want continuity with the working name. |
+| **Pull Room** | where you open packs | Great for the streaming/Whatnot audience. Near *PullVault* — check hard. |
+
+Mechanics: the display name is a plain string everywhere — internal ids stay
+`pokechest.*` forever for data compatibility. The swap is one command:
+`bash scripts/rename.sh "Vitrine"`.
+
+Before committing to any of these: USPTO TESS search, App Store + Google Play
+name search, and a domain check (`.app` is the realistic target for all of them).
 
 ## 2 · Researched feature backlog (competitor + community sweep)
 
@@ -162,7 +184,8 @@ pkmn.gg, Eyevo, PriceCharting app reviews, and app-store/blog comparisons
    I don't know this one and can't see your Mac from the cloud session. Is it a
    publishing tool / a typo (Gatekeeper? Codegate?)? Tell me what it is and I'll
    wire the pipeline to it.
-2. **Ship name**: Card Den, The Amber Den, DenKeeper — pick one (or veto all)?
+2. **Ship name**: shortlist is **Vitrine** / **Longbox** / **Compsheet** (§1) —
+   pick one, or veto the batch and I'll go again from a different angle.
 3. **Audience for v1 public**: sellers (current strength) or collectors
    (set-completion/scanning)? Decides which backlog features go first.
 4. **Apple Developer Program**: you have a development cert — do you also have a
