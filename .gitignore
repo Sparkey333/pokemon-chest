@@ -19,6 +19,10 @@ src-tauri/gen/
 # OS cruft
 .DS_Store
 
+# Python bytecode
+__pycache__/
+*.pyc
+
 # Generated iPhone snapshot (regenerated from data)
 Pok*mon Chest — Pocket.html
 
