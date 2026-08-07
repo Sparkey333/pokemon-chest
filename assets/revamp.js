@@ -139,6 +139,7 @@ const RV_VIEWS = {
   scan: () => renderScan(),
   ledger: () => renderLedger(),
   sets: () => renderSets(),
+  trade: () => renderTrade(),
   parity: () => renderParity(),
 };
 (function hookSwitchView() {
@@ -2026,4 +2027,284 @@ VERIFY: ${i.verify}
 Standard verification: run POKECHEST_HOME=<scratch> python3 server.py, drive http://127.0.0.1:8787 headless with playwright-core (chromium at /opt/pw-browsers), assert zero JS pageerrors across all tabs.
 
 WHEN DONE: in data/parity.json set this item's status to "shipped", append "✅ <date>" to its notes, bump the top-level "updated" date; commit with a clear message; push to the branch (never merge PR #1 without Brandon's approval). Internal storage keys (pokechest.*) and the bundle identifier must never change.${i.notes ? '\n\nNOTES: ' + i.notes : ''}`;
+}
+
+/* ============================================================
+   🤝 TRADE CHECKER — two stacks, live values, a fairness verdict.
+
+   Backlog #6. Put what you're giving up on the left, what you'd get
+   on the right, and the app prices both sides and calls it.
+
+   Cards come from three places, in the same order the Scanner uses:
+   your own collection first (instant, already priced), then the
+   PriceCharting catalog if a token is connected (priced), then the
+   bundled codex (free and offline — real card identity, you fill in
+   the price). Anything the app can't price is counted as unpriced and
+   held out of the verdict rather than silently treated as $0.
+
+   The trade-specific insight: a trade dodges marketplace fees, so the
+   break-even point isn't parity — it's parity minus what selling would
+   have cost you. That comparison is the last line of the verdict.
+   ============================================================ */
+const LS_TRADE = 'pokechest.trade.v1';
+const TRADE = { pickOpen: { give: false, get: false }, res: { give: [], get: [] }, seq: 0 };
+
+function tradeLoad() {
+  const t = loadJSON(LS_TRADE, {});
+  return { give: Array.isArray(t.give) ? t.give : [], get: Array.isArray(t.get) ? t.get : [] };
+}
+function tradeSave(t) { localStorage.setItem(LS_TRADE, JSON.stringify(t)); }
+function tradeSide(s) { return s === 'get' ? 'get' : 'give'; }
+
+/* Rows are keyed by a counter, not by card id — the same card can sit on
+   a side twice (different grades, different asking prices) without the
+   two rows fighting over one key. */
+function tradeKey() { return 'k' + Date.now().toString(36) + Math.floor(performance.now() * 1000 % 1e6).toString(36); }
+
+function tradeAdd(side, item) {
+  const t = tradeLoad();
+  t[tradeSide(side)].push(Object.assign({ k: tradeKey(), qty: 1 }, item));
+  tradeSave(t); renderTrade();
+}
+function tradeRemove(side, k) {
+  const t = tradeLoad();
+  t[tradeSide(side)] = t[tradeSide(side)].filter(r => r.k !== k);
+  tradeSave(t); renderTrade();
+}
+function tradeQty(side, k, delta) {
+  const t = tradeLoad();
+  const r = t[tradeSide(side)].find(x => x.k === k); if (!r) return;
+  r.qty = Math.max(1, (r.qty || 1) + delta);
+  tradeSave(t); renderTrade();
+}
+function tradeSetPrice(side, k, raw) {
+  const t = tradeLoad();
+  const r = t[tradeSide(side)].find(x => x.k === k); if (!r) return;
+  const n = parseFloat(String(raw).replace(/[^0-9.]/g, ''));
+  r.price = isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : null;
+  tradeSave(t); renderTrade();
+}
+function tradeClear() { tradeSave({ give: [], get: [] }); renderTrade(); }
+
+/* Priced rows sum; unpriced rows are counted separately so the verdict can
+   say how much of the trade it couldn't see. */
+function tradeStackTotal(rows) {
+  let total = 0, unpriced = 0, cards = 0;
+  for (const r of rows) {
+    const q = Math.max(1, r.qty || 1);
+    cards += q;
+    if (r.price == null) unpriced += q; else total += r.price * q;
+  }
+  return { total: Math.round(total * 100) / 100, unpriced, cards };
+}
+
+/* Fee-adjusted cash you'd raise by selling a stack instead of trading it —
+   reuses the same per-card venue rule the Sell Hub uses. */
+function tradeStackNet(rows) {
+  let net = 0;
+  for (const r of rows) {
+    if (r.price == null) continue;
+    const q = Math.max(1, r.qty || 1);
+    net += sellNet({ value: r.price * q, graded: !!r.graded, lang: r.lang }).net;
+  }
+  return Math.round(net * 100) / 100;
+}
+
+function tradeVerdict(giveT, getT) {
+  const base = Math.max(giveT, getT);
+  if (!base) return { label: 'Nothing to weigh yet', tone: 'muted', detail: 'Add priced cards to both sides.' };
+  const delta = Math.round((getT - giveT) * 100) / 100;
+  const pct = Math.round(Math.abs(delta) / base * 1000) / 10;
+  const yours = delta >= 0;
+  const who = yours ? 'your favor' : 'their favor';
+  const amt = money(Math.abs(delta));
+  if (pct < 5) return { label: '⚖️ Even trade', tone: 'green', detail: `Within ${pct}% — a ${amt} gap on ${money(base)} of cards. Close enough that condition and want-level decide it.` };
+  if (pct < 15) return { label: `Slightly in ${who}`, tone: yours ? 'green' : 'gold', detail: `${amt} (${pct}%) ${yours ? 'up' : 'down'}. Normal trade friction — fine if you want the cards.` };
+  if (pct < 30) return { label: `Clearly in ${who}`, tone: yours ? 'green' : 'gold', detail: `${amt} (${pct}%) ${yours ? 'in your pocket' : 'against you'}. ${yours ? 'Good deal — take it.' : 'Ask them to even it up before you agree.'}` };
+  return {
+    label: `${yours ? '🔥' : '⚠️'} Lopsided — ${who}`,
+    tone: yours ? 'green' : 'red',
+    // A trade this good is worth a second look: it's also what a scam looks like.
+    detail: `${amt} (${pct}%) ${yours ? 'your way. Worth double-checking their cards are real and the grades are what they claim.' : 'against you. Walk, or ask for a lot more.'}`,
+  };
+}
+
+function tradeRowHTML(side, r) {
+  const q = Math.max(1, r.qty || 1);
+  const line = r.price == null ? null : Math.round(r.price * q * 100) / 100;
+  return `<div class="tr-row" data-k="${esc(r.k)}">
+    ${r.img ? `<img class="tr-thumb" src="${esc(r.img)}" alt="" loading="lazy" onerror="this.remove()">` : '<div class="tr-thumb tr-noart">🃏</div>'}
+    <div class="tr-id"><b>${esc(r.name)}</b>${r.num ? ` <span class="reason">#${esc(r.num)}</span>` : ''}
+      <br><span class="reason">${esc(r.sub || '')}</span></div>
+    <div class="tr-qty">
+      <button class="btn sm tr-minus" data-side="${side}" data-k="${esc(r.k)}" title="One fewer">−</button>
+      <span class="tr-qn">×${q}</span>
+      <button class="btn sm tr-plus" data-side="${side}" data-k="${esc(r.k)}" title="One more">+</button>
+    </div>
+    <div class="tr-price">
+      <input class="s-inp tr-pin" data-side="${side}" data-k="${esc(r.k)}" inputmode="decimal"
+             value="${r.price == null ? '' : r.price}" placeholder="price"
+             title="Each — edit to override">
+      <span class="tr-line ${line == null ? 'tr-unp' : ''}">${line == null ? 'unpriced' : money(line)}</span>
+    </div>
+    <button class="btn sm ghost tr-del" data-side="${side}" data-k="${esc(r.k)}" title="Remove">✕</button>
+  </div>`;
+}
+
+function tradeStackHTML(side, rows, tot) {
+  const mine = side === 'give';
+  return `<div class="panel tr-stack">
+    <div class="tr-head">
+      <div><h3 style="margin:0">${mine ? '📤 You give' : '📥 You get'}</h3>
+        <div class="reason">${mine ? 'Cards leaving your collection' : "Cards you'd receive"}</div></div>
+      <div class="tr-tot ${mine ? '' : 'tr-tot-get'}">${money(tot.total)}<div class="reason">${tot.cards} card${tot.cards === 1 ? '' : 's'}${tot.unpriced ? ` · ${tot.unpriced} unpriced` : ''}</div></div>
+    </div>
+    <div class="tr-rows">${rows.map(r => tradeRowHTML(side, r)).join('') || `<p class="reason" style="padding:10px 2px">Nothing here yet.</p>`}</div>
+    <button class="btn sm ${mine ? '' : 'primary'} tr-addbtn" data-side="${side}">➕ Add a card</button>
+    <div class="tr-pick" data-side="${side}">${TRADE.pickOpen[side] ? tradePickerHTML(side) : ''}</div>
+  </div>`;
+}
+
+function tradePickerHTML(side) {
+  const pcOn = !!(State.live && State.live.priceCharting);
+  return `<input class="s-inp tr-q" data-side="${side}" style="width:100%;margin:8px 0 4px"
+      placeholder="Search your collection${pcOn ? ' + the PriceCharting catalog' : ' + the card codex'}…">
+    <div class="tr-res" data-side="${side}"></div>
+    <button class="btn sm ghost tr-manual" data-side="${side}">✎ Add by hand instead</button>`;
+}
+
+/* Local first — an owned card is already priced, already has art, and is the
+   most likely thing either side is putting up. */
+function tradeSearchOwned(q) {
+  const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) return [];
+  return State.cards.filter(c => {
+    if (uget(c).archived) return false;
+    const hay = `${c.name} ${c.set || ''} ${c.number || ''} ${c.lang || ''}`.toLowerCase();
+    return terms.every(t => hay.includes(t));
+  }).slice(0, 6);
+}
+
+function tradeItemFromOwned(c) {
+  return {
+    name: c.name, num: c.number, img: c.img || null, lang: c.lang,
+    graded: !!c.graded, price: c.price == null ? null : c.price,
+    sub: `${c.set || '—'}${c.graded ? ` · ${c.grader || 'graded'} ${c.grade ?? ''}`.trimEnd() : ' · raw'} · yours`,
+    src: 'own',
+  };
+}
+
+async function tradeRunSearch(side, q) {
+  const box = $(`.tr-res[data-side="${side}"]`); if (!box) return;
+  const seq = ++TRADE.seq;
+  const owned = tradeSearchOwned(q);
+  const pcOn = !!(State.live && State.live.priceCharting);
+  const ownedHTML = owned.length
+    ? `<p class="reason tr-grp">From your collection</p>` + owned.map((c, i) => `
+      <button class="sc-res tr-pickrow" data-src="own" data-x="${i}">
+        ${c.img ? `<img class="sc-thumb" src="${esc(c.img)}" alt="" loading="lazy">` : ''}
+        <span><b>${esc(c.name)}</b>${c.number ? ' #' + esc(c.number) : ''}<br>
+        <span class="reason">${esc(c.set || '—')} · ${c.price == null ? 'unpriced' : money(c.price)}</span></span>
+      </button>`).join('')
+    : '';
+  box.innerHTML = ownedHTML + `<p class="reason tr-grp">Searching ${pcOn ? 'PriceCharting' : 'the card codex'}…</p>`;
+  TRADE.res[side] = owned.map(tradeItemFromOwned);
+
+  let catalog = [];
+  try {
+    if (pcOn) {
+      const j = await (await fetch('/api/pc/search?q=' + enc(q), { cache: 'no-store' })).json();
+      if (j.ok) catalog = (j.products || []).slice(0, 8).map(p => ({
+        name: p.name, num: p.number, img: null, lang: 'en', graded: false,
+        price: p.price == null ? null : p.price, sub: `${p.set || 'PriceCharting'} · catalog`, src: 'pc',
+      }));
+    } else {
+      const j = await (await fetch('/api/codex/search?limit=8&q=' + enc(q), { cache: 'no-store' })).json();
+      if (j.ok) catalog = (j.cards || []).map(c => ({
+        name: c.name, num: c.number, img: c.img || null, lang: c.lang, graded: false,
+        price: null, sub: `${c.set} · ${c.lang === 'ja' ? '🇯🇵 JP' : '🇺🇸 EN'} · type the price`, src: 'codex',
+      }));
+    }
+  } catch (e) { catalog = []; }
+  if (seq !== TRADE.seq) return;                    // a newer keystroke won
+  const live = $(`.tr-res[data-side="${side}"]`); if (!live) return;
+
+  TRADE.res[side] = owned.map(tradeItemFromOwned).concat(catalog);
+  const catHTML = catalog.length
+    ? `<p class="reason tr-grp">${pcOn ? 'PriceCharting catalog' : 'Card codex — price it yourself'}</p>`
+      + catalog.map((it, i) => `
+      <button class="sc-res tr-pickrow" data-src="cat" data-x="${owned.length + i}">
+        ${it.img ? `<img class="sc-thumb" src="${esc(it.img)}" alt="" loading="lazy">` : ''}
+        <span><b>${esc(it.name)}</b>${it.num ? ' #' + esc(it.num) : ''}<br>
+        <span class="reason">${esc(it.sub)}${it.price != null ? ' · ' + money(it.price) : ''}</span></span>
+      </button>`).join('')
+    : `<p class="reason tr-grp">No catalog matches${pcOn ? '' : ' — add it by hand below'}.</p>`;
+  live.innerHTML = ownedHTML + catHTML;
+  $$('.tr-pickrow', live).forEach(b => b.onclick = () => {
+    const it = TRADE.res[side][+b.dataset.x];
+    if (it) { TRADE.pickOpen[side] = false; tradeAdd(side, it); }
+  });
+}
+
+function renderTrade() {
+  const el = $('#view-trade'); if (!el) return;
+  const t = tradeLoad();
+  const gT = tradeStackTotal(t.give), rT = tradeStackTotal(t.get);
+  const v = tradeVerdict(gT.total, rT.total);
+  const anyUnpriced = gT.unpriced + rT.unpriced;
+  const sellCash = tradeStackNet(t.give);
+  const feeGap = Math.round((gT.total - sellCash) * 100) / 100;
+
+  el.innerHTML = `
+    <div class="section-head"><div><h2>🤝 Trade Checker</h2>
+      <div class="sub">Stack both sides, price them, and see who's ahead — before you hand anything over. Your cards price themselves; theirs come from the catalog or the codex.</div></div>
+      ${(t.give.length || t.get.length) ? `<button class="btn sm ghost" id="tr-clear">Clear the trade</button>` : ''}
+    </div>
+
+    <div class="tr-verdict tr-${v.tone}">
+      <div class="tr-vhead">${esc(v.label)}</div>
+      <div class="tr-vnums">
+        <span>You give <b>${money(gT.total)}</b></span>
+        <span class="tr-vs">vs</span>
+        <span>You get <b>${money(rT.total)}</b></span>
+      </div>
+      <p class="tr-vdetail">${esc(v.detail)}</p>
+      ${gT.total && rT.total ? `<p class="reason tr-vfee">Selling your side instead would net ≈ <b>${money(sellCash)}</b> after ~${money(feeGap)} of marketplace fees — so a trade only has to beat <b>${money(sellCash)}</b>, not ${money(gT.total)}, to be the better move. ${rT.total >= sellCash ? '<b style="color:var(--green)">This one clears that bar.</b>' : '<b style="color:var(--gold)">This one does not.</b>'}</p>` : ''}
+      ${anyUnpriced ? `<p class="reason tr-vwarn">⚠️ ${anyUnpriced} card${anyUnpriced === 1 ? " has" : 's have'} no price and ${anyUnpriced === 1 ? 'is' : 'are'} left out of the verdict. Type a price on those rows to fold them in.</p>` : ''}
+    </div>
+
+    <div class="tr-grid">
+      ${tradeStackHTML('give', t.give, gT)}
+      ${tradeStackHTML('get', t.get, rT)}
+    </div>
+    <p class="reason" style="margin-top:12px">Prices are your export's market values and PriceCharting's catalog — estimates, not offers. Check live sold comps on anything you're not sure about before you agree to a trade.</p>`;
+
+  const clr = $('#tr-clear'); if (clr) clr.onclick = tradeClear;
+  $$('.tr-addbtn', el).forEach(b => b.onclick = () => {
+    const s = b.dataset.side;
+    TRADE.pickOpen[s] = !TRADE.pickOpen[s];
+    renderTrade();
+    const q = $(`.tr-q[data-side="${s}"]`); if (q) q.focus();
+  });
+  $$('.tr-minus', el).forEach(b => b.onclick = () => tradeQty(b.dataset.side, b.dataset.k, -1));
+  $$('.tr-plus', el).forEach(b => b.onclick = () => tradeQty(b.dataset.side, b.dataset.k, +1));
+  $$('.tr-del', el).forEach(b => b.onclick = () => tradeRemove(b.dataset.side, b.dataset.k));
+  // change, not input — re-rendering mid-keystroke would steal focus
+  $$('.tr-pin', el).forEach(i => i.onchange = () => tradeSetPrice(i.dataset.side, i.dataset.k, i.value));
+  $$('.tr-manual', el).forEach(b => b.onclick = () => {
+    const s = b.dataset.side;
+    const box = $(`.tr-q[data-side="${s}"]`);
+    const name = (box && box.value.trim()) || 'Card';
+    TRADE.pickOpen[s] = false;
+    tradeAdd(s, { name, num: '', img: null, lang: 'en', graded: false, price: null, sub: 'added by hand · type the price', src: 'manual' });
+  });
+  $$('.tr-q', el).forEach(inp => {
+    let timer = null;
+    inp.oninput = () => {
+      const q = inp.value.trim();
+      clearTimeout(timer);
+      if (!q) { const r = $(`.tr-res[data-side="${inp.dataset.side}"]`); if (r) r.innerHTML = ''; return; }
+      timer = setTimeout(() => tradeRunSearch(inp.dataset.side, q), 320);
+    };
+  });
 }

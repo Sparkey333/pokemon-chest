@@ -82,8 +82,18 @@ pkmn.gg, Eyevo, PriceCharting app reviews, and app-store/blog comparisons
    Computed from the bundled codex, so it needs no API key and works
    offline. Sets the codex lacks a card list for are shown flagged rather
    than silently dropped.
-6. **Trade checker** — two stacks side-by-side with live values and a fairness
-   verdict (PokéVault). Great for live streams too.
+6. **Trade checker** ✅ 2026-08-01 — new **🤝 Trade** tab: stack what you'd give
+   against what you'd get, and the app prices both sides and calls it.
+   Cards come from the same three tiers the Scanner uses — your own
+   collection (already priced), the PriceCharting catalog when a token is
+   connected, then the bundled codex (free/offline, you type the price) —
+   plus an add-by-hand row. Qty steppers, per-row price overrides, and the
+   worksheet persists across reloads. Cards the app can't price are held
+   *out* of the verdict and flagged rather than counted as $0. The verdict
+   bands at 5 / 15 / 30% of the larger side, and the closing line is the
+   trade-specific one: selling your side would cost ~11–13.6% in
+   marketplace fees, so a trade only has to beat the **fee-adjusted net**,
+   not the sticker total, to be the better move.
 7. **Multi-TCG expansion** — Magic, Yu-Gi-Oh!, sports (Collectr's moat; your
    export already carries a `game` field — the UI just filters it today).
 8. **Cloud backup / multi-device sync** — top complaint category everywhere;
@@ -175,7 +185,9 @@ pkmn.gg, Eyevo, PriceCharting app reviews, and app-store/blog comparisons
       Remaining store blockers: the IP rename, and sandboxing the bundled
       Python server (see §4 — direct notarized distribution avoids the latter).
 - [ ] Real signing + notarization in CI (needs Apple cert secrets in repo)
-- [ ] Top-5 backlog features above implemented
+- [x] Top-5 backlog features above implemented ✅ 2026-08-01 — bulk binder scan
+      (#1), AI pre-grade (#2), price alerts (#3), per-card history charts (#4)
+      and set completion (#5) all shipped; trade checker (#6) landed with them.
 - [ ] Beta round (TestFlight / direct DMG) with 5–10 collectors
 
 ## 5 · Open questions for Brandon
