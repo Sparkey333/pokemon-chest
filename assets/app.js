@@ -1293,7 +1293,7 @@ function renderDashboard() {
   wireFeedback();
 }
 
-function gameBarsHTML() {
+function gamesBarsHTML() {
   const bg = (State.meta && State.meta.byGame) || {};
   const rows = Object.entries(bg).sort((a, b) => b[1] - a[1]);
   if (!rows.length) return '<p class="muted" style="font-size:13px">No games yet.</p>';
