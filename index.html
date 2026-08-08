@@ -31,13 +31,14 @@
     </svg>
     <div>
       <h1>Pokémon <span>Chest</span></h1>
-      <p class="tagline">Multi-game collection · live comps · sell &amp; grade intelligence</p>
+      <p class="tagline">Your vault · one-time · yours forever</p>
     </div>
   </div>
   <div class="search-wrap">
-    <input id="search" type="search" placeholder="Search your collection — name, set, number…" autocomplete="off" />
+    <input id="search" type="search" placeholder="Search your vault — name, set, number…" autocomplete="off" />
   </div>
   <div class="topbar-right">
+    <div class="own-pill" title="Runs 100% on this Mac. No account. No subscription.">Owned vault</div>
     <div class="value-pill" id="valuePill" title="Total market value of your collection">
       <span class="vp-label">Portfolio</span>
       <span class="vp-value" id="vpValue">—</span>
@@ -49,17 +50,22 @@
 </header>
 
 <nav class="tabs" id="tabs">
-  <button data-view="dashboard" class="tab active">Dashboard</button>
-  <button data-view="scan" class="tab">📷 Scanner</button>
-  <button data-view="arcade" class="tab">🕹 Arcade</button>
-  <button data-view="collection" class="tab">Collection</button>
-  <button data-view="case" class="tab">🏛 Display Case</button>
-  <button data-view="sell" class="tab">Sell Hub</button>
-  <button data-view="lab" class="tab">Grade Lab</button>
-  <button data-view="submit" class="tab">Submit</button>
-  <button data-view="guide" class="tab">Sell &amp; Grade Guide</button>
-  <button data-view="merch" class="tab">Merch Vault</button>
-  <button data-view="admin" class="tab">🛠 Admin</button>
+  <button data-view="dashboard" class="tab active">Today</button>
+  <button data-view="collection" class="tab">Vault</button>
+  <button data-view="sell" class="tab">Sell</button>
+  <button data-view="lab" class="tab">Grade</button>
+  <button data-view="scan" class="tab">📷 Scan</button>
+  <div class="tab-more" id="tabMore">
+    <button type="button" class="tab tab-more-btn" id="tabMoreBtn" aria-haspopup="true" aria-expanded="false">More ▾</button>
+    <div class="tab-more-menu" id="tabMoreMenu" hidden>
+      <button data-view="case" class="tab">🏛 Display Case</button>
+      <button data-view="arcade" class="tab">🕹 Arcade</button>
+      <button data-view="submit" class="tab">Submit</button>
+      <button data-view="guide" class="tab">Sell &amp; Grade Guide</button>
+      <button data-view="merch" class="tab">Merch Vault</button>
+      <button data-view="admin" class="tab">🛠 Admin</button>
+    </div>
+  </div>
 </nav>
 
 <main id="main">

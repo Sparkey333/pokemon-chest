@@ -1,7 +1,7 @@
 # Pokémon Chest 🔴⚪
 
-A premium‑style, **free** database & sell/grade advisor for your Pokémon card
-collection — built from your PriceCharting export. English **and** Japanese, card art,
+A premium‑style **vault you own** (free from source / one‑time when purchased) for your
+card collection — built from your PriceCharting export. English **and** Japanese, card art,
 one‑click live sold‑comp links, and (optionally, bring‑your‑own‑key) live price data and
 AI recommendations. Runs 100% locally on your Mac: no accounts, no subscriptions, and
 every core feature works with **no API keys at all**.
@@ -133,3 +133,9 @@ Pokemon Chest/
 Grading costs, fees, multiples, and venue guidance are compiled from public hobby
 sources and change often. Prices are estimates. **Always check live sold comps before
 you sell or grade** — decisions and outcomes are yours.
+
+---
+
+## Store publishing
+
+See **[STORE.md](STORE.md)** for Mac App Store, direct (Gumroad/Lemon), itch.io, Microsoft Store, and Steam — positioned as a **one-time owned vault**, not a subscription.

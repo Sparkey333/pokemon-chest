@@ -1,8 +1,8 @@
 {
   "name": "pokemon-chest",
   "private": true,
-  "version": "1.15.0",
-  "description": "Pokémon Chest — your card collection, live comps, and sell & grade intelligence. © 2026 DarkHearts",
+  "version": "1.16.0",
+  "description": "Pok\u00e9mon Chest \u2014 your card collection, live comps, and sell & grade intelligence. \u00a9 2026 DarkHearts",
   "scripts": {
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
