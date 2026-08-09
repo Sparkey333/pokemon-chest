@@ -1,17 +1,15 @@
 name: Build macOS DMG
 
-# Builds "Pokemon Den.app" + the styled .dmg on GitHub's macOS machines,
-# so a fresh installer is downloadable without building on your own Mac.
-# Runs on every push to the redesign branch, or on demand (Run workflow).
+# Builds "Pokemon Chest.app" + the .dmg on GitHub's macOS runners, then
+# publishes a rolling chest-latest release (DMG + source zip + guide) so the
+# GET-POKEMON-CHEST.html download buttons always point at a fresh build.
 on:
   workflow_dispatch:
-    inputs:
-      public_art:
-        description: "Public build: ship with NO external catalog card art (user-scanned art only)"
-        type: boolean
-        default: false
   push:
-    branches: [claude/pokemon-chest-redesign-31io2c, main]
+    branches:
+      - main
+      - cursor/card-scan-codex-8306
+      - claude/pokemon-chest-redesign-31io2c
     paths:
       - "src-tauri/**"
       - "assets/**"
@@ -20,10 +18,17 @@ on:
       - "index.html"
       - "server.py"
       - "icon-source.png"
+      - "package.json"
+      - "GET-POKEMON-CHEST.html"
+      - "OPEN-ANYWAY.command"
       - ".github/workflows/build-dmg.yml"
 
 permissions:
-  contents: write   # lets the job publish the dmg as a release asset
+  contents: write
+
+concurrency:
+  group: chest-latest
+  cancel-in-progress: true
 
 jobs:
   dmg:
@@ -44,52 +49,73 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: Public-art build profile (suppress external catalog art)
-        if: ${{ inputs.public_art == true }}
-        run: |
-          echo '{ "publicArt": true }' > data/build-flags.json
-          echo "Built with publicArt:true — external catalog card art suppressed."
-
       - name: Regenerate the full icon set from icon-source.png
         run: npx --yes "@tauri-apps/cli@^2" icon icon-source.png
 
-      # CI has no Apple Developer certificate — ad-hoc sign ("-") instead of the
-      # configured identity. First launch needs right-click -> Open (Gatekeeper).
+      # CI has no Apple Developer certificate secrets in this repo yet — ad-hoc
+      # sign ("-") instead of the configured Apple Development identity.
+      # Gatekeeper still needs Open Anyway once (see OPEN-ANYWAY.command).
+      # When Developer ID + notarization secrets exist, /gitkit switches to them.
       - name: Build app + dmg (universal, ad-hoc signed)
         run: >
           npx --yes "@tauri-apps/cli@^2" build
           --target universal-apple-darwin
-          --config '{"bundle":{"macOS":{"signingIdentity":"-"}}}'
+          --config '{"bundle":{"macOS":{"signingIdentity":"-","hardenedRuntime":false}}}'
 
-      # Primary delivery: a rolling "dmg-latest" release — release assets do NOT
-      # count against the Actions artifact-storage quota (which is what failed
-      # on run #1). Download from the repo's Releases page.
       - name: Zip the source tree (tracked files at this commit)
         run: |
-          git archive --format=zip -o "PokemonDen-source-${GITHUB_SHA:0:7}.zip" "$GITHUB_SHA"
-          ls -lh PokemonDen-source-*.zip
+          git archive --format=zip -o "PokemonChest-source-${GITHUB_SHA:0:7}.zip" "$GITHUB_SHA"
+          cp "PokemonChest-source-${GITHUB_SHA:0:7}.zip" PokemonChest-source-latest.zip
+          ls -lh PokemonChest-source-*.zip
 
-      - name: Publish the dmg + source zip to the dmg-latest release
+      - name: Publish DMG + source to chest-latest release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          DMG=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg)
-          SRC=$(ls PokemonDen-source-*.zip)
-          echo "publishing: $DMG  +  $SRC"
-          gh release delete dmg-latest --cleanup-tag --yes || true
-          gh release create dmg-latest "$DMG" "$SRC" \
+          VER=$(python3 -c "import json; print(json.load(open('package.json'))['version'])")
+          DMG=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg | head -1)
+          # Stable asset name (spaces → dots) so download buttons + SHA256SUMS match
+          DMG_NAME=$(basename "$DMG" | tr ' ' '.')
+          cp "$DMG" "$DMG_NAME"
+          SRC_HASH="PokemonChest-source-${GITHUB_SHA:0:7}.zip"
+          SRC_LATEST=PokemonChest-source-latest.zip
+          GUIDE=GET-POKEMON-CHEST.html
+          UNLOCK=OPEN-ANYWAY.command
+          test -f "$DMG_NAME" && test -f "$SRC_HASH" && test -f "$SRC_LATEST" && test -f "$GUIDE" && test -f "$UNLOCK"
+          shasum -a 256 "$DMG_NAME" "$SRC_HASH" "$SRC_LATEST" "$GUIDE" "$UNLOCK" > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          echo "publishing: $DMG_NAME + source + guide + unlock + checksums (v$VER)"
+          NOTES=$(cat <<EOF
+          Pokémon Chest v${VER} — commit ${GITHUB_SHA:0:7}.
+
+          **Download:** DMG installer, source zip, GET-POKEMON-CHEST.html, OPEN-ANYWAY.command, SHA256SUMS.txt.
+
+          **Gatekeeper (Sequoia “Not Opened / Done only”):**
+          1. Install from the DMG into Applications
+          2. System Settings → Privacy & Security → Open Anyway
+             — or double-click OPEN-ANYWAY.command
+             — or: \`xattr -cr "/Applications/Pokemon Chest.app"\`
+
+          Ad-hoc signed CI build (no Apple notarization ticket yet). Local
+          \`build-app.command\` uses your Apple Development identity when present.
+          EOF
+          )
+          gh release delete chest-latest --cleanup-tag --yes || true
+          gh release create chest-latest "$DMG_NAME" "$SRC_HASH" "$SRC_LATEST" "$GUIDE" "$UNLOCK" SHA256SUMS.txt \
             --prerelease \
             --target "$GITHUB_SHA" \
-            --title "Pokémon Den — latest macOS build + source" \
-            --notes "Universal (Apple Silicon + Intel) build of commit ${GITHUB_SHA:0:7}. Ad-hoc signed — first launch: right-click the app → Open (or build locally via build-app.command for a clean double-click). Source zip attached."
+            --title "Pokémon Chest — latest macOS build + source" \
+            --notes "$NOTES"
 
-      # Best-effort secondary copy; skipped gracefully while the artifact
-      # storage quota is exhausted.
       - name: Upload the dmg as a workflow artifact
         uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
           name: Pokemon-Chest-dmg
-          path: src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          path: |
+            src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+            GET-POKEMON-CHEST.html
+            OPEN-ANYWAY.command
+            SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14

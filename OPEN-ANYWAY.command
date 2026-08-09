@@ -1,15 +1,21 @@
 #!/bin/bash
 # ─────────────────────────────────────────────────────────────────────────────
-# Pokémon Den — unblock Gatekeeper after a GitHub / browser DMG download
+# Pokémon Chest — unblock Gatekeeper after a GitHub / browser DMG download
 # Double-click me on your Mac (or: right-click → Open the first time).
 # ─────────────────────────────────────────────────────────────────────────────
 set -e
 APP=""
 for cand in \
-  "/Applications/Pokemon Den.app" \
-  "/Applications/Pokémon Den.app" \
-  "$HOME/Applications/Pokemon Den.app" \
-  "$HOME/Applications/Pokémon Den.app"
+  "/Applications/Pokemon Chest.app" \
+  "/Applications/Pokémon Chest.app" \
+  "$HOME/Applications/Pokemon Chest.app" \
+  "$HOME/Applications/Pokémon Chest.app" \
+  "$HOME/Desktop/Pokemon Chest.app" \
+  "$HOME/Desktop/Pokémon Chest.app" \
+  "$HOME/Library/Mobile Documents/com~apple~CloudDocs/Pokemon Chest.app" \
+  "$HOME/Library/Mobile Documents/com~apple~CloudDocs/Pokémon Chest.app" \
+  "$HOME/Library/Mobile Documents/com~apple~CloudDocs/Desktop/Pokemon Chest.app" \
+  "$HOME/Library/Mobile Documents/com~apple~CloudDocs/Applications/Pokemon Chest.app"
 do
   if [ -d "$cand" ]; then APP="$cand"; break; fi
 done
@@ -17,9 +23,9 @@ done
 # Also accept a .app dropped onto this script / passed as $1
 if [ -z "$APP" ] && [ -d "$1" ]; then APP="$1"; fi
 
-echo "── Pokémon Den · Open Anyway ──"
+echo "── Pokémon Chest · Open Anyway ──"
 if [ -z "$APP" ]; then
-  echo "✗ Could not find Pokemon Den.app in /Applications."
+  echo "✗ Could not find Pokemon Chest.app in /Applications."
   echo "  Install from the DMG first (drag the app into Applications), then run me again."
   echo
   echo "Or paste the full path when prompted:"
@@ -43,7 +49,7 @@ echo
 echo "If macOS still shows “Not Opened” with only Done:"
 echo "  1) Click Done"
 echo "  2) Apple menu → System Settings → Privacy & Security"
-echo "  3) Scroll to Security → “Pokemon Den was blocked…” → Open Anyway"
+echo "  3) Scroll to Security → “Pokemon Chest was blocked…” → Open Anyway"
 echo "  4) Confirm with password / Touch ID, then Open"
 read -n 1 -s -r -p "Press any key to close…"
 exit 1

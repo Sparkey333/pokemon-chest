@@ -3,9 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Pokémon Den — Collection &amp; Price Tracker</title>
+<title>Pokémon Chest — Collection &amp; Price Tracker</title>
 <link rel="stylesheet" href="assets/styles.css" />
-<link rel="stylesheet" href="assets/revamp.css" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M4 13Q4 4 16 4q12 0 12 9v3H4z' fill='%23ffce4d'/%3E%3Crect x='4' y='16' width='24' height='12' rx='2' fill='%23c9961f'/%3E%3Crect x='9' y='4.8' width='3' height='23.2' fill='%236b4f12'/%3E%3Crect x='20' y='4.8' width='3' height='23.2' fill='%236b4f12'/%3E%3Ccircle cx='16' cy='16' r='5' fill='%23e23b3b' stroke='%231e1603' stroke-width='1.4'/%3E%3Cpath d='M11 16a5 5 0 0 0 10 0z' fill='%23fff'/%3E%3Crect x='11' y='15.3' width='10' height='1.4' fill='%231e1603'/%3E%3Ccircle cx='16' cy='16' r='1.7' fill='%23fff' stroke='%231e1603' stroke-width='1.1'/%3E%3C/svg%3E" />
 </head>
 <body>
@@ -31,48 +30,47 @@
       <circle cx="16" cy="16" r="1.6" fill="#f4f0e4" stroke="#1e1603" stroke-width="1"/>
     </svg>
     <div>
-      <h1>Pokémon <span>Den</span></h1>
-      <p class="tagline">Your collection · live comps · sell &amp; grade intelligence</p>
+      <h1>Pokémon <span>Chest</span></h1>
+      <p class="tagline">Your vault · one-time · yours forever</p>
     </div>
   </div>
   <div class="search-wrap">
-    <input id="search" type="search" placeholder="Search your collection — name, set, number…" autocomplete="off" />
+    <input id="search" type="search" placeholder="Search your vault — name, set, number…" autocomplete="off" />
   </div>
   <div class="topbar-right">
+    <div class="own-pill" title="Runs 100% on this Mac. No account. No subscription.">Owned vault</div>
     <div class="value-pill" id="valuePill" title="Total market value of your collection">
       <span class="vp-label">Portfolio</span>
       <span class="vp-value" id="vpValue">—</span>
     </div>
     <button class="btn ghost" id="refreshBtn" title="Re-read the data file and record a new price snapshot">↻ Refresh</button>
     <button class="btn ghost" id="helpBtn" title="How it works — the first-run walkthrough">？ Guide</button>
-    <button class="btn ghost" id="alertsBtn" title="Price alerts">🔔<span id="alertsBadge" style="display:none"></span></button>
     <button class="btn ghost" id="settingsBtn" title="Connect live data &amp; AI (your own API keys)">⚙ Live</button>
   </div>
 </header>
 
 <nav class="tabs" id="tabs">
-  <button data-view="dashboard" class="tab active">📊 Dashboard</button>
-  <button data-view="collection" class="tab">🗂 Collection</button>
-  <button data-view="sets" class="tab">🧩 Sets</button>
-  <button data-view="ledger" class="tab">➕ Add &amp; Sold</button>
-  <button data-view="scan" class="tab">📷 Scanner</button>
-  <button data-view="den" class="tab">🏠 The Den</button>
-  <button data-view="studio3d" class="tab">🧊 3D Studio</button>
-  <button data-view="best" class="tab">💰 Best Sellers</button>
-  <button data-view="brand" class="tab">🏷 Brand Lab</button>
-  <button data-view="case" class="tab">🏛 Display Case</button>
-  <button data-view="sell" class="tab">💵 Sell Hub</button>
-  <button data-view="lab" class="tab">🧪 Grade Lab</button>
-  <button data-view="submit" class="tab">📮 Submit</button>
-  <button data-view="guide" class="tab">📖 Sell &amp; Grade Guide</button>
-  <button data-view="merch" class="tab">🧢 Merch Vault</button>
-  <button data-view="arcade" class="tab">🕹 Arcade</button>
-  <button data-view="parity" class="tab">📋 Parity</button>
-  <button data-view="admin" class="tab">🛠 Admin</button>
+  <button data-view="dashboard" class="tab active">Today</button>
+  <button data-view="collection" class="tab">Vault</button>
+  <button data-view="sell" class="tab">Sell</button>
+  <button data-view="lab" class="tab">Grade</button>
+  <button data-view="scan" class="tab">📷 Scan</button>
+  <div class="tab-more" id="tabMore">
+    <button type="button" class="tab tab-more-btn" id="tabMoreBtn" aria-haspopup="true" aria-expanded="false">More ▾</button>
+    <div class="tab-more-menu" id="tabMoreMenu" hidden>
+      <button data-view="case" class="tab">🏛 Display Case</button>
+      <button data-view="arcade" class="tab">🕹 Arcade</button>
+      <button data-view="submit" class="tab">Submit</button>
+      <button data-view="guide" class="tab">Sell &amp; Grade Guide</button>
+      <button data-view="merch" class="tab">Merch Vault</button>
+      <button data-view="admin" class="tab">🛠 Admin</button>
+    </div>
+  </div>
 </nav>
 
 <main id="main">
   <section id="view-dashboard" class="view active"></section>
+  <section id="view-scan" class="view"></section>
   <section id="view-arcade" class="view"></section>
   <section id="view-collection" class="view">
     <div class="toolbar" id="collectionToolbar"></div>
@@ -87,14 +85,6 @@
   <section id="view-lab" class="view"></section>
   <section id="view-submit" class="view"></section>
   <section id="view-admin" class="view"></section>
-  <section id="view-ledger" class="view"></section>
-  <section id="view-scan" class="view"></section>
-  <section id="view-den" class="view"></section>
-  <section id="view-studio3d" class="view"></section>
-  <section id="view-best" class="view"></section>
-  <section id="view-brand" class="view"></section>
-  <section id="view-sets" class="view"></section>
-  <section id="view-parity" class="view"></section>
 </main>
 
 <div id="modalRoot"></div>
@@ -102,17 +92,14 @@
 <footer class="footer">
   <span id="footMeta">—</span>
   <span class="dot">·</span>
-  <button class="linklike" id="aboutBtn">About &amp; Legal</button>
-  <span class="dot">·</span>
   Images: <a href="https://tcgdex.dev" target="_blank" rel="noopener">TCGdex</a> (free, EN+JA)
   <span class="dot">·</span>
   Prices: your PriceCharting export
   <span class="dot">·</span>
-  <span class="muted">Comp links open live data on eBay / TCGplayer / Mercari. Not financial advice.</span>
-  <br><span class="muted" style="font-size:10.5px">Pokémon © Nintendo / Creatures Inc. / GAME FREAK inc. Pokémon and all respective character names are trademarks of Nintendo. This is an unofficial, fan-made collection tool for cards you own — not affiliated with, endorsed, or sponsored by Nintendo, The Pokémon Company, or PriceCharting. Card images belong to their respective owners.</span>
+  <span class="muted">Scanner searches the full TCGdex codex + PriceCharting products. Not financial advice.</span>
 </footer>
 
 <script src="assets/app.js"></script>
-<script src="assets/revamp.js"></script>
+<script src="assets/scanner.js"></script>
 </body>
 </html>

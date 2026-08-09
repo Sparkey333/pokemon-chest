@@ -1,0 +1,63 @@
+name: Deploy web vault (GitHub Pages)
+
+# Publishes the static HTML vault to:
+#   https://sparkey333.github.io/pokemon-chest/
+# Live /api features still require the Mac app / local server.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - cursor/card-scan-codex-8306
+    paths:
+      - "index.html"
+      - "assets/**"
+      - "data/**"
+      - "GET-POKEMON-CHEST.html"
+      - "chest-test.html"
+      - ".github/workflows/deploy-pages.yml"
+      - "vercel.json"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-web-vault
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stage static site
+        run: |
+          mkdir -p _site
+          cp index.html GET-POKEMON-CHEST.html _site/
+          cp -r assets data _site/
+          # Friendly landing that deep-links into the vault UI
+          cat > _site/404.html <<'EOF'
+          <!DOCTYPE html><meta charset="utf-8">
+          <title>Pokémon Chest</title>
+          <script>location.replace('./index.html?skipGuide=1')</script>
+          <a href="./index.html?skipGuide=1">Open vault</a>
+          EOF
+          # Ensure Pages serves from project root path
+          touch _site/.nojekyll
+          ls -la _site
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

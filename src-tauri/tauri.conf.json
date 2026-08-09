@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Pokemon Den",
-  "version": "2.3.0",
+  "productName": "Pokemon Chest",
+  "version": "1.16.0",
   "identifier": "com.darkhearts.pokemonchest",
   "build": {
     "frontendDist": "../tauri-shell"
@@ -10,7 +10,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "Pokémon Den",
+        "title": "Pok\u00e9mon Chest",
         "label": "main",
         "width": 1340,
         "height": 880,
@@ -31,18 +31,20 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["app", "dmg"],
+    "targets": [
+      "app",
+      "dmg"
+    ],
     "category": "Lifestyle",
-    "copyright": "© 2026 DarkHearts",
-    "shortDescription": "Your Pokémon card collection — live comps, sell & grade intelligence.",
-    "longDescription": "Pokémon Den turns your PriceCharting collection export into a premium local database: every card with real art (English + Japanese), portfolio value and P/L, one-click live sold comps on eBay/TCGplayer/Mercari, a grading break-even advisor, and optional bring-your-own-key live data and AI recommendations. 100% local and private. Unofficial fan-made tool: Pokémon © Nintendo / Creatures Inc. / GAME FREAK inc.; Pokémon and character names are trademarks of Nintendo. Not affiliated with, endorsed, or sponsored by Nintendo or The Pokémon Company.",
+    "copyright": "\u00a9 2026 DarkHearts",
+    "shortDescription": "Your card vault \u2014 one-time, on your Mac. Sell, grade, buy, scan.",
+    "longDescription": "Pok\u00e9mon Chest is a private collection vault you own: open Today for clear next steps (sell, grade, buy, refresh, scan), fee-aware listings, grading math, and a full TCGdex scanner. Runs locally with no account and no subscription. Optional bring-your-own-key live data. \u00a9 2026 DarkHearts",
     "resources": {
       "../server.py": "app/server.py",
       "../index.html": "app/index.html",
       "../assets/": "app/assets/",
       "../data/": "app/data/",
-      "../scripts/": "app/scripts/",
-      "../LEGAL.md": "app/LEGAL.md"
+      "../scripts/": "app/scripts/"
     },
     "icon": [
       "icons/32x32.png",
@@ -55,13 +57,7 @@
       "minimumSystemVersion": "11.0",
       "exceptionDomain": "",
       "signingIdentity": "Apple Development: Brandon Barkey (LFQPLFRKD2)",
-      "providerShortName": null,
-      "dmg": {
-        "background": "dmg-background.png",
-        "windowSize": { "width": 660, "height": 420 },
-        "appPosition": { "x": 180, "y": 220 },
-        "applicationFolderPosition": { "x": 480, "y": 220 }
-      }
+      "providerShortName": null
     },
     "iOS": {
       "minimumSystemVersion": "14.0",

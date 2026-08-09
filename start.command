@@ -1,8 +1,12 @@
 #!/bin/bash
-# ── Pokémon Den launcher ───────────────────────────────────────────
+# ── Pokémon Chest launcher ───────────────────────────────────────────
 # Double-click this file to open your collection in the browser.
-# (Prefer the native "Pokémon Den.app" once built — same app, no Terminal.)
-cd "$(dirname "$0")" || exit 1
+# (Prefer the native "Pokémon Chest.app" once built — same app, no Terminal.)
+ROOT="$(cd "$(dirname "$0")" && pwd -P)"
+export POKECHEST_ROOT="$ROOT"
+# shellcheck source=scripts/pokechest-env.sh
+source "$ROOT/scripts/pokechest-env.sh"
+cd "$ROOT" || exit 1
 PORT=8787
 PY="$(command -v python3 || echo /usr/bin/python3)"
 
@@ -12,7 +16,7 @@ if curl -s -o /dev/null "http://localhost:$PORT/index.html"; then
 fi
 
 echo "┌──────────────────────────────────────────────┐"
-echo "│  Pokémon Den is running at                 │"
+echo "│  Pokémon Chest is running at                 │"
 echo "│  http://localhost:$PORT                        │"
 echo "│                                              │"
 echo "│  Keep this window open while you browse.     │"
