@@ -12,6 +12,9 @@ cache/
 # Phone-mode LAN TLS (self-signed, local only)
 lan-tls/
 
+# Cached PriceCharting catalog searches (re-fetched on demand)
+search-cache.json
+
 # Node / Tauri build artifacts
 node_modules/
 src-tauri/target/

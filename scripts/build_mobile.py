@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Build the Pokémon Chest MOBILE app — a single self-contained .html you AirDrop /
+Build the Pokémon Den MOBILE app — a single self-contained .html you AirDrop /
 email / drop in iCloud, open on iPhone, and "Add to Home Screen" so it runs like
 a native app (full-screen, offline, its own icon).
 
@@ -11,7 +11,7 @@ show as "wild — catch it". Caught cards embed your real photo; a handful of to
 wild cards embed a small catalog thumbnail so the deck looks full.
 
 Run:  python3 scripts/build_mobile.py     (or POST /api/mobile from the app)
-Output: "Pokémon Chest — Deck.html" in POKECHEST_HOME.
+Output: "Pokémon Den — Deck.html" in POKECHEST_HOME.
 """
 import os, sys, json, base64, datetime, urllib.request, urllib.parse
 
@@ -24,7 +24,7 @@ LISTING = os.path.join(HOME, "listing-photos")
 CACHE = os.path.join(HOME, "cache")
 os.makedirs(CACHE, exist_ok=True)
 TEMPLATE = os.path.join(ROOT, "assets", "mobile.html")
-OUT = os.path.join(HOME, "Pokémon Chest — Deck.html")
+OUT = os.path.join(HOME, "Pokémon Den — Deck.html")
 WILD_MAX = 60           # how many wild catalog thumbnails to embed
 _MIME = {".webp": "image/webp", ".png": "image/png", ".jpg": "image/jpeg",
          ".jpeg": "image/jpeg", ".gif": "image/gif", ".avif": "image/avif"}

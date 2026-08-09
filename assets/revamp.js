@@ -1,0 +1,2029 @@
+/* ============== Pokémon Den — Revamp views ==============
+   Adds five tabs on top of app.js (which owns State + helpers):
+     🧊 3D Studio   — interactive 3D card viewer + 3D-print STL exports
+     🏠 The Den     — a VR-style 3D display room, auto-loaded & editable
+     💰 Best Sellers— what to sell, where: scoring + channel playbooks
+     🏷 Brand Lab   — brand + packaging build-out for spare bulk cards
+     📷 Scanner     — camera capture stored with the card file, phone mode,
+                      PriceCharting bulk sync
+   Loaded AFTER app.js; uses its globals ($, $$, esc, money, State, toast,
+   openModal, phThumb, loadJSON …). All state keys are rv-prefixed. */
+'use strict';
+
+const LS_DEN = 'pokechest.den.v1';
+const LS_CUSTOM = 'pokechest.customcards.v1';   // cards added in-app (not from the export)
+const LS_SALES = 'pokechest.sales.v1';          // per-card sale records {pcId:{price,venue,fees,net,date,note}}
+
+const RV = {
+  data: {},                          // fetched json data files
+  rendered: {},
+  den: loadJSON(LS_DEN, { theme: 'amber', wall: 'top', shelf: 'graded', side: 'case', featured: 'auto', auto: true }),
+  cam: { stream: null, deviceId: null, mirror: true },
+  scan: { card: null },
+  pcPoll: null,
+};
+
+async function rvData(name) {
+  if (RV.data[name] !== undefined) return RV.data[name];
+  try { RV.data[name] = await (await fetch('data/' + name + '.json?_=' + Date.now())).json(); }
+  catch { RV.data[name] = null; }
+  return RV.data[name];
+}
+
+function rvSaveDen() { try { localStorage.setItem(LS_DEN, JSON.stringify(RV.den)); } catch { } }
+
+function rvThumb(c, cls) { return imgHTML(c, cls); }  // app.js helper: art or placeholder
+
+function rvReady() { return !!State.meta; }   // boot init() reached this point — true even for an empty (first-run) collection
+function rvLoadingPanel(el, fn) {
+  el.innerHTML = `<div class="panel" style="margin-top:20px"><p class="muted">Loading your collection…</p></div>`;
+  setTimeout(() => { if (rvReady()) fn(); }, 600);
+}
+
+/* ---------- custom cards, sales & the archive ----------
+   Cards you add in-app and sales you record live in localStorage (keyed by
+   pcId, so they survive every export refresh). Archived cards stay saved —
+   photos, sale data and all — but leave the collection totals & grids. */
+function saleGet(c) { return loadJSON(LS_SALES, {})[c.pcId] || null; }
+function saleSet(c, rec) {
+  const all = loadJSON(LS_SALES, {});
+  if (rec) all[c.pcId] = rec; else delete all[c.pcId];
+  localStorage.setItem(LS_SALES, JSON.stringify(all));
+}
+function rvSoldCards() {
+  return State.cards
+    .filter(c => saleGet(c) || uget(c).status === 'sold')
+    .sort((a, b) => ((saleGet(b) || {}).date || '').localeCompare((saleGet(a) || {}).date || ''));
+}
+function rvMergeCustom() {
+  const key = c => [c.name, c.number || '', c.set].join('|').toLowerCase();
+  const inExport = new Set(State.cards.filter(c => !String(c.pcId).startsWith('custom-')).map(key));
+  for (const cc of loadJSON(LS_CUSTOM, [])) {
+    if (State.cards.some(c => String(c.pcId) === String(cc.pcId))) continue;
+    if (inExport.has(key(cc))) continue;   // it arrived via the export — the export copy wins
+    const card = Object.assign({
+      img: null, era: 'modern', game: 'Pokémon', pcUrl: null, setRaw: cc.set || 'Custom',
+      setId: null, setYear: null, condition: cc.graded ? 'Graded' : 'Ungraded', wear: '',
+      certId: null, datePurchased: null, grader: null, grade: null,
+    }, cc);
+    card.i = State.cards.length;
+    card.fullName = card.name + (card.number ? ' #' + card.number : '');
+    card.q = [card.lang === 'ja' ? 'Japanese' : '', card.name, card.number, card.set].filter(Boolean).join(' ');
+    card.value = Math.round((card.price || 0) * (card.qty || 1) * 100) / 100;
+    card.pl = Math.round((card.value - (card.cost || 0) * (card.qty || 1)) * 100) / 100;
+    card.plPct = card.cost ? Math.round(card.pl / ((card.cost || 0) * (card.qty || 1)) * 1000) / 10 : null;
+    State.cards.push(card);
+  }
+}
+function rvRecalcMeta() {
+  if (!State.meta) return;
+  const act = State.cards.filter(c => !uget(c).archived);
+  const m = State.meta;
+  m.totalEntries = act.length;
+  m.totalCards = act.reduce((a, c) => a + (c.qty || 1), 0);
+  m.totalValue = Math.round(act.reduce((a, c) => a + (c.value || 0), 0) * 100) / 100;
+  m.totalCost = Math.round(act.reduce((a, c) => a + (c.cost || 0) * (c.qty || 1), 0) * 100) / 100;
+  m.totalPL = Math.round((m.totalValue - m.totalCost) * 100) / 100;
+  const vp = $('#vpValue'); if (vp) vp.textContent = money0(m.totalValue);
+}
+(function hookDataLayer() {
+  // archived cards leave every grid except an explicit "Sold" status filter
+  const baseApply = window.applyFilters;
+  window.applyFilters = function () {
+    baseApply();
+    if (State.filters.status !== 'sold') State.filtered = State.filtered.filter(c => !uget(c).archived);
+  };
+  // every (re)load — refresh, PC sync reload — re-merges customs & recounts
+  const baseInit = window.init;
+  window.init = async function () {
+    await baseInit();
+    rvMergeCustom(); rvRecalcMeta();
+  };
+  // the very first init() ran before this file loaded — patch it in once ready
+  const t = setInterval(() => {
+    if (rvReady()) {
+      clearInterval(t);
+      rvMergeCustom(); rvRecalcMeta();
+      try { renderDashboard(); } catch { }
+      rvWatchAutosync();
+    }
+  }, 250);
+})();
+
+/* auto inventory import: the server watches for new PriceCharting exports and
+   rebuilds on its own — we just notice, reload, and say so */
+let rvAsSeq = null;
+function rvWatchAutosync() {
+  setInterval(async () => {
+    if (!State.live || document.hidden) return;
+    try {
+      const s = await (await fetch('/api/autosync', { cache: 'no-store' })).json();
+      if (!s || !s.ok) return;
+      if (rvAsSeq === null) { rvAsSeq = s.seq; return; }
+      if (s.seq !== rvAsSeq) {
+        rvAsSeq = s.seq;
+        const r = s.lastReport || {};
+        await init();
+        toast(`📥 New inventory pulled in automatically — ${(r.entries ?? 0).toLocaleString()} entries · ${money0(r.value)}`);
+      }
+    } catch { /* server briefly away — try again next tick */ }
+  }, 25000);
+}
+
+/* ---------- routing hook: lazy-render the new views ---------- */
+const RV_VIEWS = {
+  studio3d: () => renderStudio3d(),
+  den: () => renderDen(),
+  best: () => renderBest(),
+  brand: () => renderBrand(),
+  scan: () => renderScan(),
+  ledger: () => renderLedger(),
+  sets: () => renderSets(),
+  parity: () => renderParity(),
+};
+(function hookSwitchView() {
+  const base = window.switchView;
+  window.switchView = function (v) {
+    const prev = State.view;
+    base(v);
+    if (prev === 'scan' && v !== 'scan') rvCamStop();     // release the camera
+    if (prev === 'den' && v !== 'den') { rvDenStopLoop(); denKeysUnbind(); }
+    const fn = RV_VIEWS[v];
+    if (fn) {
+      const el = $('#view-' + v);
+      if (!rvReady()) return rvLoadingPanel(el, fn);
+      try { fn(); } catch (e) { console.error(e); el.innerHTML = `<div class="panel"><p class="muted">This tab hit an error: ${esc(e.message)}</p></div>`; }
+    }
+  };
+})();
+
+/* ---------- shared card pickers ---------- */
+function rvPickCards(source, n) {
+  let arr = [...State.cards];
+  const byValue = (a, b) => (b.value || 0) - (a.value || 0);
+  switch (source) {
+    case 'newest': arr.sort((a, b) => (b.dateAdded || '').localeCompare(a.dateAdded || '')); break;
+    case 'graded': arr = arr.filter(c => c.graded).sort(byValue); break;
+    case 'ja': arr = arr.filter(c => c.lang === 'ja').sort(byValue); break;
+    case 'vintage': arr = arr.filter(c => c.era === 'vintage').sort(byValue); break;
+    case 'case': {
+      const picks = loadJSON(LS_CASE, {});
+      arr = arr.filter(c => picks[c.pcId]).sort(byValue);
+      break;
+    }
+    case 'sold': arr = rvSoldCards(); break;
+    default: arr.sort(byValue);
+  }
+  if (source !== 'sold') arr = arr.filter(c => !uget(c).archived);
+  // visual displays look best with real art — art first, placeholders pad
+  const withArt = arr.filter(c => c.img), noArt = arr.filter(c => !c.img);
+  return withArt.concat(noArt).slice(0, n);
+}
+const RV_SOURCES = [
+  ['top', 'Top value'], ['newest', 'Newest adds'], ['graded', 'Graded slabs'],
+  ['ja', 'Japanese heat'], ['vintage', 'Vintage'], ['case', 'Display Case picks'],
+  ['sold', 'Sold cards'],
+];
+
+/* ============================================================
+   🧊 3D STUDIO — 3D card viewer + STL generator for 3D printing
+   ============================================================ */
+const ST3 = { card: null, spin: true, holo: true, rx: -8, ry: 22, drag: null };
+
+function renderStudio3d() {
+  const el = $('#view-studio3d');
+  if (!State.cards.length) return rvEmptyDenState(el, '🧊 3D Studio');
+  if (!ST3.card) ST3.card = rvPickCards('top', 1)[0] || State.cards[0];
+  const top = rvPickCards('top', 14);
+  el.innerHTML = `
+  <div class="section-head"><div><h2>🧊 3D Studio</h2>
+    <div class="sub">Turn any card into a 3D visual asset — spin it for videos &amp; thumbnails, then print a real display for it. Screen-record Showcase mode for YouTube Shorts.</div></div></div>
+  <div class="st3-wrap">
+    <div class="panel st3-side">
+      <h3 style="margin-bottom:8px">Pick a card</h3>
+      <input id="st3-q" class="s-inp" placeholder="Search name / set / number…" style="width:100%;margin-bottom:8px">
+      <div id="st3-results" class="st3-results">
+        ${top.map(c => `<button class="st3-pick" data-i="${c.i}" title="${esc(c.fullName)}">${rvThumb(c)}</button>`).join('')}
+      </div>
+      <div id="st3-info" class="st3-info"></div>
+    </div>
+    <div class="st3-stagecol">
+      <div class="st3-stage" id="st3-stage">
+        <div class="st3-scene" id="st3-scene">
+          <div class="st3-card" id="st3-card">
+            <div class="st3-face st3-front" id="st3-front"></div>
+            <div class="st3-face st3-back">
+              <div class="st3-backart"><span>⭐</span><b>POKÉMON DEN</b><span class="reason">private collection</span></div>
+            </div>
+            <div class="st3-holo" id="st3-holo"></div>
+          </div>
+        </div>
+        <button class="btn sm st3-exit" id="st3-exit">✕ exit showcase</button>
+      </div>
+      <div class="st3-controls">
+        <label class="rv-check"><input type="checkbox" id="st3-spin" ${ST3.spin ? 'checked' : ''}> Auto-spin</label>
+        <label class="rv-check"><input type="checkbox" id="st3-holoT" ${ST3.holo ? 'checked' : ''}> Holo foil</label>
+        <button class="btn sm" id="st3-reset">Reset view</button>
+        <button class="btn gold sm" id="st3-show">🎬 Showcase mode</button>
+        <span class="reason">drag to rotate · double-click for card details</span>
+      </div>
+    </div>
+    <div class="panel st3-side">
+      <h3 style="margin-bottom:4px">🖨️ 3D-print a display</h3>
+      <p class="reason" style="margin-bottom:10px">Generates a real, sliceable <b>.stl</b> (millimetres, Z-up) sized to this card — print it, then sell the card <i>with</i> its stand (see Brand Lab → Slab &amp; Stand Bundles).</p>
+      <label class="s-lab">Card format</label>
+      <select id="st3-fmt" class="s-inp" style="width:100%">
+        <option value="66,91,1">Sleeved raw card (66 × 91 × 1 mm)</option>
+        <option value="77,103,3.2">Toploader (77 × 103 × 3.2 mm)</option>
+        <option value="65,108,9.5">PSA-style slab (65 × 108 × 9.5 mm)</option>
+        <option value="custom">Custom…</option>
+      </select>
+      <div id="st3-custom" style="display:none;gap:6px" class="rv-row">
+        <input id="st3-w" class="s-inp" type="number" value="66" min="20" max="200" title="width mm">
+        <input id="st3-h" class="s-inp" type="number" value="91" min="20" max="250" title="height mm">
+        <input id="st3-t" class="s-inp" type="number" value="1" min="0.4" max="25" step="0.1" title="thickness mm">
+      </div>
+      <div class="rv-row" style="margin-top:10px;flex-wrap:wrap">
+        <button class="btn primary sm" id="st3-stl-stand">⬇ Easel stand .stl</button>
+        <button class="btn primary sm" id="st3-stl-frame">⬇ Wall frame .stl</button>
+      </div>
+      <p class="reason" style="margin-top:10px">Print tips: PLA, 0.2 mm layers, 3 walls, no supports (stand prints flat on its base). Your logo can be embossed later in any slicer.</p>
+    </div>
+  </div>`;
+
+  const results = $('#st3-results');
+  $('#st3-q').oninput = e => {
+    const q = e.target.value.trim().toLowerCase();
+    const list = q
+      ? State.cards.filter(c => (c.name + ' ' + c.set + ' ' + (c.number || '')).toLowerCase().includes(q)).slice(0, 14)
+      : top;
+    results.innerHTML = list.map(c => `<button class="st3-pick" data-i="${c.i}" title="${esc(c.fullName)}">${rvThumb(c)}</button>`).join('') ||
+      '<p class="reason">No matches.</p>';
+    wirePicks();
+  };
+  const wirePicks = () => $$('.st3-pick', el).forEach(b => b.onclick = () => { ST3.card = State.cards[+b.dataset.i]; st3Update(); });
+  wirePicks();
+
+  // stage interactions
+  const stage = $('#st3-stage'), cardEl = $('#st3-card');
+  stage.onpointerdown = e => { ST3.drag = { x: e.clientX, y: e.clientY, rx: ST3.rx, ry: ST3.ry }; stage.setPointerCapture(e.pointerId); };
+  stage.onpointermove = e => {
+    if (!ST3.drag) return;
+    ST3.ry = ST3.drag.ry + (e.clientX - ST3.drag.x) * 0.5;
+    ST3.rx = Math.max(-70, Math.min(70, ST3.drag.rx - (e.clientY - ST3.drag.y) * 0.5));
+    st3Apply();
+  };
+  stage.onpointerup = stage.onpointercancel = () => ST3.drag = null;
+  stage.ondblclick = () => ST3.card && openModal(ST3.card);
+  $('#st3-spin').onchange = e => { ST3.spin = e.target.checked; st3Apply(); };
+  $('#st3-holoT').onchange = e => { ST3.holo = e.target.checked; st3Apply(); };
+  $('#st3-reset').onclick = () => { ST3.rx = -8; ST3.ry = 22; st3Apply(); };
+  $('#st3-show').onclick = () => { $('#st3-stage').classList.toggle('showcase'); ST3.spin = true; $('#st3-spin').checked = true; st3Apply(); };
+  $('#st3-exit').onclick = e => { e.stopPropagation(); $('#st3-stage').classList.remove('showcase'); };
+  $('#st3-fmt').onchange = e => $('#st3-custom').style.display = e.target.value === 'custom' ? 'flex' : 'none';
+  $('#st3-stl-stand').onclick = () => st3Download('stand');
+  $('#st3-stl-frame').onclick = () => st3Download('frame');
+
+  function st3Apply() {
+    cardEl.classList.toggle('spin', ST3.spin);
+    $('#st3-holo').style.display = ST3.holo ? '' : 'none';
+    if (!ST3.spin) cardEl.style.transform = `rotateX(${ST3.rx}deg) rotateY(${ST3.ry}deg)`;
+    else cardEl.style.transform = '';
+  }
+  function st3Update() {
+    const c = ST3.card;
+    $('#st3-front').innerHTML = c.img
+      ? `<img src="${esc(c.img)}" alt="${esc(c.name)}" onerror="this.outerHTML=phHTML(${c.i})">` : phHTML(c.i);
+    $('#st3-info').innerHTML = `
+      <div class="st3-name">${esc(c.name)}${c.number ? ' <span class="reason">#' + esc(c.number) + '</span>' : ''}</div>
+      <div class="reason">${esc(c.set)} · ${c.lang === 'ja' ? '🇯🇵' : '🇺🇸'} ${c.graded ? '· ' + esc(c.grader || '') + ' ' + esc(c.grade || '') : '· raw'}</div>
+      <div class="st3-price">${money(c.price)}</div>`;
+  }
+  st3Update(); st3Apply();
+}
+
+/* ----- STL generation (ASCII, mm, Z-up) ----- */
+function st3Dims() {
+  const v = $('#st3-fmt').value;
+  if (v === 'custom') return [+$('#st3-w').value || 66, +$('#st3-h').value || 91, +$('#st3-t').value || 1];
+  return v.split(',').map(Number);
+}
+function stlHexa(v) {  // v: 8 vertices — bottom 0-3, top 4-7 (matching order)
+  const q = (a, b, c, d) => [[v[a], v[b], v[c]], [v[a], v[c], v[d]]];
+  return [...q(0, 3, 2, 1), ...q(4, 5, 6, 7), ...q(0, 1, 5, 4), ...q(1, 2, 6, 5), ...q(2, 3, 7, 6), ...q(3, 0, 4, 7)];
+}
+function stlBox(x, y, z, w, d, h) {
+  return stlHexa([[x, y, z], [x + w, y, z], [x + w, y + d, z], [x, y + d, z],
+  [x, y, z + h], [x + w, y, z + h], [x + w, y + d, z + h], [x, y + d, z + h]]);
+}
+function stlText(tris, name) {
+  const f = n => (Math.round(n * 1000) / 1000).toString();
+  const out = ['solid ' + name];
+  for (const [a, b, c] of tris) {
+    const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], w = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    let n = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]];
+    const L = Math.hypot(n[0], n[1], n[2]) || 1;
+    out.push(` facet normal ${f(n[0] / L)} ${f(n[1] / L)} ${f(n[2] / L)}`, '  outer loop');
+    for (const p of [a, b, c]) out.push(`   vertex ${f(p[0])} ${f(p[1])} ${f(p[2])}`);
+    out.push('  endloop', ' endfacet');
+  }
+  out.push('endsolid ' + name);
+  return out.join('\n');
+}
+function st3Stand(W, H, T) {
+  // flat base + front lip + card slot + leaned back-rest plate (20° recline)
+  const bw = W + 16, gap = T + 0.8, lipY = 8, lipD = 3, plate = 3.2;
+  const restH = Math.min(H * 0.72, 85), lean = Math.tan(20 * Math.PI / 180) * restH;
+  const slotY = lipY + lipD + gap;                       // rest front face
+  const baseD = slotY + plate + lean + 10;
+  const tris = [];
+  tris.push(...stlBox(0, 0, 0, bw, baseD, 3));           // base
+  tris.push(...stlBox(0, lipY, 3, bw, lipD, 9));         // front lip
+  tris.push(...stlHexa([                                  // leaned back-rest
+    [0, slotY, 3], [bw, slotY, 3], [bw, slotY + plate, 3], [0, slotY + plate, 3],
+    [0, slotY + lean, 3 + restH], [bw, slotY + lean, 3 + restH],
+    [bw, slotY + plate + lean, 3 + restH], [0, slotY + plate + lean, 3 + restH]]));
+  return tris;
+}
+function st3Frame(W, H, T) {
+  // wall/desk frame: floor slab + 4 walls forming a recessed pocket for the card
+  const wall = 4, fw = W + 2 * wall + 1, fh = H + 2 * wall + 1, depth = T + 1.4;
+  const tris = [];
+  tris.push(...stlBox(0, 0, 0, fw, fh, 2));                           // back slab
+  tris.push(...stlBox(0, 0, 2, fw, wall, depth));                     // bottom wall
+  tris.push(...stlBox(0, fh - wall, 2, fw, wall, depth));             // top wall
+  tris.push(...stlBox(0, wall, 2, wall, fh - 2 * wall, depth));       // left
+  tris.push(...stlBox(fw - wall, wall, 2, wall, fh - 2 * wall, depth)); // right
+  return tris;
+}
+function st3Download(kind) {
+  const [W, H, T] = st3Dims();
+  const tris = kind === 'stand' ? st3Stand(W, H, T) : st3Frame(W, H, T);
+  const name = (ST3.card ? ST3.card.name : 'card').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const blob = new Blob([stlText(tris, 'pokechest_' + kind)], { type: 'model/stl' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `chest-${kind}-${name || 'card'}-${W}x${H}mm.stl`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast(`STL ready — ${kind === 'stand' ? 'easel stand' : 'wall frame'} sized ${W}×${H}×${T} mm`);
+}
+
+/* ============================================================
+   🏠 THE DEN — VR-style display room (CSS 3D), editable displays
+   ============================================================ */
+const DEN = { yaw: 0, pitch: 4, zoom: 260, posX: 0, drag: null, orbit: false, raf: null, keysBound: false, gyro: false, gyroBase: null };
+
+function renderDen() {
+  const el = $('#view-den');
+  if (!State.cards.length) return rvEmptyDenState(el, '🏠 The Den');
+  const d = RV.den;
+  const sel = (id, val, opts, extra) => `<select id="${id}" class="s-inp den-sel" title="${extra || ''}">${opts.map(([v, l]) => `<option value="${v}"${v === String(val) ? ' selected' : ''}>${l}</option>`).join('')}</select>`;
+  const featuredOpts = [['auto', '⭐ Auto (top card)']].concat(rvPickCards('top', 20).map(c => [String(c.pcId), c.name + ' — ' + money0(c.price)]));
+  el.innerHTML = `
+  <div class="section-head"><div><h2>🏠 The Den</h2>
+    <div class="sub">Your collection as a walk-in room — <b>WASD/arrows to walk</b>, drag to look, click any card. On a phone, tap 📱 Tilt and move your device to look around. Every display auto-loads and is editable below.</div></div>
+    <div class="rv-row" style="flex-wrap:wrap">
+      <button class="btn sm" id="den-immerse">⛶ Immersive</button>
+      <button class="btn sm" id="den-tilt">📱 Tilt</button>
+      <button class="btn sm" id="den-orbit">🎥 Auto-orbit</button>
+      <button class="btn sm" id="den-cam">📷 Den Cam</button>
+      <button class="btn ghost sm" id="den-reset">Reset view</button>
+    </div></div>
+  <div class="den-bar panel">
+    <span class="tlabel">Theme</span>${sel('den-theme', d.theme, [['amber', '🟠 Amber Den'], ['midnight', '🌙 Midnight'], ['neon', '🕹 Neon Arcade']])}
+    <span class="tlabel">Trophy wall</span>${sel('den-wall', d.wall, RV_SOURCES)}
+    <span class="tlabel">Slab shelf</span>${sel('den-shelf', d.shelf, RV_SOURCES)}
+    <span class="tlabel">Side gallery</span>${sel('den-side', d.side, RV_SOURCES)}
+    <span class="tlabel">Pedestal</span>${sel('den-feat', d.featured, featuredOpts)}
+    <label class="rv-check" title="Shelves that build themselves from your collection — top set + newest pulls, refreshed automatically"><input type="checkbox" id="den-auto" ${d.auto !== false ? 'checked' : ''}> 🗄 Auto shelves</label>
+  </div>
+  <div class="den-viewport theme-${esc(d.theme)}" id="den-vp">
+    <div class="den-world" id="den-world">${denRoomHTML()}</div>
+    <div class="den-motes">${Array.from({ length: 14 }, (_, i) => `<i style="left:${(i * 37 + 11) % 100}%;animation-delay:-${(i * 1.7) % 18}s;animation-duration:${14 + (i % 5) * 3}s"></i>`).join('')}</div>
+    <div class="den-hud"><span>WASD — walk</span><span>drag — look</span><span>scroll — zoom</span><span>click card — details</span></div>
+    <button class="den-exit btn sm" id="den-exit" hidden>✕ exit</button>
+  </div>`;
+
+  $('#den-cam').onclick = () => switchView('scan');
+  $('#den-reset').onclick = () => { DEN.yaw = 0; DEN.pitch = 4; DEN.zoom = 260; DEN.posX = 0; DEN.gyroBase = null; denApply(); };
+  $('#den-orbit').onclick = () => { DEN.orbit = !DEN.orbit; $('#den-orbit').classList.toggle('primary', DEN.orbit); denLoop(); };
+  $('#den-tilt').onclick = () => DEN.gyro ? (denGyroStop(), $('#den-tilt').classList.remove('primary'), $('#den-tilt').textContent = '📱 Tilt') : denGyroStart($('#den-tilt'));
+  const vpEl = $('#den-vp');
+  $('#den-immerse').onclick = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else if (vpEl.requestFullscreen) await vpEl.requestFullscreen();
+    } catch (err) { toast('Fullscreen blocked: ' + err.message); }
+  };
+  $('#den-exit').onclick = () => { if (document.fullscreenElement) document.exitFullscreen(); };
+  vpEl.onfullscreenchange = () => {
+    const on = !!document.fullscreenElement;
+    vpEl.classList.toggle('den-fs', on);
+    $('#den-exit').hidden = !on;
+    $('#den-immerse').classList.toggle('primary', on);
+  };
+  if (!DEN.keysBound) { document.addEventListener('keydown', denKeyHandler); DEN.keysBound = true; }
+  $('#den-auto').onchange = e => { RV.den.auto = e.target.checked; rvSaveDen(); renderDen(); };
+  $('#den-theme').onchange = e => { RV.den.theme = e.target.value; rvSaveDen(); $('#den-vp').className = 'den-viewport theme-' + e.target.value; };
+  const rebind = (id, key) => $('#' + id).onchange = e => { RV.den[key] = e.target.value; rvSaveDen(); renderDen(); };
+  rebind('den-wall', 'wall'); rebind('den-shelf', 'shelf'); rebind('den-side', 'side'); rebind('den-feat', 'featured');
+
+  const vp = $('#den-vp');
+  vp.onpointerdown = e => { DEN.drag = { x: e.clientX, y: e.clientY, yaw: DEN.yaw, pitch: DEN.pitch, moved: 0 }; $('#den-world').classList.add('dragging'); vp.setPointerCapture(e.pointerId); };
+  vp.onpointermove = e => {
+    if (!DEN.drag) return;
+    const dx = e.clientX - DEN.drag.x, dy = e.clientY - DEN.drag.y;
+    DEN.drag.moved = Math.max(DEN.drag.moved, Math.abs(dx) + Math.abs(dy));
+    DEN.yaw = Math.max(-70, Math.min(70, DEN.drag.yaw - dx * 0.15));
+    DEN.pitch = Math.max(-6, Math.min(26, DEN.drag.pitch + dy * 0.1));
+    denApply();
+  };
+  vp.onpointerup = vp.onpointercancel = () => { const w = $('#den-world'); if (w) w.classList.remove('dragging'); setTimeout(() => DEN.drag = null, 0); };
+  vp.onwheel = e => { e.preventDefault(); DEN.zoom = Math.max(40, Math.min(620, DEN.zoom + (e.deltaY < 0 ? 40 : -40))); denApply(); };
+  vp.onclick = e => {
+    if (DEN.drag && DEN.drag.moved > 6) return;          // that was a drag, not a click
+    const t = e.target.closest('[data-i]');
+    if (t) openModal(State.cards[+t.dataset.i]);
+  };
+  denApply();
+}
+function denApply() {
+  const w = $('#den-world');
+  if (w) w.style.transform = `translate3d(${DEN.posX}px, 0, ${DEN.zoom}px) rotateX(${DEN.pitch}deg) rotateY(${DEN.yaw}deg)`;
+}
+/* keyboard walk-through — WASD / arrows move you through the room */
+function denKeyHandler(e) {
+  if (State.view !== 'den') return;
+  if (e.target && e.target.matches && e.target.matches('input,textarea,select')) return;
+  const k = e.key.toLowerCase();
+  if (k === 'w' || k === 'arrowup') DEN.zoom = Math.min(620, DEN.zoom + 25);
+  else if (k === 's' || k === 'arrowdown') DEN.zoom = Math.max(40, DEN.zoom - 25);
+  else if (k === 'a') DEN.posX = Math.min(280, DEN.posX + 22);
+  else if (k === 'd') DEN.posX = Math.max(-280, DEN.posX - 22);
+  else if (k === 'q' || k === 'arrowleft') DEN.yaw = Math.max(-70, DEN.yaw - 4);
+  else if (k === 'e' || k === 'arrowright') DEN.yaw = Math.min(70, DEN.yaw + 4);
+  else return;
+  e.preventDefault();
+  denApply();
+}
+function denKeysUnbind() {
+  if (DEN.keysBound) { document.removeEventListener('keydown', denKeyHandler); DEN.keysBound = false; }
+  denGyroStop();
+}
+/* device-orientation "magic window" — tilt a phone to look around the room */
+function denGyroHandler(e) {
+  if (State.view !== 'den' || e.beta == null) return;
+  if (!DEN.gyroBase) DEN.gyroBase = { beta: e.beta, gamma: e.gamma };
+  DEN.pitch = Math.max(-6, Math.min(26, 4 + (e.beta - DEN.gyroBase.beta) * 0.6));
+  DEN.yaw = Math.max(-70, Math.min(70, (e.gamma - DEN.gyroBase.gamma) * 1.4));
+  denApply();
+}
+async function denGyroStart(btn) {
+  try {
+    const DME = window.DeviceOrientationEvent;
+    if (!DME) return toast('This device has no motion sensors.');
+    if (DME.requestPermission) {            // iOS 13+ needs an explicit grant
+      const ok = await DME.requestPermission();
+      if (ok !== 'granted') return toast('Motion access denied.');
+    }
+    DEN.gyro = true; DEN.gyroBase = null;
+    window.addEventListener('deviceorientation', denGyroHandler);
+    if (btn) { btn.classList.add('primary'); btn.textContent = '📱 Tilt: ON'; }
+    toast('Tilt your phone to look around the Den.');
+  } catch (err) { toast('Motion sensors unavailable: ' + err.message); }
+}
+function denGyroStop() {
+  if (DEN.gyro) { window.removeEventListener('deviceorientation', denGyroHandler); DEN.gyro = false; DEN.gyroBase = null; }
+}
+function denLoop() {
+  rvDenStopLoop();
+  if (!DEN.orbit) return denApply();
+  let t0 = performance.now();
+  const step = (t) => {
+    DEN.yaw = Math.sin((t - t0) / 6000) * 34;
+    denApply();
+    DEN.raf = requestAnimationFrame(step);
+  };
+  DEN.raf = requestAnimationFrame(step);
+}
+function rvDenStopLoop() { if (DEN.raf) cancelAnimationFrame(DEN.raf); DEN.raf = null; }
+
+/* auto shelves: displays that build themselves from the collection — the top
+   set gets its own low shelf on the back wall, the newest pulls a front shelf
+   on the left wall. Zero configuration; they re-derive on every render. */
+function denAutoShelvesHTML(frame) {
+  if (RV.den.auto === false) return '';
+  const out = [];
+  const topSet = (State.meta && State.meta.topSets && State.meta.topSets[0]) ? State.meta.topSets[0].set : null;
+  if (topSet) {
+    const setCards = State.cards
+      .filter(c => c.set === topSet && !uget(c).archived)
+      .sort((a, b) => (b.value || 0) - (a.value || 0)).slice(0, 5);
+    if (setCards.length) out.push(`<div class="den-display den-autoshelf-back">
+      <div class="den-disp-title">🗄 ${esc(topSet)}</div>
+      <div class="den-shelf-row">${setCards.map(c => frame(c, 'slab')).join('')}</div>
+      <div class="den-shelf-plank"></div>
+    </div>`);
+  }
+  const newest = rvPickCards('newest', 3);
+  if (newest.length) out.push(`<div class="den-display den-autoshelf-left">
+    <div class="den-disp-title">🆕 Newest pulls</div>
+    <div class="den-shelf-row">${newest.map(c => frame(c, 'slab')).join('')}</div>
+    <div class="den-shelf-plank"></div>
+  </div>`);
+  return out.join('');
+}
+
+/* shared empty-state for 3D/visual tabs when the collection has zero cards */
+function rvEmptyDenState(el, title) {
+  el.innerHTML = `<div class="panel" style="margin-top:20px;text-align:center;padding:30px">
+    <p class="muted">${esc(title)} needs at least one card to show. Add your first card to get started.</p>
+    <button class="btn primary sm" id="rv-empty-add" style="margin-top:8px">➕ Add a card</button>
+  </div>`;
+  $('#rv-empty-add').onclick = () => switchView('ledger');
+}
+
+function denRoomHTML() {
+  if (!State.cards.length) return '';
+  const wallCards = rvPickCards(RV.den.wall, 6);
+  const shelfCards = rvPickCards(RV.den.shelf, 8);
+  const sideCards = rvPickCards(RV.den.side, 6);
+  let feat = null;
+  if (RV.den.featured !== 'auto') feat = State.cards.find(c => String(c.pcId) === String(RV.den.featured));
+  if (!feat) feat = rvPickCards('top', 1)[0];
+  const meta = State.meta || {};
+  const movers = rvPickCards('top', 4).map(c => `${esc(c.name)} ${money0(c.price)}`).join('  ·  ');
+  const frame = (c, cls) => {
+    const sale = cls === 'soldcard' ? saleGet(c) : null;
+    return `<div class="den-card ${cls || ''}" data-i="${c.i}" title="${esc(c.fullName)} — ${money(c.price)}">${rvThumb(c)}${c.graded && cls !== 'soldcard' ? `<span class="den-slabtag">${esc(c.grader || 'GRADED')} ${esc(c.grade || '')}</span>` : ''}${cls === 'soldcard' ? `<span class="den-soldtag">SOLD${sale && sale.price ? ' ' + money0(sale.price) : ''}</span>` : ''}</div>`;
+  };
+  const soldCards = rvPickCards('sold', 5);
+  return `
+    <div class="den-face den-floor"></div>
+    <div class="den-face den-ceil"></div>
+    <div class="den-face den-back"></div>
+    <div class="den-face den-left"></div>
+    <div class="den-face den-right"></div>
+    <div class="den-rug"></div>
+    <div class="den-ticker"><div class="den-ticker-in">PORTFOLIO ${money0(meta.totalValue)} · ${(meta.totalEntries || 0).toLocaleString()} CARDS · TOP: ${movers} · </div></div>
+    <div class="den-display den-trophy">
+      <div class="den-disp-title">🏆 Trophy Wall</div>
+      <div class="den-trophy-row">${wallCards.map(c => frame(c, 'framed')).join('')}</div>
+    </div>
+    <div class="den-display den-shelfwall">
+      <div class="den-disp-title">🧊 Slab Shelf</div>
+      <div class="den-shelf-row">${shelfCards.slice(0, 4).map(c => frame(c, 'slab')).join('')}</div>
+      <div class="den-shelf-plank"></div>
+      <div class="den-shelf-row">${shelfCards.slice(4, 8).map(c => frame(c, 'slab')).join('')}</div>
+      <div class="den-shelf-plank"></div>
+    </div>
+    <div class="den-display den-gallery">
+      <div class="den-disp-title">🖼️ Gallery</div>
+      <div class="den-gallery-grid">${sideCards.map(c => frame(c, 'framed')).join('')}</div>
+    </div>
+    ${soldCards.length ? `<div class="den-display den-soldshelf">
+      <div class="den-disp-title">💸 Sold Shelf</div>
+      <div class="den-shelf-row">${soldCards.map(c => frame(c, 'soldcard')).join('')}</div>
+      <div class="den-shelf-plank"></div>
+    </div>` : ''}
+    ${denAutoShelvesHTML(frame)}
+    <div class="den-sconce den-sconce-l"></div>
+    <div class="den-sconce den-sconce-r"></div>
+    <div class="den-sign">THE DEN</div>
+    <div class="den-pedestal"><div class="den-ped-top"></div><div class="den-ped-col"></div></div>
+    <div class="den-featured">
+      <div class="den-feat-spin">
+        <div class="den-feat-face">${rvThumb(feat)}</div>
+        <div class="den-feat-face den-feat-backface"><div class="st3-backart"><span>⭐</span><b>POKÉMON DEN</b></div></div>
+      </div>
+      <div class="den-feat-label" data-i="${feat.i}">${esc(feat.name)} · ${money0(feat.price)}</div>
+    </div>`;
+}
+
+/* ============================================================
+   💰 BEST SELLERS — what to sell + where (auctions/live/YouTube)
+   ============================================================ */
+const BEST = { includeGraded: true, min: 10 };
+
+async function renderBest() {
+  const el = $('#view-best');
+  const bs = await rvData('best-sellers');
+  const sc = (bs && bs.scoring) || {};
+  const bands = sc.priceBands || [
+    { min: 0, max: 10, factor: 0.25, label: 'Bulk zone', advice: 'Feed into lots & Brand Lab packaging.' },
+    { min: 10, max: 25, factor: 0.7, label: 'Slow singles', advice: 'Sell in lots or live streams.' },
+    { min: 25, max: 100, factor: 1.25, label: 'Sweet spot', advice: 'Fastest movers.' },
+    { min: 100, max: 400, factor: 1.15, label: 'Serious buyers', advice: 'Crisp photos required.' },
+    { min: 400, max: 99999, factor: 0.9, label: 'Big tickets', advice: 'Auction for price discovery.' }];
+  const band = p => bands.find(b => p >= b.min && p < b.max) || bands[bands.length - 1];
+  const setHeat = c => {
+    for (const s of (sc.setHeat || [])) if ((c.set || '').toLowerCase().includes(s.match.toLowerCase())) return s;
+    return null;
+  };
+  const score = c => {
+    const p = c.price || 0;
+    if (!p) return 0;
+    let s = (c.value || p) * band(p).factor
+      * ((sc.eraHeat || {})[c.era] || 1)
+      * ((sc.langFactor || {})[c.lang] || 1);
+    const h = setHeat(c); if (h) s *= h.factor;
+    if (c.graded) s *= sc.gradedBonus || 1.15;
+    return s;
+  };
+  const sellable = State.cards
+    .filter(c => (c.price || 0) >= BEST.min && (BEST.includeGraded || !c.graded)
+      && uget(c).status !== 'sold' && !uget(c).archived && !saleGet(c))
+    .map(c => ({ c, s: score(c), b: band(c.price || 0), h: setHeat(c) }))
+    .sort((a, b) => b.s - a.s);
+  const board = sellable.slice(0, 25);
+  const sweet = sellable.filter(x => x.b.label === 'Sweet spot');
+  const anchors = sellable.filter(x => (x.c.price || 0) >= 100);
+  const channels = (bs && bs.channels) || [];
+  const chanBy = k => channels.find(ch => ch.key === k);
+  const suggest = (c) => {
+    const p = c.price || 0;
+    if (p >= 400) return { key: 'ebay-auction', label: '🔨 eBay auction', why: 'price discovery' };
+    if (p >= 100) return { key: 'ebay-auction', label: '🔨 Auction night', why: 'anchor lot' };
+    if (p >= 25) return { key: 'ebay-bin', label: '🏷️ eBay BIN / Whatnot', why: 'sweet spot' };
+    if (p >= 10) return { key: 'whatnot', label: '📺 Live lots', why: 'stream filler' };
+    return { key: 'brand', label: '🧰 Brand Lab packs', why: 'bulk → product' };
+  };
+  const net = (c, key) => {
+    const ch = chanBy(key === 'brand' ? 'whatnot' : key) || { feePct: 13, feeFlat: 0.3 };
+    return Math.max(0, (c.price || 0) * (1 - (ch.feePct || 0) / 100) - (ch.feeFlat || 0));
+  };
+  const kpi = (label, v, sub, cls) => `<div class="kpi ${cls || ''}"><div class="k-label">${label}</div><div class="k-value">${v}</div><div class="k-sub">${sub}</div></div>`;
+
+  el.innerHTML = `
+  <div class="section-head"><div><h2>💰 Best Sellers</h2>
+    <div class="sub">The cards most worth selling <i>right now</i> — scored for liquidity, matched to the venue (bidding, live, YouTube) where each will do best.</div></div>
+    <div class="rv-row">
+      <label class="rv-check"><input type="checkbox" id="bs-graded" ${BEST.includeGraded ? 'checked' : ''}> include graded</label>
+      <span class="tlabel">min $</span><input id="bs-min" class="s-inp" type="number" style="width:80px" value="${BEST.min}">
+    </div></div>
+  <div class="kpis">
+    ${kpi('Top-25 board value', money0(board.reduce((a, x) => a + (x.c.value || 0), 0)), 'if the whole board sold at ask', 'k-gold')}
+    ${kpi('Sweet-spot cards', sweet.length.toLocaleString(), '$25–$100 · fastest sell-through', 'k-green')}
+    ${kpi('Auction anchors', anchors.length.toLocaleString(), '$100+ · Sunday auction night', 'k-blue')}
+    ${kpi('Weekly live lot', money0(sellable.slice(25, 85).reduce((a, x) => a + (x.c.value || 0), 0)), 'next 60 cards → one 2-hr stream', '')}
+  </div>
+  <div class="panel" style="margin-top:14px">
+    <h3>The Best-Sell Board</h3>
+    <p class="reason">score = value × price-band × era × set-heat ${bs ? '' : '(defaults — data file missing)'} — net shown after the suggested venue's fees${bs ? '' : ''}.</p>
+    <div class="rv-tablewrap"><table class="rv-table">
+      <thead><tr><th></th><th>Card</th><th>Ask</th><th>Band</th><th>Why it moves</th><th>Sell it via</th><th>Est. net</th><th></th></tr></thead>
+      <tbody>${board.map((x, i) => {
+    const sg = suggest(x.c);
+    return `<tr>
+        <td class="rv-rank">${i + 1}</td>
+        <td class="rv-cardcell"><span class="rv-thumb" data-i="${x.c.i}">${rvThumb(x.c)}</span>
+          <div><b>${esc(x.c.name)}</b>${x.c.number ? ' <span class="reason">#' + esc(x.c.number) + '</span>' : ''}<br>
+          <span class="reason">${esc(x.c.set)} ${x.c.graded ? '· ' + esc(x.c.grader || '') + ' ' + esc(x.c.grade || '') : ''}</span></div></td>
+        <td><b>${money(x.c.price)}</b></td>
+        <td><span class="rv-band">${esc(x.b.label)}</span></td>
+        <td class="reason">${x.h ? esc(x.h.why) : esc(x.b.advice)}</td>
+        <td>${sg.label}<br><span class="reason">${sg.why}</span></td>
+        <td class="rv-net">${money(net(x.c, sg.key))}</td>
+        <td><button class="minilink rv-open" data-i="${x.c.i}">open ↗</button></td>
+      </tr>`;
+  }).join('')}</tbody>
+    </table></div>
+  </div>
+  <h3 style="margin:22px 0 10px">Where to sell — the channel matrix</h3>
+  <div class="rv-cards">${channels.map(ch => `
+    <div class="panel rv-chan">
+      <div class="rv-chan-head">${ch.icon} <b>${esc(ch.name)}</b>
+        <span class="rv-fee">${ch.feePct ? ch.feePct + '% + $' + (ch.feeFlat || 0).toFixed(2) : 'no fees'}</span></div>
+      <p><b style="color:var(--green)">Best for:</b> ${esc(ch.bestFor)}</p>
+      <p><b style="color:var(--red)">Avoid:</b> ${esc(ch.avoid)}</p>
+      <ul class="rv-ul">${(ch.tips || []).map(t => `<li>${esc(t)}</li>`).join('')}</ul>
+      <p class="reason">payout: ${esc(ch.payout)}</p>
+    </div>`).join('') || '<p class="reason">Channel data file missing — run from the app folder.</p>'}
+  </div>
+  ${bs && bs.auctionNight ? `<div class="rv-2col">
+    <div class="panel"><h3>${esc(bs.auctionNight.title)}</h3><ol class="rv-ol">${bs.auctionNight.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol></div>
+    <div class="panel"><h3>${esc(bs.livePlaybook.title)}</h3><ol class="rv-ol">${bs.livePlaybook.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol></div>
+  </div>` : ''}
+  ${bs && bs.notes ? `<p class="reason" style="margin-top:12px">${bs.notes.map(esc).join(' · ')}</p>` : ''}`;
+
+  $('#bs-graded').onchange = e => { BEST.includeGraded = e.target.checked; renderBest(); };
+  $('#bs-min').onchange = e => { BEST.min = +e.target.value || 0; renderBest(); };
+  $$('.rv-open, .rv-thumb', el).forEach(b => b.onclick = () => openModal(State.cards[+b.dataset.i]));
+}
+
+/* ============================================================
+   🏷 BRAND LAB — brand + packaging build-out for the bulk mountain
+   ============================================================ */
+async function renderBrand() {
+  const el = $('#view-brand');
+  const bl = await rvData('brand-lab');
+  if (!bl) {
+    el.innerHTML = '<div class="panel" style="margin-top:20px"><p class="muted">data/brand-lab.json missing — pull the latest app files.</p></div>';
+    return;
+  }
+  // how much bulk feeds the machine
+  const bulk = State.cards.filter(c => (c.price || 0) < 10);
+  const bulkQty = bulk.reduce((a, c) => a + (c.qty || 1), 0);
+  const mid = State.cards.filter(c => (c.price || 0) >= 10 && (c.price || 0) < 25);
+  const copyBtn = (txt, label) => `<button class="minilink rv-copy" data-txt="${esc(txt)}">${label || '📋 copy'}</button>`;
+  const risk = r => `<span class="rv-risk ${r}">${r === 'high' ? '⚠ IP risk' : '✓ safe'}</span>`;
+
+  el.innerHTML = `
+  <div class="section-head"><div><h2>🏷 Brand Lab</h2>
+    <div class="sub">${esc(bl.brand.positioning)}</div></div></div>
+  <div class="kpis">
+    <div class="kpi k-gold"><div class="k-label">Bulk to package</div><div class="k-value">${bulkQty.toLocaleString()}</div><div class="k-sub">cards under $10 in this export — plus your unlisted spare boxes</div></div>
+    <div class="kpi k-green"><div class="k-label">Pack "hits" ready</div><div class="k-value">${mid.length.toLocaleString()}</div><div class="k-sub">$10–$25 cards to seed Mystery Chests</div></div>
+    <div class="kpi k-blue"><div class="k-label">Product lines</div><div class="k-value">${bl.packagingLines.length}</div><div class="k-sub">start with ONE — the sample run tells you which</div></div>
+  </div>
+
+  <div class="panel" style="margin-top:14px;border-color:var(--gold-dim)">
+    <h3>⚖️ ${esc(bl.ipSafety.title)}</h3>
+    <ul class="rv-ul">${bl.ipSafety.rules.map(r => `<li>${esc(r)}</li>`).join('')}</ul>
+  </div>
+
+  <div class="rv-2col" style="margin-top:14px">
+    <div class="panel">
+      <h3>The brand</h3>
+      <table class="rv-table"><thead><tr><th>Name</th><th>Why</th><th></th></tr></thead><tbody>
+        ${bl.brand.nameCandidates.map(n => `<tr><td><b>${esc(n.name)}</b></td><td class="reason">${esc(n.why)}</td><td>${risk(n.risk)}</td></tr>`).join('')}
+      </tbody></table>
+      <p style="margin-top:10px"><b>Taglines:</b></p>
+      <ul class="rv-ul">${bl.brand.taglines.map(t => `<li>“${esc(t)}” ${copyBtn(t)}</li>`).join('')}</ul>
+      <p style="margin-top:10px"><b>Voice:</b> <span class="reason">${esc(bl.brand.voice)}</span></p>
+      <div class="rv-row" style="margin-top:10px;flex-wrap:wrap">
+        ${bl.brand.colorSystem.map(c => `<span class="rv-swatch" title="${esc(c.use)}"><i style="background:${esc(c.hex)}"></i>${esc(c.name)} ${esc(c.hex)}</span>`).join('')}
+      </div>
+    </div>
+    <div class="panel">
+      <h3>🎨 Generate the art</h3>
+      <p class="reason">Original, IP-safe logo prompts — paste into your image generator of choice (or hand them to a designer):</p>
+      ${bl.brand.logoPrompts.map(p => `<div class="rv-prompt">${esc(p)} ${copyBtn(p)}</div>`).join('')}
+      <h3 style="margin-top:14px">${esc(bl.artPipeline.title)}</h3>
+      <ol class="rv-ol">${bl.artPipeline.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol>
+      <table class="rv-table" style="margin-top:8px"><thead><tr><th>Item</th><th>Where</th><th>Cost</th></tr></thead><tbody>
+        ${bl.artPipeline.printCategories.map(p => `<tr><td>${esc(p.item)}</td><td class="reason">${esc(p.vendorType)}</td><td>${esc(p.cost)}</td></tr>`).join('')}
+      </tbody></table>
+    </div>
+  </div>
+
+  <h3 style="margin:22px 0 10px">📦 Packaging lines — millions of spare cards → products</h3>
+  <div class="rv-cards">${bl.packagingLines.map(p => `
+    <div class="panel rv-pack ${p.tier === 'hero' ? 'rv-hero' : ''}">
+      <div class="rv-chan-head">${p.icon} <b>${esc(p.name)}</b><span class="rv-fee">${esc(p.tier)}</span></div>
+      <p>${esc(p.what)}</p>
+      <p class="reason"><b>Feeds on:</b> ${esc(p.uses)}</p>
+      <div class="rv-row" style="gap:14px"><span><b style="color:var(--gold)">${esc(p.pricePoint)}</b> <span class="reason">retail</span></span>
+      <span class="reason">cost ${esc(p.unitCost)}</span></div>
+      <p style="margin-top:6px"><b style="color:var(--accent)">Stand-out:</b> ${esc(p.standout)}</p>
+    </div>`).join('')}
+  </div>
+
+  <h3 style="margin:22px 0 10px">✨ Stand-out moves</h3>
+  <div class="rv-cards">${bl.standout.map(s => `<div class="panel"><p>${s.icon} ${esc(s.idea)}</p></div>`).join('')}</div>
+
+  <div class="panel" style="margin-top:14px">
+    <h3>🗺️ Roadmap</h3>
+    <div class="rv-2col">${bl.roadmap.map(r => `<div><b style="color:var(--gold)">${esc(r.phase)}</b><ul class="rv-ul">${r.items.map(i => `<li>${esc(i)}</li>`).join('')}</ul></div>`).join('')}</div>
+  </div>
+  <p class="reason" style="margin-top:12px">${esc(bl.about)}</p>`;
+
+  $$('.rv-copy', el).forEach(b => b.onclick = async () => {
+    try { await navigator.clipboard.writeText(b.dataset.txt); toast('Copied.'); }
+    catch { toast('Clipboard blocked — select & copy manually.'); }
+  });
+}
+
+/* ============================================================
+   📷 SCANNER — camera → photo stored with the card file, phone
+   mode (LAN + QR), PriceCharting bulk sync
+   ============================================================ */
+function renderScan() {
+  const el = $('#view-scan');
+  const live = !!State.live;
+  el.innerHTML = `
+  <div class="section-head"><div><h2>📷 Scanner</h2>
+    <div class="sub">Hold a card up to your Mac camera (or your phone's), snap it, and the photo is stored with that card's file — ready for listings, provenance QRs, and sale builds.</div></div></div>
+  ${live ? '' : `<div class="panel" style="border-color:var(--red-dim);margin-bottom:12px"><p class="muted">⚠ Static mode — photos can't be saved. Launch via <b>start.command</b> (or the app) to enable the Scanner.</p></div>`}
+  <div class="rv-2col rv-scangrid">
+    <div class="panel">
+      <h3>1 · Pick the card</h3>
+      <input id="sc-q" class="s-inp" style="width:100%" placeholder="Search your ${(State.meta && State.meta.totalEntries || 0).toLocaleString()} cards…">
+      <div id="sc-results" class="sc-results"></div>
+      <div id="sc-selected" class="sc-selected"></div>
+      <div id="sc-gallery" class="sc-gallery"></div>
+    </div>
+    <div class="panel">
+      <h3>2 · Frame it &amp; snap</h3>
+      <div class="sc-camwrap">
+        <video id="sc-video" autoplay playsinline muted class="${RV.cam.mirror ? 'mirror' : ''}"></video>
+        <div class="sc-guide"></div>
+        <div id="sc-flash"></div>
+      </div>
+      <div class="rv-row" style="margin-top:10px;flex-wrap:wrap">
+        <button class="btn primary" id="sc-start">🎥 Start camera</button>
+        <button class="btn gold" id="sc-snap" disabled>📸 Capture</button>
+        <select id="sc-device" class="s-inp" style="max-width:200px" title="Camera — your iPhone shows up here via Continuity"></select>
+        <label class="rv-check"><input type="checkbox" id="sc-mirror" ${RV.cam.mirror ? 'checked' : ''}> mirror</label>
+      </div>
+      <div id="sc-staged"></div>
+      <p class="reason" style="margin-top:8px">Snap first, then pick — or pick first and every capture saves straight to the card as its next <code>scan-N</code> photo. Your iPhone appears in the camera list automatically (Continuity Camera).</p>
+      <div class="rv-row" style="margin-top:6px;flex-wrap:wrap">
+        <label class="btn sm" style="cursor:pointer">📱 Or take/upload a photo
+          <input id="sc-file" type="file" accept="image/*" capture="environment" style="display:none"></label>
+        <button class="btn sm" id="sc-studio" disabled>🎬 Guided Photo Studio</button>
+        ${State.live && State.live.ai && State.live.ai.enabled ? `<label class="btn sm gold" style="cursor:pointer">🗂 Scan a 9-pocket binder page
+          <input id="sc-binderfile" type="file" accept="image/*" capture="environment" style="display:none"></label>` : ''}
+      </div>
+      <div id="sc-binder"></div>
+    </div>
+  </div>
+  <div class="rv-2col" style="margin-top:14px">
+    <div class="panel">
+      <h3>📱 Phone mode — scan from anywhere in the room</h3>
+      <p class="reason">Turns on a LAN address so your phone (same Wi-Fi) opens this exact app — Scanner included. Home networks only.</p>
+      <div id="sc-lan">${live ? '<p class="reason">Checking…</p>' : '<p class="reason">Needs the local server (start.command).</p>'}</div>
+    </div>
+    <div class="panel">
+      <h3>🔄 PriceCharting sync</h3>
+      <p class="reason">With your PriceCharting API token (⚙ Live), re-price the whole collection straight from their API — no export download. The xlsx export + ↻ Refresh flow still works as the no-key fallback, and is still the way to pull <i>new</i> cards you've added to your PriceCharting collection.</p>
+      <div id="sc-pc">${live ? '<p class="reason">Checking…</p>' : '<p class="reason">Needs the local server (start.command).</p>'}</div>
+    </div>
+  </div>`;
+
+  /* --- card picking --- */
+  const results = $('#sc-results');
+  const renderResults = (list, q) => {
+    results.innerHTML = list.map(c => `<button class="sc-res" data-i="${c.i}">${rvThumb(c)}<span><b>${esc(c.name)}</b>${c.number ? ' #' + esc(c.number) : ''}<br><span class="reason">${esc(c.set)} · ${money(c.price)}</span></span></button>`).join('')
+      || '<p class="reason" style="padding:8px">Not in your collection — checking the card codex…</p>';
+    $$('.sc-res', results).forEach(b => b.onclick = () => scSelect(State.cards[+b.dataset.i]));
+    // Nothing owned matched: fall back to the bundled 31,603-card codex, which
+    // needs no API key and no network — so scanning still identifies a card you
+    // don't own yet, and can hand it straight to the ledger to add.
+    if (!list.length && q) scCodexSearch(q);
+  };
+  $('#sc-q').oninput = e => {
+    const q = e.target.value.trim().toLowerCase();
+    if (!q) { results.innerHTML = '<p class="reason" style="padding:8px">Type to search — or snap first and let 🔮 Identify fill this in.</p>'; return; }
+    const toks = q.split(/\s+/);
+    renderResults(State.cards.filter(c => {
+      const hay = (c.name + ' ' + c.set + ' ' + (c.number || '')).toLowerCase();
+      return toks.every(t => hay.includes(t));
+    }).slice(0, 8), q);
+  };
+  $('#sc-q').oninput({ target: $('#sc-q') });
+  if (RV.scan.card) scSelect(RV.scan.card);
+
+  /* --- camera --- */
+  $('#sc-start').onclick = () => rvCamStart();
+  $('#sc-device').onchange = e => { RV.cam.deviceId = e.target.value || null; if (RV.cam.stream) rvCamStart(); };
+  $('#sc-mirror').onchange = e => { RV.cam.mirror = e.target.checked; $('#sc-video').classList.toggle('mirror', RV.cam.mirror); };
+  $('#sc-snap').onclick = scCapture;
+  $('#sc-file').onchange = async e => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    const dataUrl = await blobToDataUrl(f);
+    if (RV.scan.card) scSave(dataUrl);
+    else { RV.scan.staged = { dataUrl }; scRenderStaged(); }
+    e.target.value = '';
+  };
+  $('#sc-studio').onclick = () => RV.scan.card && window.openPhotoStudio && openPhotoStudio(RV.scan.card);
+  if ($('#sc-binderfile')) $('#sc-binderfile').onchange = async e => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    const dataUrl = await blobToDataUrl(f);
+    RV.scan.binder = { dataUrl, guesses: null, crops: {}, saved: {}, catalog: {} };
+    scRenderBinder();
+    scBinderIdentify();
+    e.target.value = '';
+  };
+
+  scRenderStaged();
+  scRenderBinder();
+  // camera permission already granted? start the preview without another click
+  if (live && navigator.permissions && navigator.permissions.query) {
+    navigator.permissions.query({ name: 'camera' })
+      .then(p => { if (p.state === 'granted' && State.view === 'scan' && !RV.cam.stream) rvCamStart(); })
+      .catch(() => { });
+  }
+  if (live) { scRenderLan(); scRenderPc(); }
+}
+
+/* staged shot: captured before a card was picked — identify it, then file it */
+function scRenderStaged() {
+  const box = $('#sc-staged'); if (!box) return;
+  const st = RV.scan.staged;
+  if (!st) { box.innerHTML = ''; return; }
+  const aiOn = State.live && State.live.ai && State.live.ai.enabled;
+  const pcOn = State.live && State.live.priceCharting;
+  const cat = st.catalog;
+  box.innerHTML = `<div class="sc-stagedcard">
+    <img src="${st.dataUrl}" alt="staged shot">
+    <div style="flex:1;min-width:0">
+      <b>Captured — now match it</b>
+      <div class="reason" id="sc-guess">${st.guess ? esc(st.guessLine) : (aiOn ? 'Let the AI read the card, or pick it on the left.' : 'Pick the card on the left to file this shot.')}</div>
+      ${cat === 'loading' ? `<p class="reason">Checking the PriceCharting catalog…</p>` : ''}
+      ${Array.isArray(cat) && cat.length ? `<div class="sc-results" style="margin-top:6px">${cat.slice(0, 3).map((p, i) => `
+        <button class="sc-res sc-catrow" data-x="${i}">
+          <span class="lg-pcprice">${p.price != null ? money(p.price) : '—'}</span>
+          <span><b>${esc(p.name)}</b>${p.number ? ' #' + esc(p.number) : ''}<br><span class="reason">${esc(p.set)} · ➕ add straight from here</span></span>
+        </button>`).join('')}</div>` : ''}
+      <div class="rv-row" style="margin-top:7px;flex-wrap:wrap">
+        ${aiOn ? `<button class="btn sm primary" id="sc-ident">🔮 Identify card</button>` : ''}
+        ${st.guess && pcOn && !(Array.isArray(cat) && cat.length) ? `<button class="btn sm gold" id="sc-pcadd">➕ Not in the chest? Add via PriceCharting</button>` : ''}
+        <button class="minilink" id="sc-discard">✕ discard shot</button>
+      </div>
+    </div></div>`;
+  if ($('#sc-ident')) $('#sc-ident').onclick = scIdentify;
+  if ($('#sc-pcadd')) $('#sc-pcadd').onclick = () => {
+    RV.lgQuery = [st.guess.name, st.guess.number].filter(Boolean).join(' ');
+    switchView('ledger');
+  };
+  if (Array.isArray(cat)) $$('.sc-catrow', box).forEach(b => b.onclick = async () => {
+    const p = cat[+b.dataset.x];
+    const card = pcCatalogAdd(p);
+    if (!card) return;
+    await scSaveTo(card, st.dataUrl);
+    RV.scan.staged = null;
+    scRenderStaged();
+    toast(`${p.name} added and this photo filed with it.`);
+  });
+  $('#sc-discard').onclick = () => { RV.scan.staged = null; scRenderStaged(); };
+}
+/* Third search tier: the bundled TCGdex codex (395 sets / 31,603 EN+JA cards,
+   secret & special rares included). Unlike the collection search it covers
+   cards you don't own, and unlike the PriceCharting catalog search it needs
+   no token and no network — it's local data shipped with the app. */
+let SC_CODEX_SEQ = 0;
+async function scCodexSearch(q) {
+  const box = $('#sc-results'); if (!box) return;
+  const seq = ++SC_CODEX_SEQ;
+  try {
+    const j = await (await fetch('/api/codex/search?limit=8&q=' + enc(q), { cache: 'no-store' })).json();
+    if (seq !== SC_CODEX_SEQ || !$('#sc-results')) return;   // a newer keystroke won
+    if (!j.ok || !j.cards || !j.cards.length) {
+      box.innerHTML = `<p class="reason" style="padding:8px">No matches in your collection or the card codex.</p>`;
+      return;
+    }
+    const pcOn = State.live && State.live.priceCharting;
+    box.innerHTML = `<p class="reason" style="padding:6px 8px 2px">Not in your collection — found in the card codex:</p>` +
+      j.cards.map((c, i) => `<button class="sc-res sc-codexrow" data-x="${i}">
+        ${c.img ? `<img class="sc-thumb" src="${esc(c.img)}" alt="" loading="lazy">` : ''}
+        <span><b>${esc(c.name)}</b>${c.number ? ' #' + esc(c.number) : ''}${c.special ? ' <span class="chip gold" style="font-size:9px">secret</span>' : ''}<br>
+        <span class="reason">${esc(c.set)} · ${c.lang === 'ja' ? '🇯🇵 JP' : '🇺🇸 EN'} · ➕ add via ${pcOn ? 'PriceCharting' : 'Add &amp; Sold'}</span></span>
+      </button>`).join('');
+    $$('.sc-codexrow', box).forEach(b => b.onclick = () => {
+      const c = j.cards[+b.dataset.x];
+      RV.lgQuery = [c.name, c.number].filter(Boolean).join(' ');
+      switchView('ledger');
+    });
+  } catch (e) {
+    if (seq === SC_CODEX_SEQ && $('#sc-results')) box.innerHTML = `<p class="reason" style="padding:8px">No matches.</p>`;
+  }
+}
+
+/* after an AI guess, auto-check the (cache-backed) PriceCharting catalog so
+   a card that isn't owned yet can be added right here — no tab jump, no
+   retyping what the AI already read off the card. */
+async function scFetchCatalogMatch(st) {
+  const pcOn = State.live && State.live.priceCharting;
+  if (!pcOn || !st.guess || !st.guess.name) { st.catalog = null; return; }
+  st.catalog = 'loading';
+  try {
+    const q = [st.guess.name, st.guess.number].filter(Boolean).join(' ');
+    const j = await (await fetch('/api/pc/search?q=' + enc(q), { cache: 'no-store' })).json();
+    if (RV.scan.staged !== st) return;                 // shot was discarded/replaced mid-fetch
+    const owned = new Set(State.cards.map(c => String(c.pcId)));
+    st.catalog = j.ok ? (j.products || []).filter(p => !owned.has(String(p.id))) : null;
+  } catch (e) { if (RV.scan.staged === st) st.catalog = null; }
+  if (RV.scan.staged === st) scRenderStaged();
+}
+async function scIdentify() {
+  const st = RV.scan.staged; if (!st) return;
+  const g = $('#sc-guess'); if (g) g.textContent = 'Reading the card…';
+  try {
+    const j = await (await fetch('/api/ai/identify', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ dataUrl: st.dataUrl })
+    })).json();
+    if (!j.ok) { if (g) g.textContent = '✕ ' + (j.error || 'could not identify'); return; }
+    st.guess = j.guess || {};
+    st.guessLine = `Looks like: ${st.guess.name || '?'}${st.guess.number ? ' #' + st.guess.number : ''} · ${st.guess.set || 'set unknown'} · ${st.guess.lang === 'ja' ? '🇯🇵' : '🇺🇸'}${st.guess.confidence != null ? ' · ' + Math.round(st.guess.confidence * 100) + '% sure' : ''}`;
+    // drop the guess into the card search so your matches surface instantly
+    const q = $('#sc-q');
+    if (q && st.guess.name) {
+      q.value = [st.guess.name, st.guess.number].filter(Boolean).join(' ');
+      q.oninput({ target: q });
+      // number+name may over-filter — fall back to name only if nothing matched
+      if (!$('.sc-res', $('#sc-results'))) { q.value = st.guess.name; q.oninput({ target: q }); }
+    }
+    scRenderStaged();
+    scFetchCatalogMatch(st);
+  } catch (e) { if (g) g.textContent = '✕ ' + e.message; }
+}
+
+/* bulk binder scan: one photo of a 9-pocket page -> up to 9 identified cards */
+function scBinderCrop(dataUrl, slot) {
+  const bin = RV.scan.binder;
+  if (bin.crops[slot]) return Promise.resolve(bin.crops[slot]);
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const col = (slot - 1) % 3, row = Math.floor((slot - 1) / 3);
+      const cw = img.naturalWidth / 3, ch = img.naturalHeight / 3;
+      const cv = document.createElement('canvas');
+      cv.width = cw; cv.height = ch;
+      cv.getContext('2d').drawImage(img, col * cw, row * ch, cw, ch, 0, 0, cw, ch);
+      const out = cv.toDataURL('image/jpeg', 0.85);
+      bin.crops[slot] = out;
+      resolve(out);
+    };
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  });
+}
+function scBinderMatches(guess) {
+  const hay = [guess.name, guess.number].filter(Boolean).join(' ').toLowerCase();
+  if (!hay.trim()) return [];
+  const toks = hay.split(/\s+/).filter(Boolean);
+  return State.cards.filter(c => {
+    const h = (c.name + ' ' + c.set + ' ' + (c.number || '')).toLowerCase();
+    return toks.every(t => h.includes(t));
+  }).slice(0, 4);
+}
+/* an unowned pocket + a PriceCharting token: auto-check the cache-backed
+   catalog so the binder-scan → add loop closes without leaving the tab.
+   Memoized per slot on the binder object so re-renders don't re-fetch. */
+async function scBinderCatalogMatch(bin, slot, g) {
+  const pcOn = State.live && State.live.priceCharting;
+  if (!pcOn || !g || !g.name) { bin.catalog[slot] = null; return; }
+  bin.catalog[slot] = 'loading';
+  try {
+    const q = [g.name, g.number].filter(Boolean).join(' ');
+    const j = await (await fetch('/api/pc/search?q=' + enc(q), { cache: 'no-store' })).json();
+    if (RV.scan.binder !== bin) return;                 // page closed/replaced mid-fetch
+    const owned = new Set(State.cards.map(c => String(c.pcId)));
+    bin.catalog[slot] = j.ok ? (j.products || []).filter(p => !owned.has(String(p.id))).slice(0, 2) : null;
+  } catch (e) { if (RV.scan.binder === bin) bin.catalog[slot] = null; }
+  if (RV.scan.binder === bin) scRenderBinder();
+}
+async function scRenderBinder() {
+  const box = $('#sc-binder'); if (!box) return;
+  const bin = RV.scan.binder;
+  if (!bin) { box.innerHTML = ''; return; }
+  const loading = bin.guesses === null;
+  const bySlot = {};
+  (bin.guesses || []).forEach(g => { bySlot[g.slot] = g; });
+  const slots = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+  const crops = await Promise.all(slots.map(s => scBinderCrop(bin.dataUrl, s)));
+  box.innerHTML = `<div class="sc-binder-head reason">🗂 Binder page — ${loading ? 'reading the page…' : `${(bin.guesses || []).length} card${(bin.guesses || []).length === 1 ? '' : 's'} found`} <button class="minilink" id="sc-binder-close">✕ close</button></div>
+    <div class="sc-bgrid">${slots.map((s, idx) => {
+    const crop = crops[idx];
+    if (loading) return `<div class="sc-bcell sc-bcell-pending" data-slot="${s}"><img src="${crop || bin.dataUrl}" alt="pocket ${s}"><span class="reason">reading…</span></div>`;
+    const g = bySlot[s];
+    if (!g) return `<div class="sc-bcell sc-bcell-empty" data-slot="${s}"><img src="${crop || bin.dataUrl}" alt="pocket ${s}"><span class="reason">no card seen</span></div>`;
+    const saved = bin.saved[s];
+    const matches = scBinderMatches(g);
+    const cat = bin.catalog[s];
+    if (!saved && matches.length === 0 && cat === undefined) scBinderCatalogMatch(bin, s, g);
+    const line = `${g.name || '?'}${g.number ? ' #' + g.number : ''} · ${g.set || 'set unknown'}${g.confidence != null ? ' · ' + Math.round(g.confidence * 100) + '%' : ''}`;
+    return `<div class="sc-bcell" data-slot="${s}">
+        <img src="${crop || bin.dataUrl}" alt="pocket ${s}">
+        <div class="reason sc-bline">${esc(line)}</div>
+        ${saved ? `<div class="sc-bsaved">✓ saved to ${esc(saved)}</div>` : `
+        <div class="sc-bmatches">
+          ${matches.map(c => `<button class="minilink sc-bmatch" data-slot="${s}" data-i="${c.i}">→ ${esc(c.name)}${c.number ? ' #' + esc(c.number) : ''}</button>`).join('') || ''}
+          ${cat === 'loading' ? `<span class="reason">checking catalog…</span>` : ''}
+          ${Array.isArray(cat) ? cat.map((p, ci) => `<button class="minilink sc-bcatadd" data-slot="${s}" data-ci="${ci}">➕ ${esc(p.name)}${p.number ? ' #' + esc(p.number) : ''} (catalog)</button>`).join('') : ''}
+          <button class="minilink sc-badd" data-slot="${s}">➕ Add manually</button>
+        </div>`}
+      </div>`;
+  }).join('')}</div>`;
+  $('#sc-binder-close').onclick = () => { RV.scan.binder = null; scRenderBinder(); };
+  $$('.sc-bmatch', box).forEach(b => b.onclick = async () => {
+    const slot = +b.dataset.slot, card = State.cards[+b.dataset.i];
+    const crop = bin.crops[slot];
+    const r = await scSaveTo(card, crop);
+    if (r) { bin.saved[slot] = card.name; scRenderBinder(); }
+  });
+  $$('.sc-bcatadd', box).forEach(b => b.onclick = async () => {
+    const slot = +b.dataset.slot;
+    const p = bin.catalog[slot][+b.dataset.ci];
+    const card = pcCatalogAdd(p);
+    if (!card) return;
+    await scSaveTo(card, bin.crops[slot]);
+    bin.saved[slot] = card.name;
+    scRenderBinder();
+  });
+  $$('.sc-badd', box).forEach(b => b.onclick = () => {
+    const slot = +b.dataset.slot;
+    const g = (bin.guesses || []).find(x => x.slot === slot) || {};
+    RV.lgQuery = [g.name, g.number].filter(Boolean).join(' ');
+    switchView('ledger');
+  });
+}
+async function scBinderIdentify() {
+  const bin = RV.scan.binder; if (!bin) return;
+  try {
+    const j = await (await fetch('/api/ai/identify', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ dataUrl: bin.dataUrl, mode: 'grid' })
+    })).json();
+    if (!j.ok) { toast('Binder scan failed: ' + (j.error || 'could not identify')); return; }
+    bin.guesses = j.guesses || [];
+    scRenderBinder();
+  } catch (e) { toast('Binder scan error: ' + e.message); }
+}
+
+function scSelect(c) {
+  RV.scan.card = c;
+  if (RV.scan.staged) {           // a waiting shot files itself the moment you pick
+    const d = RV.scan.staged.dataUrl;
+    RV.scan.staged = null;
+    scRenderStaged();
+    scSave(d);
+  }
+  $('#sc-selected').innerHTML = `<div class="sc-sel-card">${rvThumb(c)}<div><b>${esc(c.name)}</b>${c.number ? ' <span class="reason">#' + esc(c.number) + '</span>' : ''}<br><span class="reason">${esc(c.set)} · ${money(c.price)}</span><br><button class="minilink" id="sc-open">open card ↗</button></div></div>`;
+  $('#sc-open').onclick = () => openModal(c);
+  const st = $('#sc-studio'); if (st) st.disabled = !State.live;
+  scGallery();
+}
+async function scGallery() {
+  const c = RV.scan.card, g = $('#sc-gallery');
+  if (!c || !g) return;
+  if (!State.live) { g.innerHTML = ''; return; }
+  try {
+    const j = await (await fetch('/api/listingphotos?pcId=' + enc(c.pcId), { cache: 'no-store' })).json();
+    const entries = Object.entries((j && j.photos) || {});
+    g.innerHTML = `<div class="reason" style="margin:8px 0 4px">${entries.length} photo${entries.length === 1 ? '' : 's'} on file${entries.length ? ' — stored with this card' : ''}</div>
+      <div class="sc-gal-grid">${entries.map(([slot, p]) => `
+        <figure class="sc-shot"><img src="${esc(p)}?t=${Date.now()}" alt="${esc(slot)}">
+        <figcaption>${esc(slot)} <button class="minilink sc-del" data-slot="${esc(slot)}">✕</button></figcaption></figure>`).join('')}</div>`;
+    $$('.sc-del', g).forEach(b => b.onclick = async () => {
+      await fetch('/api/listingphoto/delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pcId: c.pcId, slot: b.dataset.slot }) });
+      scGallery();
+    });
+  } catch { g.innerHTML = ''; }
+}
+async function rvCamStart() {
+  rvCamStop();
+  const video = $('#sc-video');
+  try {
+    const constraints = { audio: false, video: RV.cam.deviceId ? { deviceId: { exact: RV.cam.deviceId }, width: { ideal: 1920 } } : { facingMode: 'environment', width: { ideal: 1920 } } };
+    RV.cam.stream = await navigator.mediaDevices.getUserMedia(constraints);
+    video.srcObject = RV.cam.stream;
+    $('#sc-snap').disabled = false;
+    $('#sc-start').textContent = '⏹ Stop camera';
+    $('#sc-start').onclick = () => { rvCamStop(); };
+    // labels only populate after permission — refresh the device list now
+    const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+    $('#sc-device').innerHTML = devs.map((d, i) => `<option value="${esc(d.deviceId)}"${d.deviceId === RV.cam.deviceId ? ' selected' : ''}>${esc(d.label || 'Camera ' + (i + 1))}</option>`).join('');
+    if (!RV.cam.deviceId && devs[0]) RV.cam.deviceId = devs[0].deviceId;
+  } catch (e) {
+    if (location.protocol === 'http:' && !/^(127\.|localhost)/.test(location.hostname))
+      return toast('Live camera needs the HTTPS phone-mode link — or use “take/upload a photo” below.');
+    const msgs = {
+      NotAllowedError: 'Camera permission denied — allow it in System Settings → Privacy & Security → Camera (then reload), or via the 🎥 icon in the address bar.',
+      NotFoundError: 'No camera found — plug one in, or bring your iPhone nearby for Continuity Camera.',
+      NotReadableError: 'The camera is busy in another app — close it (Zoom, FaceTime…) and try again.',
+      OverconstrainedError: 'That camera went away — pick another one from the list.',
+    };
+    if (e.name === 'OverconstrainedError') { RV.cam.deviceId = null; }
+    toast(msgs[e.name] || 'Camera blocked: ' + e.message);
+  }
+}
+function rvCamStop() {
+  if (RV.cam.stream) { RV.cam.stream.getTracks().forEach(t => t.stop()); RV.cam.stream = null; }
+  const v = $('#sc-video'); if (v) v.srcObject = null;
+  const snap = $('#sc-snap'); if (snap) snap.disabled = true;
+  const st = $('#sc-start'); if (st) { st.textContent = '🎥 Start camera'; st.onclick = () => rvCamStart(); }
+}
+function scCapture() {
+  const video = $('#sc-video');
+  if (!RV.cam.stream || !video.videoWidth) return toast('Start the camera first.');
+  const scale = Math.min(1, 1600 / Math.max(video.videoWidth, video.videoHeight));
+  const cv = document.createElement('canvas');
+  cv.width = Math.round(video.videoWidth * scale);
+  cv.height = Math.round(video.videoHeight * scale);
+  const ctx = cv.getContext('2d');
+  if (RV.cam.mirror) { ctx.translate(cv.width, 0); ctx.scale(-1, 1); }
+  ctx.drawImage(video, 0, 0, cv.width, cv.height);
+  const flash = $('#sc-flash');
+  if (flash) { flash.classList.add('on'); setTimeout(() => flash.classList.remove('on'), 220); }
+  const dataUrl = cv.toDataURL('image/jpeg', 0.92);
+  if (RV.scan.card) return scSave(dataUrl);       // card picked → straight to its file
+  RV.scan.staged = { dataUrl };                   // no card yet → stage it for identify/pick
+  scRenderStaged();
+}
+function scSave(dataUrl) { return scSaveTo(RV.scan.card, dataUrl); }
+async function scSaveTo(c, dataUrl) {
+  if (!c) return;
+  if (!State.live) { toast('Static mode — launch via start.command to save photos.'); return null; }
+  try {
+    const j = await (await fetch('/api/listingphotos?pcId=' + enc(c.pcId), { cache: 'no-store' })).json();
+    let n = 1;
+    for (const slot of Object.keys((j && j.photos) || {})) {
+      const m = /^scan-(\d+)$/.exec(slot);
+      if (m) n = Math.max(n, +m[1] + 1);
+    }
+    const r = await (await fetch('/api/listingphoto', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ pcId: c.pcId, slot: 'scan-' + n, dataUrl })
+    })).json();
+    if (r.ok) { toast(`Saved to ${c.name} — scan-${n} (${r.kb} KB)`); if (c === RV.scan.card) scGallery(); return r; }
+    toast('Save failed: ' + (r.error || 'unknown')); return null;
+  } catch (e) { toast('Save error: ' + e.message); return null; }
+}
+
+/* --- phone mode (LAN + QR) --- */
+async function scRenderLan() {
+  const box = $('#sc-lan'); if (!box) return;
+  let st = null;
+  try { st = await (await fetch('/api/lan', { cache: 'no-store' })).json(); } catch { }
+  if (!st) { box.innerHTML = '<p class="reason">LAN status unavailable.</p>'; return; }
+  if (!st.enabled) {
+    box.innerHTML = `<button class="btn primary" id="sc-lan-on">📶 Turn on phone mode</button>
+      <p class="reason" style="margin-top:8px">Starts a same-Wi-Fi address (HTTPS when possible) on port ${st.port}. Turn it off when you're done.</p>`;
+    $('#sc-lan-on').onclick = async () => {
+      $('#sc-lan-on').textContent = 'Starting…';
+      await fetch('/api/lan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ enabled: true }) });
+      scRenderLan();
+    };
+    return;
+  }
+  const url = st.urls[0] || '';
+  box.innerHTML = `
+    <div class="rv-row" style="align-items:flex-start;gap:16px;flex-wrap:wrap">
+      ${url ? `<img class="sc-qr" alt="QR to open on your phone" src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=8&data=${enc(url)}" onerror="this.remove()">` : ''}
+      <div>
+        <p><b style="color:var(--green)">● Phone mode is ON</b> ${st.tls ? '<span class="reason">(HTTPS — live camera works)</span>' : '<span class="reason">(HTTP — use the “take a photo” button on the phone)</span>'}</p>
+        ${st.urls.map(u => `<p style="font-size:16px"><a href="${esc(u)}" target="_blank" rel="noopener"><b>${esc(u)}</b></a></p>`).join('') || '<p class="reason">No LAN IP found — is Wi-Fi on?</p>'}
+        <p class="reason">Scan the QR or type the address on your phone (same Wi-Fi).${st.tls ? ' First visit: accept the self-signed certificate warning — it’s your own Mac.' : ''}</p>
+        <button class="btn ghost sm" id="sc-lan-off" style="margin-top:6px">Turn off</button>
+      </div>
+    </div>`;
+  $('#sc-lan-off').onclick = async () => {
+    await fetch('/api/lan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ enabled: false }) });
+    scRenderLan();
+  };
+}
+
+/* --- PriceCharting sync --- */
+async function scRenderPc() {
+  const box = $('#sc-pc'); if (!box) return;
+  if (RV.pcPoll) { clearInterval(RV.pcPoll); RV.pcPoll = null; }
+  const hasToken = State.live && State.live.priceCharting;
+  let st = null, auto0 = null;
+  try { st = await (await fetch('/api/pc/sync/status', { cache: 'no-store' })).json(); } catch { }
+  try { auto0 = await (await fetch('/api/autosync', { cache: 'no-store' })).json(); } catch { }
+  const autoBlock = a => a ? `
+    <div class="rv-row" style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
+      <span>${a.enabled ? '🟢' : '⚪'} <b>Auto inventory import ${a.enabled ? 'ON' : 'off'}</b></span>
+      <button class="minilink" id="sc-auto-t">${a.enabled ? 'turn off' : 'turn on'}</button>
+    </div>
+    <p class="reason">Watching for new PriceCharting exports (~/Downloads or this folder). New cards pull in on their own${a.lastImport ? ` — last import ${esc(a.lastImport.replace('T', ' '))} from ${esc(a.source || 'export')}` : ''}${a.lastError ? ` · <span style="color:var(--red)">last error: ${esc(String(a.lastError))}</span>` : ''}.</p>` : '';
+  const wireAutoToggle = a => {
+    if ($('#sc-auto-t')) $('#sc-auto-t').onclick = async () => {
+      await fetch('/api/autosync', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ enabled: !a.enabled }) });
+      scRenderPc();
+    };
+  };
+  if (!hasToken) {
+    box.innerHTML = `<p class="reason">No PriceCharting token yet.</p>
+      <div class="rv-row"><button class="btn sm" id="sc-pc-key">⚙ Add token</button></div>
+      <p class="reason" style="margin-top:8px">No token needed for inventory: download your export from PriceCharting (or leave it in ~/Downloads) and it pulls in automatically below. The token adds live re-pricing + one-click catalog adds.</p>
+      ${autoBlock(auto0)}`;
+    $('#sc-pc-key').onclick = () => openSettings();
+    wireAutoToggle(auto0);
+    return;
+  }
+  if (st && st.running) {
+    const pct = st.total ? Math.round(st.done / st.total * 100) : 0;
+    box.innerHTML = `<p><b style="color:var(--accent)">Syncing…</b> ${st.done.toLocaleString()} / ${st.total.toLocaleString()} cards · ${st.updated.toLocaleString()} repriced${st.errors ? ` · <span style="color:var(--red)">${st.errors} errors</span>` : ''}</p>
+      <div class="ps-prog"><div class="ps-prog-bar" style="width:${pct}%"></div></div>
+      <p class="reason" style="margin-top:6px">~${st.total ? Math.ceil((st.total - st.done) * 0.13 / 60) : '?'} min left — keep the app open. Prices land in the collection file when done.</p>`;
+    RV.pcPoll = setInterval(async () => {
+      if (State.view !== 'scan') { clearInterval(RV.pcPoll); RV.pcPoll = null; return; }
+      const s2 = await (await fetch('/api/pc/sync/status', { cache: 'no-store' })).json().catch(() => null);
+      if (s2 && !s2.running) {
+        clearInterval(RV.pcPoll); RV.pcPoll = null;
+        toast(`PriceCharting sync done — ${s2.updated} repriced${s2.value ? ' · portfolio ' + money0(s2.value) : ''}. Reloading…`);
+        await init();
+        scRenderPc();
+      } else scRenderPc();
+    }, 2500);
+    return;
+  }
+  const last = st && st.finishedAt
+    ? `<p class="reason">Last sync ${esc(st.finishedAt.replace('T', ' '))} — ${st.updated} repriced, ${st.errors} errors${st.lastError ? ' · last error: ' + esc(String(st.lastError)) : ''}.</p>` : '';
+  box.innerHTML = `<button class="btn primary" id="sc-pc-go">🔄 Sync all prices now</button> ${last}
+    <p class="reason" style="margin-top:8px">Re-prices every card by its PriceCharting id (raw + graded tiers), then rebuilds totals. ~${Math.ceil((State.meta ? State.meta.totalEntries : 1300) * 0.13 / 60)} min for your collection.</p>
+    ${autoBlock(auto0)}`;
+  $('#sc-pc-go').onclick = async () => {
+    const r = await (await fetch('/api/pc/sync', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).json();
+    if (!r.ok) return toast(r.error || 'Could not start sync');
+    scRenderPc();
+  };
+  wireAutoToggle(auto0);
+}
+
+/* ============================================================
+   ➕ ADD & SOLD — the ledger: add cards in-app, record sales,
+   archive sold cards (kept forever, out of the collection)
+   ============================================================ */
+const LG = { saleCard: null, simport: null };
+
+function renderLedger() {
+  const el = $('#view-ledger');
+  const sold = rvSoldCards();
+  const sales = sold.map(c => ({ c, s: saleGet(c) || {} }));
+  const revenue = sales.reduce((a, x) => a + (+x.s.price || 0), 0);
+  const netTotal = sales.reduce((a, x) => a + (x.s.net != null ? +x.s.net : (+x.s.price || 0)), 0);
+  const costTotal = sales.reduce((a, x) => a + (x.c.cost || 0) * (x.c.qty || 1), 0);
+  const customs = loadJSON(LS_CUSTOM, []);
+  const kpi = (label, v, sub, cls) => `<div class="kpi ${cls || ''}"><div class="k-label">${label}</div><div class="k-value">${v}</div><div class="k-sub">${sub}</div></div>`;
+
+  el.innerHTML = `
+  <div class="section-head"><div><h2>➕ Add &amp; Sold</h2>
+    <div class="sub">One clear place to grow the chest and close the loop: add new cards (typed or scanned), record every sale, and archive sold cards — kept forever with their photos &amp; sale data, just out of your collection totals.</div></div>
+    ${sales.length ? `<button class="btn sm" id="lg-csv">⬇ Sales CSV</button>` : ''}</div>
+  <div class="kpis">
+    ${kpi('Realized revenue', money0(revenue), sales.length + ' sale' + (sales.length === 1 ? '' : 's') + ' recorded', 'k-gold')}
+    ${kpi('Net after fees', money0(netTotal), 'what actually hit your pocket', 'k-green')}
+    ${kpi('Realized profit', money0(netTotal - costTotal), 'net minus what the cards cost you', netTotal - costTotal >= 0 ? 'k-green' : '')}
+    ${kpi('Added in-app', customs.length.toLocaleString(), 'cards living outside the export', 'k-blue')}
+  </div>
+
+  <div class="rv-2col">
+    <div class="panel">
+      <h3>➕ Add a card</h3>
+      <p class="reason">New inventory pulls in <b>automatically</b> from your PriceCharting exports (drop the file in ~/Downloads — no clicks needed). For one-off adds, search the PriceCharting catalog below: no typing card details, ever.</p>
+      <div id="lg-pcadd"></div>
+      <details class="lg-manualwrap" id="lg-manualwrap"><summary class="reason">Manual add (last resort — type it in)</summary>
+      <div class="lg-form">
+        <input id="lg-name" class="s-inp" placeholder="Card name * (e.g. Charizard ex)">
+        <div class="rv-row"><input id="lg-set" class="s-inp" placeholder="Set" style="flex:2"><input id="lg-num" class="s-inp" placeholder="#" style="flex:1"></div>
+        <div class="rv-row">
+          <select id="lg-lang" class="s-inp"><option value="en">🇺🇸 English</option><option value="ja">🇯🇵 Japanese</option></select>
+          <input id="lg-price" class="s-inp" type="number" min="0" step="0.01" placeholder="Value $">
+          <input id="lg-cost" class="s-inp" type="number" min="0" step="0.01" placeholder="Cost $">
+          <input id="lg-qty" class="s-inp" type="number" min="1" value="1" style="width:64px" title="qty">
+        </div>
+        <div class="rv-row">
+          <label class="rv-check"><input type="checkbox" id="lg-graded"> graded</label>
+          <input id="lg-grader" class="s-inp" placeholder="Grader (PSA…)" style="display:none">
+          <input id="lg-grade" class="s-inp" placeholder="Grade (10…)" style="display:none;width:90px">
+        </div>
+        <div class="rv-row">
+          <button class="btn primary" id="lg-add">➕ Add to collection</button>
+          <button class="btn gold" id="lg-addscan">📷 Add &amp; scan photo</button>
+        </div>
+      </div>
+      </details>
+    </div>
+
+    <div class="panel">
+      <h3>💸 Record a sale</h3>
+      <p class="reason">Pick the card, log what it really sold for — it moves to the Sold Shelf (and the Den's 💸 shelf), archives out of your totals, and keeps its photos for the record.</p>
+      <input id="lg-sq" class="s-inp" style="width:100%" placeholder="Search the card you sold…">
+      <div id="lg-sres" class="sc-results"></div>
+      <div id="lg-sform"></div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:14px" id="lg-simport-panel">
+    <h3>📥 Import sales <span class="reason">— from an eBay orders CSV, or paste any sale email (eBay, PayPal, Whatnot…)</span></h3>
+    <div class="rv-row" style="flex-wrap:wrap;align-items:flex-start;gap:16px">
+      <div style="flex:1;min-width:240px">
+        <textarea id="lg-simport-text" class="s-inp" placeholder="Paste a &quot;Your item sold!&quot; / payment-received email here…" style="width:100%;min-height:74px;resize:vertical"></textarea>
+        <button class="btn sm" id="lg-simport-parsetext" style="margin-top:6px">📋 Parse pasted email</button>
+      </div>
+      <div style="flex:1;min-width:240px">
+        <label class="btn sm" style="cursor:pointer">📄 Upload eBay orders CSV<input id="lg-simport-file" type="file" accept=".csv,text/csv" style="display:none"></label>
+        <p class="reason" style="margin-top:6px">eBay: Seller Hub → Orders → Download reports, any date range/format. Every row becomes a match-and-record row below — nothing is saved until you click Record.</p>
+      </div>
+    </div>
+    <div id="lg-simport-results"></div>
+  </div>
+
+  <div class="panel" style="margin-top:14px">
+    <h3>🗃 Sold Shelf <span class="reason">— archived with their sale data, forever</span></h3>
+    ${sales.length ? `<div class="lg-soldgrid">${sales.map(({ c, s }) => {
+      const cost = (c.cost || 0) * (c.qty || 1);
+      const net = s.net != null ? +s.net : (+s.price || 0);
+      return `<div class="lg-soldcard">
+        <span class="lg-thumb" data-i="${c.i}">${rvThumb(c)}</span>
+        <div class="lg-soldinfo">
+          <b>${esc(c.name)}</b>${c.number ? ' <span class="reason">#' + esc(c.number) + '</span>' : ''}
+          <div class="reason">${esc(c.set)}</div>
+          <div class="lg-soldnums">${s.price != null ? `sold <b>${money(+s.price)}</b>` : 'marked sold'}${s.venue ? ' · ' + esc(s.venue) : ''}${s.date ? ' · ' + esc(s.date) : ''}</div>
+          <div class="lg-soldnums">net <b style="color:var(--green)">${money(net)}</b> · profit <b style="color:${net - cost >= 0 ? 'var(--green)' : 'var(--red)'}">${money(net - cost)}</b></div>
+          ${s.note ? `<div class="reason">“${esc(s.note)}”</div>` : ''}
+          <div class="rv-row" style="margin-top:5px">
+            ${uget(c).archived ? `<button class="minilink lg-restore" data-i="${c.i}">↩ restore to collection</button>` : `<button class="minilink lg-archive" data-i="${c.i}">🗃 archive out of totals</button>`}
+            <button class="minilink lg-unsell" data-i="${c.i}">✕ undo sale</button>
+          </div>
+        </div></div>`;
+    }).join('')}</div>` : '<p class="reason">Nothing sold yet — record your first sale above and it lands here.</p>'}
+  </div>`;
+
+  lgRenderPcAdd();
+  $('#lg-graded').onchange = e => {
+    $('#lg-grader').style.display = e.target.checked ? '' : 'none';
+    $('#lg-grade').style.display = e.target.checked ? '' : 'none';
+  };
+  const addCard = () => {
+    const name = $('#lg-name').value.trim();
+    if (!name) { toast('Give the card a name.'); return null; }
+    const graded = $('#lg-graded').checked;
+    const cc = {
+      pcId: 'custom-' + Date.now().toString(36),
+      name, set: $('#lg-set').value.trim() || 'Custom adds', number: $('#lg-num').value.trim() || null,
+      lang: $('#lg-lang').value, price: +$('#lg-price').value || 0, cost: +$('#lg-cost').value || 0,
+      qty: Math.max(1, +$('#lg-qty').value || 1), graded,
+      grader: graded ? ($('#lg-grader').value.trim() || 'PSA') : null,
+      grade: graded ? ($('#lg-grade').value.trim() || null) : null,
+      dateAdded: new Date().toISOString().slice(0, 10),
+    };
+    lgStore(cc);
+    toast(`Added ${name} — it's in your collection now.`);
+    return State.cards[State.cards.length - 1];
+  };
+  $('#lg-add').onclick = () => { if (addCard()) renderLedger(); };
+  $('#lg-addscan').onclick = () => {
+    const c = addCard();
+    if (c) { RV.scan.card = c; switchView('scan'); }
+  };
+
+  /* sale flow */
+  const sres = $('#lg-sres');
+  $('#lg-sq').oninput = e => {
+    const q = e.target.value.trim().toLowerCase();
+    if (!q) { sres.innerHTML = ''; return; }
+    const list = State.cards.filter(c => !saleGet(c) && (c.name + ' ' + c.set + ' ' + (c.number || '')).toLowerCase().includes(q)).slice(0, 6);
+    sres.innerHTML = list.map(c => `<button class="sc-res" data-i="${c.i}">${rvThumb(c)}<span><b>${esc(c.name)}</b>${c.number ? ' #' + esc(c.number) : ''}<br><span class="reason">${esc(c.set)} · ask ${money(c.price)}</span></span></button>`).join('');
+    $$('.sc-res', sres).forEach(b => b.onclick = () => lgSaleForm(State.cards[+b.dataset.i]));
+  };
+  if (LG.saleCard) lgSaleForm(LG.saleCard);
+
+  $('#lg-simport-parsetext').onclick = () => {
+    const text = $('#lg-simport-text').value;
+    const parsed = lgSimportParseEmail(text);
+    if (!parsed.length) { toast('Could not find an item name or price in that text — try pasting the full email.'); return; }
+    LG.simport = LG.simport || { candidates: [] };
+    LG.simport.candidates.push(...parsed);
+    $('#lg-simport-text').value = '';
+    lgSimportRender();
+  };
+  $('#lg-simport-file').onchange = async e => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    const text = await f.text();
+    e.target.value = '';
+    const parsed = lgSimportParseCsv(text);
+    if (!parsed.length) { toast('No rows with an item name were found in that CSV.'); return; }
+    LG.simport = LG.simport || { candidates: [] };
+    LG.simport.candidates.push(...parsed);
+    lgSimportRender();
+  };
+  if (LG.simport) lgSimportRender();
+
+  $$('.lg-thumb', el).forEach(b => b.onclick = () => openModal(State.cards[+b.dataset.i]));
+  $$('.lg-archive', el).forEach(b => b.onclick = () => { uset(State.cards[+b.dataset.i], { archived: true }); rvRecalcMeta(); renderLedger(); toast('Archived — saved forever, out of your totals.'); });
+  $$('.lg-restore', el).forEach(b => b.onclick = () => { uset(State.cards[+b.dataset.i], { archived: false }); rvRecalcMeta(); renderLedger(); toast('Back in the collection.'); });
+  $$('.lg-unsell', el).forEach(b => b.onclick = () => {
+    const c = State.cards[+b.dataset.i];
+    saleSet(c, null); uset(c, { status: '', archived: false }); rvRecalcMeta(); renderLedger();
+    toast('Sale removed — card restored.');
+  });
+  if ($('#lg-csv')) $('#lg-csv').onclick = () => {
+    const rows = [['name', 'number', 'set', 'lang', 'graded', 'grade', 'cost', 'soldPrice', 'fees', 'net', 'venue', 'date', 'note']];
+    for (const { c, s } of sales) rows.push([c.name, c.number || '', c.set, c.lang, c.graded ? 'yes' : 'no', c.grade || '',
+      (c.cost || 0) * (c.qty || 1), s.price ?? '', s.fees ?? '', s.net ?? '', s.venue || '', s.date || '', s.note || '']);
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = 'pokemon-chest-sales.csv'; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  };
+}
+
+function lgStore(cc) {
+  const all = loadJSON(LS_CUSTOM, []);
+  all.push(cc);
+  localStorage.setItem(LS_CUSTOM, JSON.stringify(all));
+  rvMergeCustom(); rvRecalcMeta();
+}
+
+/* shared: add a PriceCharting catalog product straight into the collection —
+   used by the Ledger's catalog search AND the Scanner's inline catalog-match
+   handoff, so "search the cache" and "scan → add" are the same one code path. */
+function pcCatalogAdd(p) {
+  if (State.cards.some(c => String(c.pcId) === String(p.id))) { toast('Already in your collection.'); return null; }
+  lgStore({
+    pcId: String(p.id), name: p.name, number: p.number, set: p.set,
+    lang: /japanese/i.test(p.set) ? 'ja' : 'en',
+    price: p.price || 0, cost: 0, qty: 1, graded: false,
+    dateAdded: new Date().toISOString().slice(0, 10),
+  });
+  toast(`Added ${p.name} @ ${p.price != null ? money(p.price) : 'no price yet'} — straight from PriceCharting.`);
+  return State.cards[State.cards.length - 1];
+}
+
+/* no-typing adds: search the PriceCharting catalog, one click to add */
+function lgRenderPcAdd() {
+  const box = $('#lg-pcadd'); if (!box) return;
+  const hasToken = State.live && State.live.priceCharting;
+  if (!hasToken) {
+    box.innerHTML = `<div class="rv-row" style="margin:6px 0 10px">
+      <button class="btn sm" id="lg-pckey">⚙ Add your PriceCharting token</button>
+      <span class="reason">unlocks catalog search — add any card with one click</span></div>`;
+    $('#lg-pckey').onclick = () => openSettings();
+    const mw = $('#lg-manualwrap'); if (mw) mw.open = true;
+    return;
+  }
+  box.innerHTML = `
+    <input id="lg-pcq" class="s-inp" style="width:100%;margin:6px 0 4px" placeholder="Search the PriceCharting catalog — e.g. moonbreon, charizard 151…">
+    <div id="lg-pcres" class="sc-results"></div>`;
+  const inp = $('#lg-pcq'), res = $('#lg-pcres');
+  let timer = null, lastQ = '';
+  const run = async q => {
+    if (!q) { res.innerHTML = ''; return; }
+    res.innerHTML = '<p class="reason" style="padding:6px">Searching PriceCharting…</p>';
+    try {
+      const j = await (await fetch('/api/pc/search?q=' + enc(q), { cache: 'no-store' })).json();
+      if (q !== lastQ) return;                       // a newer search superseded this one
+      if (!j.ok) { res.innerHTML = `<p class="reason" style="padding:6px">✕ ${esc(j.error || 'search failed')}</p>`; return; }
+      const owned = new Set(State.cards.map(c => String(c.pcId)));
+      const prods = j.products;
+      res.innerHTML = prods.map((p, i) => `
+        <button class="sc-res lg-pcrow" data-x="${i}">
+          <span class="lg-pcprice">${p.price != null ? money(p.price) : '—'}</span>
+          <span><b>${esc(p.name)}</b>${p.number ? ' #' + esc(p.number) : ''}<br>
+          <span class="reason">${esc(p.set)}${owned.has(String(p.id)) ? ' · <b style="color:var(--green)">already in your chest</b>' : ''}</span></span>
+        </button>`).join('') || '<p class="reason" style="padding:6px">No catalog matches.</p>';
+      $$('.lg-pcrow', res).forEach(b => b.onclick = () => {
+        if (pcCatalogAdd(prods[+b.dataset.x])) renderLedger();
+      });
+    } catch (e) { res.innerHTML = `<p class="reason" style="padding:6px">✕ ${esc(e.message)}</p>`; }
+  };
+  inp.oninput = e => {
+    lastQ = e.target.value.trim();
+    clearTimeout(timer);
+    timer = setTimeout(() => run(lastQ), 380);
+  };
+  if (RV.lgQuery) { inp.value = lastQ = RV.lgQuery; RV.lgQuery = null; run(lastQ); }
+}
+
+function lgSaleForm(c) {
+  LG.saleCard = c;
+  const f = $('#lg-sform'); if (!f) return;
+  const today = new Date().toISOString().slice(0, 10);
+  f.innerHTML = `
+    <div class="sc-sel-card" style="margin-top:10px">${rvThumb(c)}<div><b>${esc(c.name)}</b>${c.number ? ' <span class="reason">#' + esc(c.number) + '</span>' : ''}<br><span class="reason">${esc(c.set)} · was asking ${money(c.price)}</span></div></div>
+    <div class="lg-form" style="margin-top:10px">
+      <div class="rv-row">
+        <input id="lg-sp" class="s-inp" type="number" min="0" step="0.01" placeholder="Sold for $ *">
+        <input id="lg-sf" class="s-inp" type="number" min="0" step="0.01" placeholder="Fees+ship $">
+        <input id="lg-sd" class="s-inp" type="date" value="${today}">
+      </div>
+      <div class="rv-row">
+        <select id="lg-sv" class="s-inp">${['eBay', 'eBay auction', 'Whatnot', 'Facebook', 'Mercari', 'TCGplayer', 'Local / show', 'Other'].map(v => `<option>${v}</option>`).join('')}</select>
+        <input id="lg-sn" class="s-inp" placeholder="Note (buyer, lot…)" style="flex:2">
+      </div>
+      <div class="rv-row">
+        <label class="rv-check"><input type="checkbox" id="lg-sa" checked> archive out of collection totals</label>
+        <button class="btn primary" id="lg-ssave">💾 Record sale</button>
+      </div>
+    </div>`;
+  $('#lg-ssave').onclick = () => {
+    const price = +$('#lg-sp').value;
+    if (!price) return toast('Enter what it sold for.');
+    const fees = +$('#lg-sf').value || 0;
+    saleSet(c, { price, fees, net: Math.round((price - fees) * 100) / 100, venue: $('#lg-sv').value, date: $('#lg-sd').value, note: $('#lg-sn').value.trim() });
+    uset(c, { status: 'sold', archived: $('#lg-sa').checked });
+    LG.saleCard = null;
+    rvRecalcMeta(); renderLedger();
+    toast(`Sold: ${c.name} — ${money(price)}. On the Sold Shelf now.`);
+  };
+}
+
+/* ============================================================
+   📥 SALES IMPORT — pull sold-item records straight from an eBay
+   orders CSV or a pasted sale-notification email (eBay/PayPal/
+   Whatnot/etc.), fuzzy-match each to an owned card, and bulk-record
+   through the exact same saleSet()/uset() path as a manual sale.
+   Fully local: nothing is fetched from any live account — the user
+   pastes/uploads what they already exported or received.
+   ============================================================ */
+function rvParseCsv(text) {
+  const rows = []; let row = []; let field = ''; let inQ = false;
+  const s = String(text || '');
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (inQ) {
+      if (ch === '"') { if (s[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
+      else field += ch;
+    } else if (ch === '"') inQ = true;
+    else if (ch === ',') { row.push(field); field = ''; }
+    else if (ch === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+    else if (ch === '\r') { /* paired \n handles the line break */ }
+    else field += ch;
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows.filter(r => r.some(v => v.trim() !== ''));
+}
+
+function lgSimportParseCsv(text) {
+  const rows = rvParseCsv(text);
+  if (rows.length < 2) return [];
+  const headers = rows[0].map(h => h.trim().toLowerCase());
+  const findCol = re => headers.findIndex(h => re.test(h));
+  const nameCol = findCol(/title|item|name|product/);
+  const priceCol = findCol(/sold|total price|sale price|item price|price|amount|total/);
+  const dateCol = findCol(/sale date|date/);
+  if (nameCol === -1) return [];
+  const out = [];
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r];
+    if (!row || row.every(v => !v.trim())) continue;
+    const name = (row[nameCol] || '').trim();
+    if (!name) continue;
+    const price = priceCol !== -1 ? (+String(row[priceCol] || '').replace(/[^0-9.\-]/g, '') || null) : null;
+    let date = dateCol !== -1 ? (row[dateCol] || '').trim() : '';
+    const parsedDate = date ? new Date(date) : null;
+    date = parsedDate && !isNaN(parsedDate) ? parsedDate.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+    out.push({ name, price, date, venue: 'eBay', raw: row.join(' | ').slice(0, 200) });
+  }
+  return out;
+}
+
+function lgSimportParseEmail(text) {
+  text = String(text || '').trim();
+  if (!text) return [];
+  const amounts = [...text.matchAll(/\$\s?([\d,]+\.\d{2})/g)].map(m => +m[1].replace(/,/g, ''));
+  let price = null;
+  const priceLine = text.match(/(?:sold for|item price|sale price|total|you['’]?ve got money)[^$\n]{0,24}\$\s?([\d,]+\.\d{2})/i);
+  if (priceLine) price = +priceLine[1].replace(/,/g, '');
+  else if (amounts.length) price = Math.max(...amounts);
+  let name = null;
+  const labeled = text.match(/(?:item|title)\s*[:\-]\s*(.+)/i);
+  if (labeled) name = labeled[1].trim().slice(0, 120);
+  else {
+    const lines = text.split(/\r?\n/).map(l => l.trim())
+      .filter(l => l.length > 4 && l.length < 90 && !/^\$|^https?:|^(thank|dear|hi\b|view|regards|sincerely|order|payment id|transaction id|track|shipping|buyer|seller)/i.test(l));
+    lines.sort((a, b) => b.length - a.length);
+    name = lines[0] || null;
+  }
+  let date = null;
+  const dm = text.match(/\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/) || text.match(/\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}\b/i);
+  if (dm) { const d = new Date(dm[0]); if (!isNaN(d)) date = d.toISOString().slice(0, 10); }
+  let venue = 'Other';
+  if (/ebay/i.test(text)) venue = 'eBay';
+  else if (/whatnot/i.test(text)) venue = 'Whatnot';
+  else if (/mercari/i.test(text)) venue = 'Mercari';
+  else if (/tcgplayer/i.test(text)) venue = 'TCGplayer';
+  else if (/facebook/i.test(text)) venue = 'Facebook';
+  if (!name && price == null) return [];
+  return [{ name: name || '(unknown item — edit below)', price, date: date || new Date().toISOString().slice(0, 10), venue, raw: text.slice(0, 300) }];
+}
+
+function lgSimportMatch(name) {
+  const toks = String(name || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(Boolean);
+  if (!toks.length) return [];
+  return State.cards.filter(c => !saleGet(c))
+    .map(c => {
+      const hay = (c.name + ' ' + c.set + ' ' + (c.number || '')).toLowerCase();
+      return { i: c.i, c, score: toks.filter(t => hay.includes(t)).length / toks.length };
+    })
+    .filter(m => m.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
+}
+
+function lgSimportRender() {
+  const box = $('#lg-simport-results'); if (!box) return;
+  const imp = LG.simport;
+  if (!imp || !imp.candidates.length) { box.innerHTML = ''; return; }
+  const rowsHtml = imp.candidates.map((cd, ci) => {
+    const matches = lgSimportMatch(cd.name);
+    if (cd.matchIdx === undefined) cd.matchIdx = matches.length && matches[0].score >= 0.5 ? matches[0].i : -1;
+    return `<div class="rv-row" style="align-items:center;flex-wrap:wrap;border-top:1px solid var(--border,#333);padding:8px 0;gap:6px">
+      <select class="s-inp lg-simp-match" data-ci="${ci}" style="flex:2;min-width:180px">
+        <option value="-1" ${cd.matchIdx === -1 ? 'selected' : ''}>— skip / no match —</option>
+        ${matches.map(m => `<option value="${m.i}" ${cd.matchIdx === m.i ? 'selected' : ''}>${esc(m.c.name)}${m.c.number ? ' #' + esc(m.c.number) : ''} · ${esc(m.c.set)} (${Math.round(m.score * 100)}%)</option>`).join('')}
+      </select>
+      <input class="s-inp lg-simp-name" data-ci="${ci}" value="${esc(cd.name)}" title="parsed item name — edit to improve matching" style="flex:2;min-width:140px">
+      <input class="s-inp lg-simp-price" data-ci="${ci}" type="number" min="0" step="0.01" value="${cd.price != null ? cd.price : ''}" placeholder="sold $" style="width:90px">
+      <input class="s-inp lg-simp-date" data-ci="${ci}" type="date" value="${cd.date}" style="width:150px">
+      <select class="s-inp lg-simp-venue" data-ci="${ci}" style="width:120px">${['eBay', 'eBay auction', 'Whatnot', 'Facebook', 'Mercari', 'TCGplayer', 'Local / show', 'Other'].map(v => `<option ${v === cd.venue ? 'selected' : ''}>${v}</option>`).join('')}</select>
+      <button class="minilink lg-simp-rm" data-ci="${ci}">✕</button>
+    </div>`;
+  }).join('');
+  const ready = imp.candidates.filter(c => c.matchIdx !== -1 && c.price != null).length;
+  box.innerHTML = `<div class="lg-form" style="margin-top:10px">${rowsHtml}
+    <div class="rv-row" style="margin-top:8px">
+      <button class="btn primary" id="lg-simp-commit">💾 Record ${ready} sale${ready === 1 ? '' : 's'}</button>
+      <button class="btn ghost" id="lg-simp-clear">✕ clear all</button>
+    </div></div>`;
+  $$('.lg-simp-match', box).forEach(s => s.onchange = e => { imp.candidates[+e.target.dataset.ci].matchIdx = +e.target.value; lgSimportRender(); });
+  $$('.lg-simp-name', box).forEach(i => i.oninput = e => { imp.candidates[+e.target.dataset.ci].name = e.target.value; });
+  $$('.lg-simp-price', box).forEach(i => i.oninput = e => { imp.candidates[+e.target.dataset.ci].price = e.target.value === '' ? null : +e.target.value; });
+  $$('.lg-simp-date', box).forEach(i => i.oninput = e => { imp.candidates[+e.target.dataset.ci].date = e.target.value; });
+  $$('.lg-simp-venue', box).forEach(s => s.onchange = e => { imp.candidates[+e.target.dataset.ci].venue = e.target.value; });
+  $$('.lg-simp-rm', box).forEach(b => b.onclick = e => { imp.candidates.splice(+e.currentTarget.dataset.ci, 1); lgSimportRender(); });
+  $('#lg-simp-commit').onclick = () => {
+    let n = 0;
+    for (const cd of imp.candidates) {
+      if (cd.matchIdx === -1 || cd.price == null) continue;
+      const c = State.cards[cd.matchIdx];
+      if (!c || saleGet(c)) continue;
+      saleSet(c, { price: cd.price, fees: 0, net: cd.price, venue: cd.venue, date: cd.date, note: `Imported: ${cd.name}`.slice(0, 200) });
+      uset(c, { status: 'sold', archived: true });
+      n++;
+    }
+    LG.simport = null;
+    rvRecalcMeta(); renderLedger();
+    toast(n ? `Imported ${n} sale${n === 1 ? '' : 's'} — on the Sold Shelf now.` : 'Nothing matched to record — pick a card for at least one row.');
+  };
+  $('#lg-simp-clear').onclick = () => { LG.simport = null; renderLedger(); };
+}
+
+/* ============================================================
+   🧩 SETS — set-completion tracker.
+   Every owned Pokémon set as a progress bar against the real
+   TCGdex set size, with the missing cards listed and a
+   cost-to-complete. Sourced entirely from the bundled codex
+   (data/codex.json) via POST /api/codex/completion — no API key,
+   no network, works offline.
+   ============================================================ */
+const LS_SETMODE = 'pokechest.setmode.v1';   // 'official' | 'master'
+const LS_SETCOST = 'pokechest.setcost.v1';   // {key:{date,prices:{num:price|null},total}}
+const SETS = { data: null, loading: false, error: null, open: {} };
+
+function setsMode() { return localStorage.getItem(LS_SETMODE) === 'master' ? 'master' : 'official'; }
+function setsNumKey(n) { const s = String(n == null ? '' : n).trim().replace(/^0+/, ''); return s || '0'; }
+
+/* Owned numbers per "<lang>:<setId>", skipping archived (sold) cards. */
+function setsOwnedMap() {
+  const owned = {};
+  for (const c of State.cards) {
+    if (c.game !== 'Pokémon' || !c.setId || c.number == null) continue;
+    if (uget(c).archived) continue;
+    (owned[`${c.lang}:${c.setId}`] = owned[`${c.lang}:${c.setId}`] || []).push(setsNumKey(c.number));
+  }
+  return owned;
+}
+
+/* Cards counted in the current mode: master = everything incl. secret rares,
+   official = the numbered base set only (TCGdex's `official` count). */
+function setsScoped(s) {
+  return setsMode() === 'master' ? s.cards : s.cards.filter(c => !c.sp);
+}
+
+async function renderSets() {
+  const el = $('#view-sets');
+  const mode = setsMode();
+  if (SETS.data === null && !SETS.loading) {
+    SETS.loading = true;
+    el.innerHTML = '<div class="panel" style="margin-top:20px"><p class="muted">Reading your sets from the card codex…</p></div>';
+    try {
+      const j = await (await fetch('/api/codex/completion', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ owned: setsOwnedMap() }),
+      })).json();
+      SETS.data = j.ok ? (j.sets || []) : [];
+      SETS.error = j.ok ? null : (j.error || 'could not read the codex');
+    } catch (e) { SETS.data = []; SETS.error = e.message; }
+    SETS.loading = false;
+  }
+  if (SETS.loading) return;
+
+  const sets = SETS.data || [];
+  const untracked = State.cards.filter(c => c.game === 'Pokémon' && !c.setId && !uget(c).archived).length;
+  const nonPk = State.cards.filter(c => c.game !== 'Pokémon' && !uget(c).archived).length;
+  const partialCount = sets.filter(s => s.partial).length;
+
+  const rows = sets.map(s => {
+    const scoped = setsScoped(s);
+    // Partial sets (codex has the set but not its card list): fall back to the
+    // raw owned-number count so the set still shows real progress.
+    const have = s.partial ? (s.ownedCount || 0) : scoped.filter(c => c.own).length;
+    const denom = mode === 'master' ? (s.total || scoped.length) : (s.official || scoped.length);
+    const pct = denom ? Math.min(100, Math.round(have / denom * 1000) / 10) : 0;
+    const missing = scoped.filter(c => !c.own);
+    const cost = loadJSON(LS_SETCOST, {})[s.key];
+    const done = have >= denom && denom > 0;
+    return `<div class="panel set-panel" data-key="${esc(s.key)}">
+      <div class="set-head">
+        <div><b>${esc(s.name)}</b> <span class="reason">${s.lang === 'ja' ? '🇯🇵 JP' : '🇺🇸 EN'}${s.year ? ' · ' + s.year : ''} · ${esc(s.id)}</span></div>
+        <div class="set-count ${done ? 'set-done' : ''}">${have} / ${denom}${done ? ' ✓' : ''}</div>
+      </div>
+      <div class="set-prog"><div class="set-prog-bar" style="width:${pct}%"></div></div>
+      <div class="reason set-sub">${pct}% complete · ${missing.length} missing${cost && cost.total != null ? ` · cost to finish ≈ <b style="color:var(--gold)">${money(cost.total)}</b>` : ''}</div>
+      ${s.partial ? `<p class="reason">⚠️ The codex has this set but not its card list, so progress is counted from your own card numbers and the missing cards can't be listed. Rebuild with <code>scripts/build_codex.py</code> to fill it in.</p>`
+      : missing.length ? `<details class="set-missing" ${SETS.open[s.key] ? 'open' : ''} data-key="${esc(s.key)}">
+        <summary class="reason">Show the ${missing.length} missing card${missing.length === 1 ? '' : 's'}</summary>
+        <div class="set-misslist">${missing.map(c => `<div class="set-missrow"><span>#${esc(c.n)} ${esc(c.name)}${c.sp ? ' <span class="chip gold" style="font-size:9px">secret</span>' : ''}</span>${cost && cost.prices && cost.prices[setsNumKey(c.n)] != null ? `<b>${money(cost.prices[setsNumKey(c.n)])}</b>` : ''}</div>`).join('')}</div>
+        ${State.live && State.live.priceCharting
+          ? `<button class="btn sm set-price" data-key="${esc(s.key)}">💰 Price the gaps${missing.length > 40 ? ' (first 40)' : ''}</button>
+             <span class="reason set-pstat" data-key="${esc(s.key)}"></span>`
+          : `<p class="reason">Add a PriceCharting token in ⚙ Live to price the gaps and get a cost-to-complete.</p>`}
+      </details>` : '<p class="reason">Complete — nothing missing in this view.</p>'}
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="section-head"><div><h2>🧩 Sets</h2>
+      <div class="sub">Every set you own, measured against its real size — what's missing, and what it costs to finish. Runs off the bundled card codex, so it works with no API key and no internet.</div></div>
+      <div class="rv-row">
+        <button class="btn sm ${mode === 'official' ? 'primary' : ''}" id="set-m-official">Official set</button>
+        <button class="btn sm ${mode === 'master' ? 'primary' : ''}" id="set-m-master">Master set</button>
+      </div></div>
+    ${SETS.error ? `<div class="panel"><p class="muted">✕ ${esc(SETS.error)}</p></div>` : ''}
+    ${sets.length ? `<div class="kpis">
+      ${(() => {
+        const tot = sets.reduce((a, s) => { const sc = setsScoped(s); return a + (setsMode() === 'master' ? (s.total || sc.length) : (s.official || sc.length)); }, 0);
+        const owncount = s => s.partial ? (s.ownedCount || 0) : setsScoped(s).filter(c => c.own).length;
+        const have = sets.reduce((a, s) => a + owncount(s), 0);
+        const finished = sets.filter(s => { const sc = setsScoped(s); const d = setsMode() === 'master' ? (s.total || sc.length) : (s.official || sc.length); return d > 0 && owncount(s) >= d; }).length;
+        const kpi = (l, v, sub, cls) => `<div class="kpi ${cls || ''}"><div class="k-label">${l}</div><div class="k-value">${v}</div><div class="k-sub">${sub}</div></div>`;
+        return kpi('Sets tracked', sets.length.toLocaleString(), 'from your collection', 'k-blue')
+          + kpi('Cards owned', have.toLocaleString(), `of ${tot.toLocaleString()} in ${setsMode() === 'master' ? 'master' : 'official'} scope`, 'k-gold')
+          + kpi('Sets completed', finished.toLocaleString(), 'nothing missing', finished ? 'k-green' : '')
+          + kpi('Overall', tot ? (Math.round(have / tot * 1000) / 10) + '%' : '—', 'across every tracked set', 'k-green');
+      })()}
+    </div>` : ''}
+    ${rows || (SETS.error ? '' : '<div class="panel"><p class="muted">No Pokémon sets matched the codex yet.</p></div>')}
+    ${(untracked || nonPk || partialCount) ? `<p class="reason" style="margin-top:12px">Not fully tracked: ${untracked.toLocaleString()} Pokémon card${untracked === 1 ? '' : 's'} without a set id (promos and one-offs)${nonPk ? ` · ${nonPk.toLocaleString()} non-Pokémon card${nonPk === 1 ? '' : 's'}` : ''}${partialCount ? ` · ${partialCount} set${partialCount === 1 ? '' : 's'} the codex has no card list for (progress counted, missing cards not listable)` : ''}.</p>` : ''}`;
+
+  $('#set-m-official').onclick = () => { localStorage.setItem(LS_SETMODE, 'official'); renderSets(); };
+  $('#set-m-master').onclick = () => { localStorage.setItem(LS_SETMODE, 'master'); renderSets(); };
+  $$('.set-missing', el).forEach(d => d.ontoggle = () => { SETS.open[d.dataset.key] = d.open; });
+  $$('.set-price', el).forEach(b => b.onclick = () => setsPriceGaps(b.dataset.key));
+}
+
+/* Cost-to-complete: look each missing card up through the (cache-backed)
+   PriceCharting catalog search, paced 400 ms apart to stay friendly to their
+   rate limits, and capped at 40 cards per run so a 200-card gap can't spin
+   for two minutes. Results persist so you only pay the wait once. */
+async function setsPriceGaps(key) {
+  const s = (SETS.data || []).find(x => x.key === key); if (!s) return;
+  const stat = $(`.set-pstat[data-key="${key}"]`);
+  const missing = setsScoped(s).filter(c => !c.own).slice(0, 40);
+  const prices = {};
+  let total = 0, found = 0;
+  for (let i = 0; i < missing.length; i++) {
+    const c = missing[i];
+    if (stat) stat.textContent = `Pricing ${i + 1}/${missing.length}…`;
+    const q = `pokemon ${s.lang === 'ja' ? 'japanese ' : ''}${s.name} ${c.name} #${c.n}`;
+    try {
+      const j = await (await fetch('/api/pc/search?q=' + enc(q), { cache: 'no-store' })).json();
+      const p = j.ok && j.products && j.products[0] ? j.products[0].price : null;
+      prices[setsNumKey(c.n)] = p;
+      if (p != null) { total += p; found++; }
+    } catch (e) { prices[setsNumKey(c.n)] = null; }
+    if (i < missing.length - 1) await new Promise(r => setTimeout(r, 400));
+  }
+  const all = loadJSON(LS_SETCOST, {});
+  all[key] = { date: new Date().toISOString().slice(0, 10), prices, total: Math.round(total * 100) / 100 };
+  localStorage.setItem(LS_SETCOST, JSON.stringify(all));
+  if (stat) stat.textContent = `Priced ${found}/${missing.length} · ≈ ${money(total)}`;
+  renderSets();
+}
+
+/* ============================================================
+   📋 FEATURE PARITY — the living build tracker.
+   Renders data/parity.json: the canonical, machine-readable ledger
+   of every feature (shipped / partial / planned / blocked) with
+   executable specs, acceptance criteria and file pointers, plus a
+   competitor parity matrix. Agents & future sessions: data/parity.json
+   is the source of truth — update item statuses there when you ship.
+   ============================================================ */
+const PAR = { area: 'all', status: 'all', open: {} };
+const PAR_STATUS = {
+  shipped: { label: 'Shipped', icon: '✅', color: 'var(--green)' },
+  partial: { label: 'Partial', icon: '🟡', color: 'var(--gold)' },
+  planned: { label: 'Planned', icon: '🔵', color: 'var(--accent)' },
+  blocked: { label: 'Blocked', icon: '⛔', color: 'var(--red)' },
+};
+const PAR_AREAS = {
+  capture: '📷 Capture', market: '💰 Market', collection: '🗂 Collection',
+  den3d: '🏠 Den & 3D', platform: '⚙️ Platform', publish: '🚀 Publish',
+};
+
+async function renderParity() {
+  const el = $('#view-parity');
+  const p = await rvData('parity');
+  if (!p || !p.items) {
+    el.innerHTML = '<div class="panel" style="margin-top:20px"><p class="muted">data/parity.json missing — pull the latest app files.</p></div>';
+    return;
+  }
+  const items = p.items;
+  const counts = { shipped: 0, partial: 0, planned: 0, blocked: 0 };
+  items.forEach(i => { if (counts[i.status] != null) counts[i.status]++; });
+  const done = counts.shipped + counts.partial * 0.5;
+  const pct = Math.round(done / Math.max(1, items.length) * 100);
+  const shown = items.filter(i =>
+    (PAR.area === 'all' || i.area === PAR.area) && (PAR.status === 'all' || i.status === PAR.status));
+  const prioOrder = { P0: 0, P1: 1, P2: 2, P3: 3 };
+  const statusOrder = { partial: 0, planned: 1, blocked: 2, shipped: 3 };
+  shown.sort((a, b) => (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9)
+    || (prioOrder[a.priority] ?? 9) - (prioOrder[b.priority] ?? 9) || a.title.localeCompare(b.title));
+
+  const chip = (key, val, label, cur) =>
+    `<button class="pr-chip ${cur === val ? 'on' : ''}" data-k="${key}" data-v="${val}">${label}</button>`;
+  const kpi = (label, v, sub, cls) => `<div class="kpi ${cls || ''}"><div class="k-label">${label}</div><div class="k-value">${v}</div><div class="k-sub">${sub}</div></div>`;
+
+  const itemCard = i => {
+    const st = PAR_STATUS[i.status] || PAR_STATUS.planned;
+    const open = !!PAR.open[i.id];
+    return `<div class="pr-item ${open ? 'open' : ''}" data-id="${esc(i.id)}">
+      <button class="pr-head" data-id="${esc(i.id)}">
+        <span class="pr-st" style="color:${st.color}" title="${st.label}">${st.icon}</span>
+        <span class="pr-ico">${i.icon || '▫️'}</span>
+        <span class="pr-title">${esc(i.title)}</span>
+        <span class="pr-badges">
+          <i class="pr-b">${esc(PAR_AREAS[i.area] || i.area)}</i>
+          <i class="pr-b pr-${esc(i.priority)}">${esc(i.priority)}</i>
+          <i class="pr-b">${esc(i.est)}</i>
+          ${i.demand === 'high' ? '<i class="pr-b pr-hot">🔥 high demand</i>' : ''}
+        </span>
+        <span class="pr-caret">${open ? '▾' : '▸'}</span>
+      </button>
+      ${open ? `<div class="pr-body">
+        <p>${esc(i.spec)}</p>
+        <p class="reason"><b>Where:</b> ${esc(i.ux)}</p>
+        <div class="pr-files">${(i.files || []).map(f => `<code>${esc(f)}</code>`).join(' ')}</div>
+        <div class="pr-acc"><b>Acceptance</b><ul class="rv-ul">${(i.acceptance || []).map(a => `<li>${esc(a)}</li>`).join('')}</ul></div>
+        <p class="reason"><b>Verify:</b> ${esc(i.verify)}</p>
+        ${(i.dependsOn || []).length ? `<p class="reason"><b>Depends on:</b> ${i.dependsOn.map(esc).join(', ')}</p>` : ''}
+        ${i.notes ? `<p class="reason"><b>Notes:</b> ${esc(i.notes)}</p>` : ''}
+        <div class="rv-row" style="margin-top:8px">
+          <button class="btn sm primary pr-wo" data-id="${esc(i.id)}">📋 Copy work order</button>
+          <span class="reason">a complete, self-contained task prompt — paste it into any future Claude session (any model) to build or maintain this.</span>
+        </div>
+      </div>` : ''}
+    </div>`;
+  };
+
+  const m = p.matrix;
+  const usDot = v => v === 'shipped' ? '🟢' : v === 'partial' ? '🟡' : v === 'planned' ? '🔵' : '—';
+  const matrixHTML = m && m.rows ? `
+    <div class="panel" style="margin-top:16px"><h3>⚔️ Competitor parity matrix <span class="hint">🟢 shipped · 🟡 partial · 🔵 planned · — none · ✓ competitor has it (est.)</span></h3>
+    <div class="rv-tablewrap"><table class="rv-table pr-matrix">
+      <thead><tr><th>Feature</th><th>Us</th>${m.competitors.map(c => `<th title="${esc(c.note)}">${esc(c.name)}</th>`).join('')}</tr></thead>
+      <tbody>${m.rows.map(r => `<tr>
+        <td>${esc(r.label)}</td><td style="text-align:center">${usDot(r.us)}</td>
+        ${m.competitors.map(c => `<td style="text-align:center">${(r.have || []).includes(c.key) ? '✓' : ''}</td>`).join('')}
+      </tr>`).join('')}</tbody>
+    </table></div></div>` : '';
+
+  el.innerHTML = `
+  <div class="section-head"><div><h2>📋 Feature Parity</h2>
+    <div class="sub">The living build tracker — every feature's status, spec, and acceptance criteria, machine-readable in <code>data/parity.json</code> so any future session (any model) can pick up exactly where this left off.</div></div>
+    <span class="reason">updated ${esc(p.updated || '—')}</span></div>
+  <div class="kpis">
+    ${kpi('Build completion', pct + '%', `${counts.shipped} shipped · ${counts.partial} partial of ${items.length} tracked`, 'k-gold')}
+    ${kpi('Shipped', counts.shipped, 'working today, verified', 'k-green')}
+    ${kpi('Planned', counts.planned, 'specs ready to implement', 'k-blue')}
+    ${kpi('Blocked', counts.blocked, 'waiting on a decision — see roadmap questions', counts.blocked ? '' : 'k-green')}
+  </div>
+  <div class="pr-filters">
+    ${chip('status', 'all', 'All statuses', PAR.status)}
+    ${Object.entries(PAR_STATUS).map(([v, s]) => chip('status', v, s.icon + ' ' + s.label, PAR.status)).join('')}
+    <span class="dot">·</span>
+    ${chip('area', 'all', 'All areas', PAR.area)}
+    ${Object.entries(PAR_AREAS).map(([v, l]) => chip('area', v, l, PAR.area)).join('')}
+  </div>
+  <div class="pr-list">${shown.map(itemCard).join('') || '<p class="reason" style="padding:10px">Nothing matches this filter.</p>'}</div>
+  ${matrixHTML}
+  <p class="reason" style="margin-top:12px">🤖 <b>For agents &amp; future sessions:</b> <code>data/parity.json</code> is the canonical ledger. When you ship an item: set its status, append "✅ YYYY-MM-DD" to notes, bump "updated", verify headless, commit, push. Work orders below each item carry the full contract.</p>`;
+
+  $$('.pr-chip', el).forEach(b => b.onclick = () => { PAR[b.dataset.k] = b.dataset.v; renderParity(); });
+  $$('.pr-head', el).forEach(b => b.onclick = () => { PAR.open[b.dataset.id] = !PAR.open[b.dataset.id]; renderParity(); });
+  $$('.pr-wo', el).forEach(b => b.onclick = async () => {
+    const i = items.find(x => x.id === b.dataset.id);
+    const wo = parityWorkOrder(i);
+    try { await navigator.clipboard.writeText(wo); toast('Work order copied — paste it into any Claude session.'); }
+    catch { toast('Clipboard blocked — the work order was logged to the console.'); console.log(wo); }
+  });
+}
+
+function parityWorkOrder(i) {
+  return `WORK ORDER — ${i.title} (${i.id})
+Project: Pokémon Den · repo Sparkey333/pokemon-chest · branch claude/pokemon-chest-redesign-31io2c
+Current status: ${i.status} · priority ${i.priority} · size ${i.est} · area ${i.area}
+
+SPEC (implement exactly this; no other context needed):
+${i.spec}
+
+WHERE IT LIVES: ${i.ux}
+FILES: ${(i.files || []).join(', ')}
+${(i.dependsOn || []).length ? 'DEPENDS ON (check these ledger items first): ' + i.dependsOn.join(', ') + '\n' : ''}
+ACCEPTANCE CRITERIA (all must pass):
+${(i.acceptance || []).map((a, n) => `${n + 1}. ${a}`).join('\n')}
+
+VERIFY: ${i.verify}
+Standard verification: run POKECHEST_HOME=<scratch> python3 server.py, drive http://127.0.0.1:8787 headless with playwright-core (chromium at /opt/pw-browsers), assert zero JS pageerrors across all tabs.
+
+WHEN DONE: in data/parity.json set this item's status to "shipped", append "✅ <date>" to its notes, bump the top-level "updated" date; commit with a clear message; push to the branch (never merge PR #1 without Brandon's approval). Internal storage keys (pokechest.*) and the bundle identifier must never change.${i.notes ? '\n\nNOTES: ' + i.notes : ''}`;
+}

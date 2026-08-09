@@ -1,0 +1,120 @@
+{
+  "about": "Powers the 🏷 Brand Lab tab: a real brand build-out plus packaging product lines that turn millions of spare bulk cards into products people actually want. Everything marked (est.) needs verifying before you print money on it.",
+  "updated": "2026-07-18",
+
+  "brand": {
+    "positioning": "A collector-run treasure brand out of Colorado Springs: every pack, chest, and display is hand-pulled from a real collection — not pallet bulk — with honest odds and museum-grade presentation.",
+    "nameCandidates": [
+      { "name": "Pokémon Chest Co.",   "why": "Matches the app — but 'Pokémon' in a business name is a trademark problem. Use only as the app's private name.", "risk": "high" },
+      { "name": "The Card Chest",      "why": "Keeps the chest identity, IP-safe, works beyond Pokémon (you already hold YuGiOh/Magic/sports).", "risk": "low" },
+      { "name": "Springs Card Vault",  "why": "Local Colorado Springs identity — strong for FB Marketplace and card-show tables.", "risk": "low" },
+      { "name": "Treasure Grade",      "why": "Nods to your grading pipeline and 'treasure' theme; clean logo potential.", "risk": "low" },
+      { "name": "Chestbound",          "why": "One word, ownable, .com likely available (verify).", "risk": "low" }
+    ],
+    "taglines": [
+      "Every pack is a real pull.",
+      "From one collector's chest to yours.",
+      "Opened, sorted, treasured — never pallet bulk."
+    ],
+    "voice": "Honest collector-to-collector. Show the sorting, show the odds, show the room. No 'guaranteed hit' hype — transparency IS the brand.",
+    "colorSystem": [
+      { "name": "Chest Gold",   "hex": "#ffce4d", "use": "Logo, premium tier, foil accents" },
+      { "name": "Deep Vault",   "hex": "#0a0e16", "use": "Backgrounds, boxes, labels" },
+      { "name": "Signal Blue",  "hex": "#4cc2ff", "use": "Accents, links, QR frames" },
+      { "name": "Emerald Pull", "hex": "#3ad6a0", "use": "'Verified pull' badge, success states" }
+    ],
+    "logoPrompts": [
+      "Minimal flat vector logo, a golden treasure chest with a single card silhouette rising from it, dark navy background, gold and cyan palette, no text, no existing characters",
+      "Vintage wax-seal style emblem, ornate chest keyhole motif, single-color gold on black, engraved line style, circular badge, original design",
+      "Modern geometric monogram combining a 'C' and a chest lid opening, flat design, gold gradient on deep navy, app-icon ready"
+    ]
+  },
+
+  "ipSafety": {
+    "title": "Read me before printing anything",
+    "rules": [
+      "Selling GENUINE cards you own is protected resale (first-sale doctrine) — singles, lots, and repacks of real cards are fine to sell.",
+      "Never print Pokémon/Nintendo artwork, characters, logos, or the word 'Pokémon' on your packaging, brand, or 3D prints you sell. Your brand must stand on its own art.",
+      "'Compatible with trading cards' / 'fits standard 63×88mm cards' is the safe way to describe accessories and prints.",
+      "Repacks: disclose exactly what buyers get (card count, odds basis, era mix). eBay and Whatnot both require repack transparency and can ban 'gambling-style' listings — check each venue's current policy before launch. (est.)",
+      "AI-generated art for YOUR packaging must be original — prompt for original creatures/motifs, never 'in the style of' or named characters.",
+      "Don't sell 3D prints of slabs or anything that could pass as grading-company gear; stands, frames, and chests of your own design are fine."
+    ]
+  },
+
+  "packagingLines": [
+    {
+      "name": "Era Vault Packs", "icon": "🕰️", "tier": "core",
+      "what": "12 real cards from one era (WOTC / EX / DPPt / SWSH / SV), sleeved, in a branded tuck box with an era label and pull-date stamp.",
+      "uses": "The mid-bulk mountain — commons/uncommons with era identity",
+      "pricePoint": "$8–$15", "unitCost": "~$1.20 box + sleeves (est.)",
+      "standout": "QR on the box opens a page showing the exact sorting session it came from — provenance nobody else offers."
+    },
+    {
+      "name": "The Mystery Chest", "icon": "🧰", "tier": "hero",
+      "what": "3D-printed mini treasure chest (your own design from 3D Studio) holding 20 cards + one guaranteed $10+ card, odds sheet printed inside the lid.",
+      "uses": "Bulk + one sweet-spot card per unit as the 'hit'",
+      "pricePoint": "$25–$40", "unitCost": "~$4–6 print + cards (est.)",
+      "standout": "The chest IS the product — buyers keep it as a display box. Reprintable in team colors for events."
+    },
+    {
+      "name": "Frame-Ready Sets", "icon": "🖼️", "tier": "premium",
+      "what": "9 thematically matched cards (an evolution line, a type rainbow) mounted in a 3×3 display frame with a printed nameplate.",
+      "uses": "Pretty-but-cheap holos and reverse holos",
+      "pricePoint": "$35–$60", "unitCost": "~$8 frame + mount (est.)",
+      "standout": "Sold as wall art to non-collectors — a market your competitors ignore. Etsy-friendly."
+    },
+    {
+      "name": "Party Chest Favors", "icon": "🎉", "tier": "volume",
+      "what": "10-pack of kid-friendly cards in a small branded sleeve, sold in bundles of 8/12 for birthday parties.",
+      "uses": "The deepest bulk — commons with cool art, zero market value",
+      "pricePoint": "$20–$30 per bundle", "unitCost": "pennies + sleeves",
+      "standout": "Parents on FB Marketplace buy these repeatedly — subscription potential ('party box of the month')."
+    },
+    {
+      "name": "Binder Starter Kits", "icon": "📒", "tier": "core",
+      "what": "A 4-pocket binder + 50 curated cards (one era or one type), a checklist, and a 'how to collect' card written by you.",
+      "uses": "Mixed bulk with a few shinies to hook new collectors",
+      "pricePoint": "$25–$35", "unitCost": "~$9 binder + pages (est.)",
+      "standout": "The on-ramp product — every kid you convert becomes a repeat singles buyer."
+    },
+    {
+      "name": "Slab & Stand Bundles", "icon": "🏆", "tier": "premium",
+      "what": "A graded card sold WITH a custom 3D-printed stand (STL from the 3D Studio tab) and a printed spec card of its pop report.",
+      "uses": "Your graded inventory + the 3D print pipeline",
+      "pricePoint": "slab price + $8–$12", "unitCost": "~$1.50 print (est.)",
+      "standout": "Raises perceived value of every slab; the stand carries your logo into buyers' display shelves."
+    }
+  ],
+
+  "artPipeline": {
+    "title": "Generating the brand's art (original, sellable)",
+    "steps": [
+      "Lock one logo from the prompts above (⚙ Live key → generate in your AI tool of choice, or commission from the prompt)",
+      "Build a repeating 'treasure pattern' (chests, keys, compasses, gems — original motifs) for box wraps and sleeves",
+      "Export print files: tuck boxes and sleeves need 300 DPI CMYK with 3mm bleed (est.) — online box printers list dielines per size",
+      "Order a short sample run (25–50 boxes) before any bulk print",
+      "Version everything — put a tiny batch code on each box so you can trace which design sells"
+    ],
+    "printCategories": [
+      { "item": "Tuck boxes (12-card)", "vendorType": "Custom box printers (short-run)", "cost": "$0.60–$1.50/unit at 100+ (est.)" },
+      { "item": "Sticker seals + logo labels", "vendorType": "Sticker printers", "cost": "$0.05–$0.15/unit (est.)" },
+      { "item": "3D prints (chests, stands, frames)", "vendorType": "Your printer — STLs from the 3D Studio tab", "cost": "filament ~$0.02/g" },
+      { "item": "Odds/provenance inserts", "vendorType": "Any online print shop", "cost": "$0.03–$0.08/unit (est.)" }
+    ]
+  },
+
+  "standout": [
+    { "icon": "🛰️", "idea": "Provenance QR — every product links to its real sorting session photo (shot in 📷 Scanner). Nobody in repacks does verifiable provenance." },
+    { "icon": "🏠", "idea": "Den tours — a 60-second video walk of your 3D Den room with the week's inventory on the shelves, posted before each live show." },
+    { "icon": "🔨", "idea": "Chest Night — a weekly live auction stream where one Mystery Chest on the shelf gets cracked at every $500 in sales." },
+    { "icon": "🖨️", "idea": "Local card-shop consignment of Frame-Ready Sets and Party Chests — Colorado Springs shops take 20–30% but move volume (est.)." },
+    { "icon": "📈", "idea": "Publish your sell-through numbers monthly — radical transparency content nobody else posts, and it feeds the YouTube channel." }
+  ],
+
+  "roadmap": [
+    { "phase": "Now (weeks 1–2)", "items": ["Pick the brand name + lock the logo", "Sort bulk into era boxes while watching TV — 30 min/day", "Apply for Whatnot seller approval"] },
+    { "phase": "Build (weeks 3–6)", "items": ["Sample run: 50 Era Vault boxes + 10 Mystery Chest prints", "Shoot product photos in 📷 Scanner", "List first batch on eBay + FB; note sell-through per line"] },
+    { "phase": "Scale (months 2–4)", "items": ["Double down on the best-selling line only", "Start Chest Night weekly live", "Etsy storefront for Frame-Ready Sets", "Consider LLC + resale license once revenue is steady (see Game Plan tab)"] }
+  ]
+}

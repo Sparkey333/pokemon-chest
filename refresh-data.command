@@ -1,5 +1,5 @@
 #!/bin/bash
-# ── Pokémon Chest data refresh (fallback) ────────────────────────────
+# ── Pokémon Den data refresh (fallback) ────────────────────────────
 # NOTE: the ↻ Refresh button inside the app now does this same rebuild for
 # you — this script is the Terminal fallback if the app isn't running.
 # 1. Export a fresh collection from PriceCharting.com (Collection → Download).
@@ -27,6 +27,6 @@ echo "Refreshing the iPhone Pocket Edition…"
 "$PY" scripts/build_pocket.py
 
 echo ""
-echo "✅ Done. Reload Pokémon Chest (or just use the in-app ↻ Refresh next time)."
-echo "   📱 'Pokémon Chest — Pocket.html' is updated — AirDrop it to your iPhone."
+echo "✅ Done. Reload Pokémon Den (or just use the in-app ↻ Refresh next time)."
+echo "   📱 'Pokémon Den — Pocket.html' is updated — AirDrop it to your iPhone."
 read -r -p "Press Enter to close."

@@ -1,6 +1,6 @@
 # GradeStage — 3D-printed card imaging & pre-grading rig
 
-© 2026 DarkHearts · companion hardware for **Pokémon Chest** (Grade Lab tab)
+© 2026 DarkHearts · companion hardware for **Pokémon Den** (Grade Lab tab)
 
 Photograph cards the way a PSA grader sees them: a fixed stage with **20° raking
 light** (exposes print lines and holo scratches — the 10-killers), **45° even
