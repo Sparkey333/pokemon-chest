@@ -81,15 +81,32 @@ reps = [
 # this idempotent, as the header above promises.
 SENTINEL = "\u0000RENAMED\u0000"
 
-def apply(text):
+import unicodedata
+def _fold(s):
+    """Transliterate accents away: 'Pokémon DenZ' -> 'Pokemon DenZ'.
+    NOT encode('ascii','ignore'), which DROPS the é and yields 'Pokmon'."""
+    return "".join(c for c in unicodedata.normalize("NFKD", s)
+                   if not unicodedata.combining(c)).encode("ascii", "ignore").decode()
+
+ASCII_NEW = _fold(new) or new
+
+def apply(text, path=None):
+    # tauri.conf.json's productName becomes the .app and .dmg filename, and
+    # GitHub strips non-ASCII from release asset names on upload — which
+    # desyncs SHA256SUMS.txt from the file people actually download and makes
+    # the `shasum -a 256 -c` line in the release notes fail. Keep it ASCII.
+    if path == "src-tauri/tauri.conf.json":
+        text = text.replace(f'"productName": "{new}"', f'"productName": "{ASCII_NEW}"')
+        text = text.replace('"productName": "' + ASCII_NEW + '"', SENTINEL + "N")
     text = text.replace(span, SENTINEL + "S")
     text = text.replace(_enc(new), SENTINEL + "E")
     text = text.replace(new, SENTINEL + "P")
     for a, b in reps:
         text = text.replace(a, b)
-    text = text.replace(SENTINEL + "S", span)
-    text = text.replace(SENTINEL + "E", _enc(new))
     text = text.replace(SENTINEL + "P", new)
+    text = text.replace(SENTINEL + "E", _enc(new))
+    text = text.replace(SENTINEL + "S", span)
+    text = text.replace(SENTINEL + "N", '"productName": "' + ASCII_NEW + '"')
     return text
 
 changed = 0
@@ -97,7 +114,7 @@ for f in files:
     if not os.path.isfile(f):
         continue
     orig = open(f, encoding="utf-8").read()
-    s = apply(orig)
+    s = apply(orig, f)
     if s != orig:
         open(f, "w", encoding="utf-8").write(s)
         changed += 1
