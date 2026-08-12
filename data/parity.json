@@ -1809,6 +1809,93 @@
       "dependsOn": [],
       "demand": "high",
       "notes": "✅ 2026-08-12 (bug-fix + hardening pass; the feature itself shipped in v2.2.0). Complements the PWA rather than replacing it: the PWA needs the Mac awake on the same Wi-Fi because server.py serves it, whereas Pocket is just a file you AirDrop. Read-only on purpose — making it writable would create a second source of truth to reconcile. 1.8 MB for 1,291 cards, most of it the inlined icon and the precomputed comp URLs."
+    },
+    {
+      "id": "unified-product-line",
+      "title": "Unified product line — Den + Chest as one app (DenZ)",
+      "icon": "🔗",
+      "area": "platform",
+      "status": "shipped",
+      "priority": "P0",
+      "spec": "The repo had forked into two shipping lines: Den 2.4.0 (19 tabs, Sets, Trade, alerts, per-card history, PWA, a11y, VR) publishing to dmg-latest, and Chest 1.16.0 (Today board, multi-game, Plinko, buy/watch, tab overflow) publishing to chest-latest. Each had features the other lacked. A plain `git merge` was NOT viable: the Chest lineage had dropped the Den features relative to the merge base, so git read them as deletions and silently removed 23 functions from app.js and 26 from server.py behind a single version-line conflict. app.js and server.py were therefore rebuilt from the Den side and the Chest additions spliced in, together with the 4 module-level declarations those functions close over (GAME_META, LS_BUYS, LS_DATA_TOUCH, _tabMoreDocWired) — omitting those threw at boot and replaced the whole app with the error panel. renderArcade was replaced wholesale by the Chest version, being a strict evolution. The tab strip became Chest's 9 primary + 10-item overflow menu. dmg-latest is now the single release.",
+      "ux": "One app. Today board and multi-game from the Chest line; Sets, Trade, alerts, history, PWA, VR from the Den line; every view reachable from a 9-tab strip plus a More menu.",
+      "files": [
+        "assets/app.js",
+        "server.py",
+        "index.html",
+        ".github/workflows/build-dmg.yml",
+        "scripts/rename.sh"
+      ],
+      "acceptance": [
+        "assets/app.js contains every function from BOTH lineages (assert missing == none in both directions).",
+        "server.py contains every def from the Den lineage and Chest's codex surfaces.",
+        "App boots with no error panel and zero page errors across all 19 tabs.",
+        "Chest features live: vault hero, next steps, game bars (detects 5 games), Plinko board, overflow menu with 10 entries.",
+        "Den features live: price alerts, per-card history, snapKey, error log, qty adjust, ship/publicArt flags, About, first-run, Sets, Trade, VR.",
+        "No storage key or bundle identifier changed."
+      ],
+      "verify": "scratchpad/verify-unified.js (27 checks) + verify-ship.js (38) + verify-trade.js (21), all green 2026-08-12.",
+      "est": "L",
+      "dependsOn": [],
+      "demand": "high",
+      "notes": "✅ 2026-08-12. The coverage assertion over both lineages is the load-bearing part of this — the silent-deletion failure mode produced only one visible conflict and would otherwise have shipped. Keep that assertion in any future cross-line merge."
+    },
+    {
+      "id": "ship-name-denz",
+      "title": "Ship name applied — Pokémon DenZ / DenZ",
+      "icon": "🏷️",
+      "area": "publish",
+      "status": "shipped",
+      "priority": "P0",
+      "spec": "bash scripts/rename.sh \"Pokémon DenZ\" across 16 files; tauri productName kept ASCII (\"Pokemon DenZ\") because it becomes the .app and .dmg filename. Store-facing name is DenZ with no \"Pokémon\" in it. Two real bugs in the rename tool were fixed doing this: (1) it could not see percent-encoded names, so the Admin \"Open Pocket Edition\" href kept 404-ing after every rename — it now rewrites the encoded form too; (2) it was not idempotent when the new name CONTAINS the old (\"Den\" -> \"DenZ\" produced DenZZ, then DenZZZ), despite its header claiming idempotence — existing occurrences are now parked behind a sentinel during replacement.",
+      "ux": "App, window, DMG, launchers and docs all read Pokémon DenZ. Store listings read DenZ.",
+      "files": [
+        "scripts/rename.sh",
+        "index.html",
+        "assets/app.js",
+        "server.py",
+        "package.json",
+        "src-tauri/tauri.conf.json",
+        "README.md",
+        "LEGAL.md"
+      ],
+      "acceptance": [
+        "No 'Pokemon Den' / 'Pokémon Den' literal remains outside the strategy docs.",
+        "A second rename run reports 0 files changed (idempotent).",
+        "POCKET_NAME in server.py and the percent-encoded href in app.js resolve to the same URL.",
+        "Storage keys (pokechest.*), bundle id and env vars are unchanged."
+      ],
+      "verify": "Run rename.sh twice and assert 0 files changed on the second; compare quote(POCKET_NAME) against the app.js href; grep for internal ids.",
+      "est": "S",
+      "dependsOn": [],
+      "demand": "high",
+      "notes": "✅ 2026-08-12. Brandon chose DenZ. Working build keeps the Pokémon prefix; anything store-facing must not — see BUSINESS-WARGAME.md §1."
+    },
+    {
+      "id": "business-wargame",
+      "title": "Business wargame — SEO, pricing, launch, marketing",
+      "icon": "📈",
+      "area": "publish",
+      "status": "shipped",
+      "priority": "P1",
+      "spec": "BUSINESS-WARGAME.md: positioning (sells decisions, not prices; local-first as the structural moat), a competitor read against Collectr/CollX/PriceCharting/Dex/PullVault/Slabfy with the honest weakness stated (desktop-first in a mobile-first hobby), a two-tier SEO plan (high-intent calculator pages, then 395 set pages generated from the bundled codex), pricing (one-time $29 direct-first, with the reasoning for rejecting subscription and freemium), revenue scenarios at 100/1k/5k units, a pre-launch test plan that validates demand before any build, a 6-phase launch sequence gated on real blockers, and a named risk list (IP exposure on paid fan tools, PriceCharting terms, Apple review on the bundled server, the mobile gap, single maintainer).",
+      "ux": "Not user-facing — the plan behind shipping.",
+      "files": [
+        "BUSINESS-WARGAME.md"
+      ],
+      "acceptance": [
+        "Names a specific price with reasoning, not a range.",
+        "SEO plan is buildable from data already in the repo (the codex).",
+        "Launch phases are gated on real blockers, not dates.",
+        "Risks are stated as decisions with mitigations, including the IP exposure of charging for a fan tool."
+      ],
+      "verify": "Editorial — read it and argue with it.",
+      "est": "M",
+      "dependsOn": [
+        "ship-name-denz"
+      ],
+      "demand": "high",
+      "notes": "✅ 2026-08-12. Headline: $29 one-time, sold direct first (5% fees) with the Mac App Store as discovery (30%), discovered through grading-calculator SEO and the 3D Den on video. The riskiest untested assumption is demand, not code — §5 tests it before any further build."
     }
   ],
   "matrix": {

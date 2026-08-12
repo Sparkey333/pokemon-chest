@@ -1,7 +1,9 @@
-# Pokémon Den → a publishable app: the roadmap
+# DenZ → a publishable app: the roadmap
 
-Working name **Pokémon Den** (personal build). This doc holds the strategy:
-naming, store paths, and the open questions that need Brandon's answers.
+Working name **Pokémon DenZ** (personal build); ship name **DenZ**. This doc
+holds the strategy: naming, store paths, and the open questions that need
+Brandon's answers. Go-to-market — SEO, pricing, launch, marketing — lives in
+[`BUSINESS-WARGAME.md`](BUSINESS-WARGAME.md).
 
 > **The canonical execution tracker is `data/parity.json`**, rendered live in
 > the app's **📋 Parity** tab — every feature with status, executable spec,
@@ -11,45 +13,30 @@ naming, store paths, and the open questions that need Brandon's answers.
 
 ---
 
-## 1 · Naming
+## 1 · Naming — decided
 
-"Pokémon" in a public product name will be refused by Apple/Google review and
-invites a Nintendo C&D. Personal build keeps **Pokémon Den**; the shipped build
-needs an original name with no "Pokémon"/"Poké" in it, and no collision with
-Collectr, Dex, Shiny, PullVault, PokéVault, CollectorVault, CollX, pkmn.gg,
-Slabfy or Pokellector.
+**Ship name: DenZ.** Chosen 2026-08-12. Applied with
+`bash scripts/rename.sh "Pokémon DenZ"` — the local build keeps the Pokémon
+prefix, and every store-facing string is `DenZ` with no "Pokémon"/"Poké" in it.
 
-### The shortlist — three angles, one pick each
+That distinction is not cosmetic: "Pokémon" in a public product name gets a
+listing refused by Apple and Google review, and is the most likely trigger for a
+Nintendo takedown — which matters more, not less, once money changes hands
+(see [`BUSINESS-WARGAME.md`](BUSINESS-WARGAME.md) §7).
 
-| Name | The read | Why it's the pick for its angle |
-|------|----------|--------------------------------|
-| **Vitrine** ⭐ | *The 3D room.* A vitrine is the actual word for a glass display cabinet. | Real word, upscale, zero hobby cliché, and it literally names what the Den tab already is. Reads as a product, not a utility. Cross-hobby by default. |
-| **Longbox** ⭐ | *The collector.* The comics/sports storage box everyone in the hobby knows. | Warm, concrete, instantly signals "collector" without naming a game. Trivial logo (a box). Carries the multi-TCG plan for free. |
-| **Compsheet** ⭐ | *The advisor.* Sold comps + fee-adjusted net + grade break-even — the thing the app actually does that others don't. | Names the differentiator instead of the container. Best fit if v1 targets sellers. Plain `Comps` is stronger but far harder to clear. |
+**Still to do before taking payment:**
 
-### The full batch
+- [ ] USPTO TESS search for "DenZ" in software/class 9 and 42
+- [ ] App Store + Google Play name search
+- [ ] Domain — `denz.app` is the realistic target
+- [ ] Check against the competitor set (Collectr, Dex, Shiny, PullVault,
+      PokéVault, CollectorVault, CollX, pkmn.gg, Slabfy, Pokellector) — none
+      collide on "DenZ", but confirm rather than assume
 
-| Name | Read | Notes |
-|------|------|-------|
-| **Vitrine** | display cabinet | Shortlist. Check `vitrine.app` — `.com` is likely gone. |
-| **Longbox** | collector storage | Shortlist. Comics-adjacent goodwill; check for comics-app collisions. |
-| **Compsheet** | sold comps + net math | Shortlist. Descriptive, so a weaker trademark — pair with a distinct logo. |
-| **Curio** | cabinet of curiosities | Warm, one word. Common product word — clearance risk is real. |
-| **Backroom** | where the good stuff is kept | Insider, a little cheeky. Reads slightly retail-inventory. |
-| **Atrium** | the walk-in room | Calm and architectural; fits the Den's scale. Generic-ish. |
-| **Under Glass** | slabs, literally | Most evocative of the batch. Two words hurt as an app name. |
-| **Sleeved** | every card goes in one | Short, hobby-native, verb-y. May read too niche outside TCG. |
-| **Mintwright** | maker + "mint" | Same craft feel you liked in *Cardwright*, but hobby-native. |
-| **Hoardly** | affectionate hoarding | Playful, modern-SaaS shape, easy to clear. Less premium. |
-| **Denwright** | keeps the Den lineage | Bridge if you want continuity with the working name. |
-| **Pull Room** | where you open packs | Great for the streaming/Whatnot audience. Near *PullVault* — check hard. |
-
-Mechanics: the display name is a plain string everywhere — internal ids stay
-`pokechest.*` forever for data compatibility. The swap is one command:
-`bash scripts/rename.sh "Vitrine"`.
-
-Before committing to any of these: USPTO TESS search, App Store + Google Play
-name search, and a domain check (`.app` is the realistic target for all of them).
+Mechanics: the display name is a plain string everywhere. Internal ids stay
+`pokechest.*` forever for data compatibility, and `rename.sh` cannot reach them.
+Earlier candidates, kept only as fallbacks if clearance fails: Vitrine, Longbox,
+Compsheet, Curio, Backroom, Atrium, Under Glass, Sleeved, Mintwright, Hoardly.
 
 ## 2 · Researched feature backlog (competitor + community sweep)
 
@@ -154,7 +141,12 @@ pkmn.gg, Eyevo, PriceCharting app reviews, and app-store/blog comparisons
 | **Nintendo Switch** | ❌ Not realistic — closed platform, Nintendo licensing required, and a Pokémon-adjacent fan app would never pass. The Steam build is the way to get it on a TV. | — |
 
 **Gate to "objectively acceptable to publish" (the routine works this list):**
-- [ ] Ship-name chosen + swapped — the swap is now **one command**: `bash scripts/rename.sh "Card Den"` ✅ tool ready 2026-07-20 (still needs Brandon to pick the name)
+- [x] Ship-name chosen + swapped ✅ 2026-08-12 — **Pokémon DenZ** locally,
+      **DenZ** for anything store-facing. Applied with
+      `bash scripts/rename.sh "Pokémon DenZ"`, which gained two fixes in the
+      process: it now rewrites percent-encoded occurrences (the Admin
+      "Open Pocket Edition" link had been 404-ing after every rename) and it
+      is genuinely idempotent when the new name contains the old.
 - [x] LEGAL.md surfaced in-app (About panel) ✅ 2026-07-19
 - [x] Replace scraped/linked card art default with user-scanned images or a
       licensed/open source in the public build — `publicArt` build flag
@@ -224,8 +216,8 @@ pkmn.gg, Eyevo, PriceCharting app reviews, and app-store/blog comparisons
    I don't know this one and can't see your Mac from the cloud session. Is it a
    publishing tool / a typo (Gatekeeper? Codegate?)? Tell me what it is and I'll
    wire the pipeline to it.
-2. **Ship name**: shortlist is **Vitrine** / **Longbox** / **Compsheet** (§1) —
-   pick one, or veto the batch and I'll go again from a different angle.
+2. **Ship name**: ✅ answered — **DenZ**. Remaining naming work is clearance
+   (USPTO, App Store/Play search, `denz.app`) before money changes hands.
 3. **Audience for v1 public**: sellers (current strength) or collectors
    (set-completion/scanning)? Decides which backlog features go first.
 4. **Apple Developer Program**: you have a development cert — do you also have a
