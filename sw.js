@@ -20,7 +20,7 @@
  * The cache name carries the app version, so shipping a new build drops every
  * old entry on activate rather than leaving a half-updated shell behind.
  */
-const VERSION = '2.4.0';
+const VERSION = '2.5.0';
 const CACHE = `pokechest-shell-v${VERSION}`;
 
 /* The minimum set that has to be present for the app to boot and render. */

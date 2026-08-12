@@ -22,7 +22,11 @@
 (function () {
   'use strict';
 
-  const tabs = () => Array.from(document.querySelectorAll('#tabs .tab'));
+  /* Only elements that actually control a panel are tabs. The overflow
+     trigger (.tab-more-btn) carries the .tab class for styling but opens a
+     menu — treating it as a tab gave it aria-controls="view-undefined" and
+     put a non-panel into the arrow-key cycle. */
+  const tabs = () => Array.from(document.querySelectorAll('#tabs [data-view]'));
 
   /* ---------- live region ---------- */
   const live = document.createElement('div');
@@ -85,9 +89,23 @@
     else if (e.key === 'End') j = list.length - 1;
     if (j == null) return;
     e.preventDefault();
+    // Ten of the nineteen tabs live in the collapsed overflow menu. Focusing a
+    // hidden element is a no-op, so arrowing into that range silently stranded
+    // focus — open the menu first and the whole strip stays keyboard-reachable.
+    revealIfInMenu(list[j]);
     list[j].focus();
     if (typeof switchView === 'function') switchView(list[j].dataset.view);
   });
+
+  function revealIfInMenu(el) {
+    const menu = document.getElementById('tabMoreMenu');
+    if (!menu || !menu.contains(el) || !menu.hidden) return;
+    menu.hidden = false;
+    const btn = document.getElementById('tabMoreBtn');
+    const wrap = document.getElementById('tabMore');
+    if (btn) btn.setAttribute('aria-expanded', 'true');
+    if (wrap) wrap.classList.add('open');
+  }
 
   /* Wrap switchView (revamp.js already wraps it once — wrapping a wrapper is
      fine, each layer just adds its own concern). */
@@ -164,6 +182,19 @@
   }
 
   /* ---------- labels the markup can't carry ---------- */
+  /* The overflow trigger is a menu button, not a tab. */
+  function labelMoreButton() {
+    const b = document.getElementById('tabMoreBtn');
+    if (!b) return;
+    b.setAttribute('role', 'button');
+    if (!b.getAttribute('aria-label')) b.setAttribute('aria-label', 'More sections');
+    const menu = document.getElementById('tabMoreMenu');
+    if (menu) {
+      menu.setAttribute('role', 'group');
+      menu.setAttribute('aria-label', 'More sections');
+    }
+  }
+
   function labelChrome() {
     const pairs = [
       ['#refreshBtn', 'Refresh data'], ['#helpBtn', 'Guide'], ['#alertsBtn', 'Price alerts'],
@@ -179,6 +210,7 @@
 
   function start() {
     wireTabs();
+    labelMoreButton();
     hookSwitchView();
     watchModals();
     labelChrome();

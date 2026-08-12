@@ -1,6 +1,6 @@
 # Legal & Credits
 
-**Pokémon Den** is an unofficial, fan-made tool for cataloging, valuing, and selling
+**Pokémon DenZ** is an unofficial, fan-made tool for cataloging, valuing, and selling
 trading cards **you personally own**. It is not affiliated with, endorsed, sponsored,
 or approved by Nintendo, The Pokémon Company, Creatures Inc., GAME FREAK inc., or
 PriceCharting.
@@ -20,7 +20,7 @@ PriceCharting.
 
 ## Privacy
 
-- **No accounts, no analytics, no tracking.** Pokémon Den doesn't know who you
+- **No accounts, no analytics, no tracking.** Pokémon DenZ doesn't know who you
   are and doesn't want to. There is no sign-up, no telemetry, and no ads.
 - **Your collection data — cards, notes, sales, photos, prices you've
   entered — never leaves this computer**, full stop. It's stored in your
@@ -51,7 +51,7 @@ PriceCharting.
 
 ## If this app is ever distributed publicly
 
-The working name "Pokémon Den" is for **personal use only**. A public release
+The working name "Pokémon DenZ" is for **personal use only**. A public release
 must (a) use an original name without "Pokémon" in it (see
 `ROADMAP-TO-PUBLISH.md` for candidates), (b) drop or license any Pokémon-IP
 visuals it displays by default, and (c) keep this credits file visible in-app.

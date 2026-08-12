@@ -1,7 +1,7 @@
-/* ===================== Pokémon Den ===================== */
+/* ===================== Pokémon DenZ ===================== */
 'use strict';
 
-const APP_VERSION = '2.4.0';
+const APP_VERSION = '2.5.0';
 const APP_REPO = 'https://github.com/Sparkey333/pokemon-chest';
 
 /* ---------- tiny helpers ---------- */
@@ -157,7 +157,7 @@ async function init() {
     $('#vpValue').textContent = money0(col.meta.totalValue);
     $('#search').placeholder = `Search ${col.meta.totalEntries.toLocaleString()} cards — name, set, number…`;
     $('#footMeta').textContent =
-      `Pokémon Den v${APP_VERSION} · ${col.meta.totalEntries.toLocaleString()} entries · ${col.meta.totalCards.toLocaleString()} cards · ${col.meta.imagesMatched.toLocaleString()} with art · generated ${col.generatedAt.slice(0, 10)} from ${col.source}`;
+      `Pokémon DenZ v${APP_VERSION} · ${col.meta.totalEntries.toLocaleString()} entries · ${col.meta.totalCards.toLocaleString()} cards · ${col.meta.imagesMatched.toLocaleString()} with art · generated ${col.generatedAt.slice(0, 10)} from ${col.source}`;
     wireChrome();
     renderDashboard();
     renderCollection(true);
@@ -293,8 +293,9 @@ function wireChrome() {
   $('#settingsBtn').onclick = openSettings;
   if ($('#alertsBtn')) $('#alertsBtn').onclick = openAlertsPanel;
   if ($('#aboutBtn')) $('#aboutBtn').onclick = openAbout;
+  wireTabMore();   // Chest line: overflow menu for the tab strip
   document.onkeydown = e => {
-    if (e.key === 'Escape') closeModal();
+    if (e.key === 'Escape') { closeTabMore(); closeModal(); }
     if (e.key === '/' && document.activeElement !== $('#search')) { e.preventDefault(); $('#search').focus(); }
   };
 }
@@ -900,40 +901,48 @@ function machineSVG() {
     <g class="gm-crank"><circle cx="150" cy="176" r="12" fill="url(#gmChrome)"/><rect x="147" y="176" width="6" height="20" rx="3" fill="#8792a8"/><circle cx="150" cy="196" r="5" fill="#c23a4e"/></g>
   </svg>`;
 }
+/* renderArcade comes from the Chest line: same machine, plus the Plinko
+   board and the multi-game wild picks. A strict evolution of the Den
+   version, so it replaces it rather than being merged line by line. */
 function renderArcade() {
   const el = $('#view-arcade'); if (!el) return;
   const s = arcadeGet();
-  const pool = (State.cards || []).filter(c => c.price != null);
-  // odds shown must match the actual draw (which renormalizes over tiers you own)
+  const games = gamesOwned();
+  const pool = arcadePool(s.game);
   const tierHas = {}; ARC_TIERS.forEach(t => tierHas[t.key] = 0);
   pool.forEach(c => tierHas[arcTierOf(c).key]++);
   const availT = ARC_TIERS.filter(t => tierHas[t.key]);
   const oddsTotal = availT.reduce((a, t) => a + t.pct, 0) || 1;
   const oddsRow = availT.map(t => `<div class="arc-odd ${t.cls}"><span class="ao-dot"></span><span class="ao-l">${t.label}</span><span class="ao-p">${Math.round(t.pct / oddsTotal * 100)}%</span></div>`).join('');
-  // resolve won cards by array index (pcId isn't unique — 158 pcIds repeat across raw/graded variants)
   const wonCard = (w) => (w.i != null && State.cards[w.i]) || (State.cards || []).find(c => c.pcId === w.pcId);
   const shelf = s.won.slice(-24).reverse().map(w => {
     const c = wonCard(w); if (!c) return '';
     const t = arcTierOf(c);
     return `<div class="arc-won ${t.cls}" data-i="${c.i}" title="${esc(c.name)} — ${money(c.price)}">${c.img ? `<img loading="lazy" src="${esc(c.img)}" onerror="this.outerHTML=phThumb(${c.i})">` : phThumb(c.i)}</div>`;
   }).join('');
+  const gameChips = `<div class="arc-games">
+      <button class="arc-gchip ${s.game === 'all' ? 'on' : ''}" data-g="all">All games · ${countByGame('all')}</button>
+      ${games.map(g => `<button class="arc-gchip ${s.game === g ? 'on' : ''}" data-g="${esc(g)}">${gameIcon(g)} ${esc(gameShort(g))} · ${countByGame(g)}</button>`).join('')}
+    </div>`;
   el.innerHTML = `
     <div class="section-head"><h2>🕹 Arcade — turn your collection into a game</h2>
-      <span class="sub">Phase 1: the Capsule Machine. Every crank pulls a real card from your vault — chase cards are rarer to win.</span></div>
+      <span class="sub">Capsule Machine + Plinko pull real cards from every game in your vault (Pokémon, Yu-Gi-Oh!, Magic, sports, Dragon Ball…). Chase cards stay rarer.</span></div>
+
+    ${gameChips}
 
     <div class="arc-grid">
       <div class="panel accent-amethyst arc-machine">
         <div class="arc-tokens">🎟️ <b id="arc-tok">${s.tokens}</b> crank${s.tokens === 1 ? '' : 's'} left today <span class="reason">· refills daily</span></div>
         <div class="gm-stage" id="gm-stage">${machineSVG()}<div class="gm-capsule" id="gm-capsule"></div></div>
         <button class="btn primary arc-crank" id="arc-crank" ${s.tokens > 0 && pool.length && !_arcBusy ? '' : 'disabled'}>🎰 Turn the crank</button>
-        <div class="reason" id="arc-msg" style="margin-top:8px;min-height:18px">${pool.length ? 'Give it a crank!' : 'Load your collection to play.'}</div>
+        <div class="reason" id="arc-msg" style="margin-top:8px;min-height:18px">${pool.length ? 'Give it a crank!' : 'No priced cards in this game filter — pick All games or another title.'}</div>
       </div>
 
       <div class="panel accent-gold arc-prizewrap">
         <div class="subhead" style="margin-top:0">Your pull</div>
-        <div class="arc-prize" id="arc-prize"><div class="arc-empty">Turn the crank to reveal a card ✨</div></div>
-        <div class="arc-odds">${oddsRow}</div>
-        <div class="reason" style="margin-top:8px">Lifetime cranks: <b>${s.pulls}</b></div>
+        <div class="arc-prize" id="arc-prize"><div class="arc-empty">Turn the crank or drop a Plinko chip ✨</div></div>
+        <div class="arc-odds">${oddsRow || '<span class="reason">No odds yet for this filter.</span>'}</div>
+        <div class="reason" style="margin-top:8px">Lifetime cranks: <b>${s.pulls}</b> · Plinko drops: <b>${s.plinko || 0}</b></div>
       </div>
     </div>
 
@@ -943,14 +952,43 @@ function renderArcade() {
     </div>
 
     <div class="cols two" style="margin-top:16px">
-      <div class="panel accent-emerald"><h3>🎳 Next up — Plinko drop (Phase 1b)</h3>
-        <p class="muted" style="font-size:13.5px;line-height:1.6">Drop a chip and watch it bounce through the pegs into a rarity slot — same odds, more suspense. Coming in the next build.</p></div>
-      <div class="panel accent-sapphire"><h3>🌍 The big one — Catch in the Wild (Phase 2)</h3>
-        <p class="muted" style="font-size:13.5px;line-height:1.6">Beat the Emerald hack, then <b>scan a card from your collection</b> → its Pokémon spawns in the game world for you to go find and catch. This is the ROM-hack build (personal-only) we’re working toward.</p></div>
+      <div class="panel accent-emerald">
+        <h3>🎳 Plinko drop</h3>
+        <p class="muted" style="font-size:13.5px;line-height:1.55;margin:0 0 10px">Same rarity odds as the capsule machine — watch the chip bounce into a slot, then reveal a real card from the active game filter. Costs 1 crank token.</p>
+        <div class="plinko" id="plinko">
+          <div class="pk-board" id="pk-board"></div>
+          <div class="pk-slots" id="pk-slots">${ARC_TIERS.map(t => `<div class="pk-slot ${t.cls}" data-tier="${t.key}">${t.label}</div>`).join('')}</div>
+          <div class="pk-chip" id="pk-chip" hidden></div>
+        </div>
+        <button class="btn" id="arc-plinko" ${s.tokens > 0 && pool.length && !_arcBusy ? '' : 'disabled'}>Drop a chip</button>
+        <div class="reason" id="pk-msg" style="margin-top:8px;min-height:18px"></div>
+      </div>
+      <div class="panel accent-sapphire">
+        <h3>🌍 Catch in the Wild (Phase 2)</h3>
+        <p class="muted" style="font-size:13.5px;line-height:1.55">Pokémon path: beat the Emerald Lab hack, then scan a card → spawn it in the wild. Other games use the same Scanner + Arcade loop today — pick a title above, pull it, open the card, and mark it caught with Photo Studio.</p>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">
+          <button class="btn sm" id="arc-to-scan">📷 Open Scanner</button>
+          <button class="btn sm ghost" id="arc-to-emerald">🛠 Emerald Lab</button>
+          <button class="btn sm ghost" id="arc-to-games">🃏 Browse other games</button>
+        </div>
+        <div class="arc-wild-list" style="margin-top:12px">${games.filter(g => !isPokemonGame(g)).slice(0, 6).map(g => {
+          const n = countByGame(g); const v = (State.meta.byGame || {})[g] || 0;
+          return `<button class="arc-wild" data-g="${esc(g)}"><span>${gameIcon(g)} ${esc(gameShort(g))}</span><span class="reason">${n} cards · ${money0(v)}</span></button>`;
+        }).join('') || '<span class="reason">Only Pokémon in this export so far — Refresh after adding other TCGs to PriceCharting.</span>'}</div>
+      </div>
     </div>`;
 
-  $('#arc-crank').onclick = () => arcadePull();
+  $$('.arc-gchip').forEach(b => b.onclick = () => {
+    const st = arcadeGet(); st.game = b.dataset.g || 'all'; arcadeSet(st); renderArcade();
+  });
+  $('#arc-crank').onclick = () => arcadePull('capsule');
+  $('#arc-plinko').onclick = () => arcadePlinko();
+  if ($('#arc-to-scan')) $('#arc-to-scan').onclick = () => switchView('scan');
+  if ($('#arc-to-emerald')) $('#arc-to-emerald').onclick = () => { switchView('admin'); setTimeout(() => { const t = document.getElementById('ad-emerald'); if (t) t.scrollIntoView({ behavior: 'smooth' }); }, 80); };
+  if ($('#arc-to-games')) $('#arc-to-games').onclick = () => filterCollectionToGame('all');
+  $$('.arc-wild').forEach(b => b.onclick = () => filterCollectionToGame(b.dataset.g));
   $$('#arc-shelf .arc-won').forEach(w => w.onclick = () => { const c = State.cards[+w.dataset.i]; if (c) openModal(c); });
+  buildPlinkoBoard();
 }
 let _arcBusy = false;
 function arcadePull() {
@@ -1019,8 +1057,16 @@ function renderDashboard() {
   ];
 
   $('#view-dashboard').innerHTML = `
+    ${vaultHeroHTML()}
+    ${nextStepsHTML()}
+
     <div class="kpis">${kpis.map(k => `
       <div class="kpi ${k.cls}"><div class="k-label">${k.l}</div><div class="k-value">${k.v}</div><div class="k-sub">${k.s}</div></div>`).join('')}
+    </div>
+
+    <div class="panel" style="margin-top:14px">
+      <h3>Your games <span class="hint">— tap a row to filter the collection</span></h3>
+      ${gamesBarsHTML()}
     </div>
 
     ${gamePlanHTML()}
@@ -1065,6 +1111,9 @@ function renderDashboard() {
     ${feedbackCardHTML()}`;
 
   $$('#view-dashboard .mini').forEach(el => el.onclick = () => openModal(State.cards[+el.dataset.i]));
+  // Chest-line dashboard: game rows filter the collection, next-steps cards act.
+  $$('#view-dashboard .game-row').forEach(el => el.onclick = () => filterCollectionToGame(el.dataset.g));
+  wireNextSteps();
   wireGamePlan();
   wireActionBoard();
   wireFeedback();
@@ -1354,7 +1403,7 @@ function wireActionBoard() {
 function diagnostics() {
   const m = State.meta || {};
   return [
-    `Pokémon Den v${APP_VERSION}`,
+    `Pokémon DenZ v${APP_VERSION}`,
     `Platform: ${navigator.userAgent}`,
     `Collection: ${m.totalEntries != null ? m.totalEntries.toLocaleString() : '?'} entries · ${m.totalCards != null ? m.totalCards.toLocaleString() : '?'} cards`,
     `Live backend: ${State.live ? 'connected' : 'not running'}`,
@@ -1374,7 +1423,7 @@ function feedbackCardHTML() {
   </div>`;
 }
 function wireFeedback() {
-  const title = `[Bug] Pokémon Den v${APP_VERSION}`;
+  const title = `[Bug] Pokémon DenZ v${APP_VERSION}`;
   const gh = $('#fbGithub'), em = $('#fbEmail'), cp = $('#fbCopy');
   if (gh) gh.onclick = () => window.open(`${APP_REPO}/issues/new?title=${enc(title)}&body=${enc(feedbackBody())}`, '_blank', 'noopener');
   if (em) em.onclick = () => { location.href = `mailto:brandonlbarkey@gmail.com?subject=${enc(title)}&body=${enc(feedbackBody())}`; };
@@ -1406,7 +1455,7 @@ function barRows(rows, maxBase) {
 function sparkline() {
   const data = snapshotSeries();
   if (data.length < 2) {
-    return `<div class="spark-empty">Tracking started today (${money(data[0] ? data[0][1] : State.meta.totalValue)}).<br>Open or refresh Pokémon Den on future days to build your value history.</div>`;
+    return `<div class="spark-empty">Tracking started today (${money(data[0] ? data[0][1] : State.meta.totalValue)}).<br>Open or refresh Pokémon DenZ on future days to build your value history.</div>`;
   }
   const vals = data.map(d => d[1]);
   const min = Math.min(...vals), max = Math.max(...vals), W = 600, H = 110, pad = 8;
@@ -2480,7 +2529,7 @@ function renderAdmin() {
     </div>
 
     <div class="panel accent-sapphire" style="margin-bottom:16px"><h3>📱 iPhone app — Swipe Deck &amp; 3D Battle</h3>
-      <p class="muted" style="font-size:13.5px;line-height:1.6">A self-contained mobile app — <code>Pokémon Den — Deck.html</code> — you AirDrop / iCloud / email to your iPhone and <b>Add to Home Screen</b> (full-screen, offline, its own icon). Swipe your deck, build a battle deck, and a 3D swirling-stadium battle buildup. <b>Only cards you’ve caught with a real photo</b> (📸 Photo Studio) are battle-playable — the rest show as “wild, go catch it.” ${liveOn ? '' : '<b style="color:var(--gold)">Launch via the app to build it.</b>'}</p>
+      <p class="muted" style="font-size:13.5px;line-height:1.6">A self-contained mobile app — <code>Pokémon DenZ — Deck.html</code> — you AirDrop / iCloud / email to your iPhone and <b>Add to Home Screen</b> (full-screen, offline, its own icon). Swipe your deck, build a battle deck, and a 3D swirling-stadium battle buildup. <b>Only cards you’ve caught with a real photo</b> (📸 Photo Studio) are battle-playable — the rest show as “wild, go catch it.” ${liveOn ? '' : '<b style="color:var(--gold)">Launch via the app to build it.</b>'}</p>
       <div id="mob-stat" class="muted" style="font-size:13px;margin:6px 0"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px">
         <button class="btn-lightblue sm" id="mob-build" ${liveOn ? '' : 'disabled'}>📱 Build iPhone app</button>
@@ -2493,16 +2542,16 @@ function renderAdmin() {
     </div>
 
     <div class="panel" style="margin-bottom:16px"><h3>📱 Take it with you — iPhone Pocket Edition</h3>
-      <p class="muted" style="font-size:13.5px;line-height:1.6">A single self-contained file — <code>Pokémon Den — Pocket.html</code> in your project folder — with your whole collection, the Game Plan, and tap-to-open comp links baked in. Works offline; no app store, no account.</p>
+      <p class="muted" style="font-size:13.5px;line-height:1.6">A single self-contained file — <code>Pokémon DenZ — Pocket.html</code> in your project folder — with your whole collection, the Game Plan, and tap-to-open comp links baked in. Works offline; no app store, no account.</p>
       <ol class="bullets" style="padding-left:20px">
-        <li><b>AirDrop</b> <code>Pokémon Den — Pocket.html</code> from the project folder to your iPhone (or email it to yourself).</li>
+        <li><b>AirDrop</b> <code>Pokémon DenZ — Pocket.html</code> from the project folder to your iPhone (or email it to yourself).</li>
         <li>Open it in <b>Safari</b> → Share → <b>Add to Home Screen</b>. It gets the chest icon and launches full-screen like an app.</li>
         <li>It’s a <b>snapshot</b> — tap <b>Regenerate</b> below (or refresh prices) after you update your collection, then re-AirDrop.</li>
       </ol>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px">
-        <!-- Percent-encoded "Pokémon Den — Pocket.html". This still said "Chest"
+        <!-- Percent-encoded "Pokémon DenZ — Pocket.html". This still said "Chest"
              after the rename, so the link 404'd against POCKET_NAME in server.py. -->
-        <a class="btn sm gold" href="/Pok%C3%A9mon%20Den%20%E2%80%94%20Pocket.html" target="_blank" rel="noopener">Open Pocket Edition ↗</a>
+        <a class="btn sm gold" href="/Pok%C3%A9mon%20DenZ%20%E2%80%94%20Pocket.html" target="_blank" rel="noopener">Open Pocket Edition ↗</a>
         ${liveOn ? '<button class="btn sm" id="ad-pocket">↻ Regenerate from latest data</button>' : '<span class="reason">Launch via start.command to regenerate from inside the app.</span>'}
         <span class="reason" id="ad-pocket-status"></span>
       </div>
@@ -2523,7 +2572,7 @@ function renderAdmin() {
       <div class="panel"><h3>Product brief</h3>
         <p class="muted" style="font-size:13.5px;line-height:1.6">
         <b style="color:var(--text)">GradeStage</b> is a printable stage that makes card photos <i>repeatable</i>: a recessed bay holds a raw card, penny sleeve, or Card Saver 1 dead-center under engraved crosshairs; snap-in LED bars give <b>20° raking light</b> (the angle that exposes print lines and holo scratches — the stuff that turns a 10 into a 9) and <b>45° even light</b> (true color + centering shots); a stacking tower holds the phone at a fixed height so every card is framed identically — which is exactly what the in-app centering calculator wants.</p>
-        <p class="muted" style="font-size:13.5px;line-height:1.6">Sell as: <b>STL files + BOM + guide</b> (digital, ~$12-19), or <b>printed kit with LEDs + polarizer film</b> (~$49-69). Companion app angle: Pokémon Den's Grade Lab is the software half.</p>
+        <p class="muted" style="font-size:13.5px;line-height:1.6">Sell as: <b>STL files + BOM + guide</b> (digital, ~$12-19), or <b>printed kit with LEDs + polarizer film</b> (~$49-69). Companion app angle: Pokémon DenZ's Grade Lab is the software half.</p>
         <div class="subhead">Print files (in repo: hardware/gradestage/)</div>
         <ul class="bullets">
           <li><code>gradestage.scad</code> — parametric source (OpenSCAD, free)</li>
@@ -2711,7 +2760,7 @@ function renderAdmin() {
     catch { toast('Couldn’t copy automatically.'); }
   };
   if ($('#errlog-send')) $('#errlog-send').onclick = () => {
-    window.open(`${APP_REPO}/issues/new?title=${enc(`[Bug] Pokémon Den v${APP_VERSION}`)}&body=${enc(errlogReport())}`, '_blank', 'noopener');
+    window.open(`${APP_REPO}/issues/new?title=${enc(`[Bug] Pokémon DenZ v${APP_VERSION}`)}&body=${enc(errlogReport())}`, '_blank', 'noopener');
   };
   if ($('#errlog-clear')) $('#errlog-clear').onclick = () => { localStorage.removeItem(LS_ERRLOG); toast('Error log cleared.'); errlogRefresh(); };
 
@@ -3071,7 +3120,7 @@ function closeModal() { $('#modalRoot').innerHTML = ''; }
 /* ---------- About & Legal (surfaces LEGAL.md in-app) ---------- */
 const LEGAL_FALLBACK = `# Legal & Credits
 
-Pokémon Den is an unofficial, fan-made tool for cataloging, valuing, and selling
+Pokémon DenZ is an unofficial, fan-made tool for cataloging, valuing, and selling
 trading cards **you personally own**. It is **not affiliated** with, endorsed, sponsored, or
 approved by Nintendo, The Pokémon Company, Creatures Inc., GAME FREAK inc., or PriceCharting.
 
@@ -3119,7 +3168,7 @@ async function openAbout() {
     <button class="close-x" id="aboutClose">×</button>
     <div class="modal-body" style="padding:28px 30px 26px">
       <div class="about-head">
-        <div class="about-title">Pokémon <span>Den</span></div>
+        <div class="about-title">Pokémon <span>DenZ</span></div>
         <div class="about-meta">Version ${esc(APP_VERSION)} · <a href="${esc(APP_REPO)}" target="_blank" rel="noopener">source</a></div>
         <div class="about-credits">Card images: <a href="https://tcgdex.dev" target="_blank" rel="noopener">TCGdex</a> · Prices: your PriceCharting export · Built by DarkHearts</div>
       </div>
@@ -3150,7 +3199,7 @@ function updateLiveBtn() {
 function openSettings() {
   const L = State.live;
   if (!L) {
-    toast('Open Pokémon Den via start.command to connect live data.');
+    toast('Open Pokémon DenZ via start.command to connect live data.');
   }
   const v = (id) => document.getElementById(id)?.value?.trim() || '';
   const enabled = (b) => b ? '<span class="chip gold">connected</span>' : '<span class="chip">not set</span>';
@@ -3158,8 +3207,8 @@ function openSettings() {
     <button class="close-x" id="modalClose">×</button>
     <div class="modal-body" style="padding:26px">
       <h2 style="font-size:20px;margin-bottom:4px">⚡ Connect live data &amp; AI</h2>
-      <p class="muted" style="font-size:13px;margin-bottom:6px">All optional and bring-your-own-key. Keys are stored locally in <code>settings.local.json</code> (gitignored) and sent only to that provider — never bundled, never shared. With nothing set, Pokémon Den runs on your export + free TCGdex images + deep-links.</p>
-      ${!L ? `<div class="rec-box no" style="margin:10px 0"><div class="rb">⚠️ The live backend isn’t running. Launch Pokémon Den with <b>start.command</b> (not by opening index.html) to save keys.</div></div>` : ''}
+      <p class="muted" style="font-size:13px;margin-bottom:6px">All optional and bring-your-own-key. Keys are stored locally in <code>settings.local.json</code> (gitignored) and sent only to that provider — never bundled, never shared. With nothing set, Pokémon DenZ runs on your export + free TCGdex images + deep-links.</p>
+      ${!L ? `<div class="rec-box no" style="margin:10px 0"><div class="rb">⚠️ The live backend isn’t running. Launch Pokémon DenZ with <b>start.command</b> (not by opening index.html) to save keys.</div></div>` : ''}
 
       <div class="subhead">PriceCharting API — accurate prices (ungraded + graded) ${L ? enabled(L.priceCharting) : ''}</div>
       <input id="s-pc" class="s-inp" type="password" placeholder="40-char API token from your PriceCharting subscription" />
@@ -3278,3 +3327,416 @@ function toast(msg) {
   document.body.appendChild(t); setTimeout(() => t.remove(), 2200);
 }
 window.switchView = switchView;
+
+/* Module-level state the Chest functions below close over. Extracting the
+   functions alone left these undefined, which threw at boot and swapped the
+   whole app for the "couldn't load your collection" panel. */
+const GAME_META = {
+  'Pokémon': { icon: '🔴', short: 'Pokémon', grade: true },
+  'Pokemon': { icon: '🔴', short: 'Pokémon', grade: true },
+  'YuGiOh': { icon: '🟣', short: 'Yu-Gi-Oh!', grade: false },
+  'Magic': { icon: '🔵', short: 'Magic', grade: false },
+  'Football': { icon: '🏈', short: 'Football', grade: false },
+  'Basketball': { icon: '🏀', short: 'Basketball', grade: false },
+  'Baseball': { icon: '⚾', short: 'Baseball', grade: false },
+  'Dragon': { icon: '🟠', short: 'Dragon Ball', grade: false },
+};
+const LS_BUYS = 'pokechest.buywatch.v1';       // local buy targets / watchlist
+const LS_DATA_TOUCH = 'pokechest.dataTouch.v1'; // last successful export refresh stamp
+
+let _tabMoreDocWired = false;
+
+/* ============================================================
+   UNIFIED FROM THE CHEST LINE (v1.16.0) — 2026-08-12
+   These 21 functions came from the parallel "Pokémon Chest" build and
+   are kept verbatim so the unified app is a strict superset of both
+   lines rather than a choice between them:
+
+     · Today / vault hero + next steps  — vaultHeroHTML, nextStepsHTML,
+       buildNextSteps, wireNextSteps, dataFreshness
+     · Multi-game        — gamesOwned, gamesBarsHTML, countByGame,
+       gameIcon, gameShort, isPokemonGame, filterCollectionToGame
+     · Buy / watch list  — buyWatchGet, buyWatchSet, buyWatchOpen
+     · Plinko arcade     — arcadePlinko, buildPlinkoBoard, arcadePool,
+       arcadeReveal
+     · Tab overflow menu — wireTabMore, closeTabMore
+
+   A plain `git merge` could NOT produce this: the Chest lineage had
+   dropped the Den features relative to the merge base, so git took
+   those deletions and silently removed 23 Den functions (price alerts,
+   per-card history, the error log, qty adjustments, the ship-build
+   flags). app.js was therefore rebuilt from the Den side with this
+   block spliced in, and a coverage assertion now guards both sets.
+   ============================================================ */
+function arcadePlinko() {
+  if (_arcBusy) return;
+  const s = arcadeGet();
+  if (s.tokens <= 0) { const m = $('#pk-msg'); if (m) m.textContent = 'Out of tokens — they refill tomorrow.'; return; }
+  const draw = arcadeDraw(s.game);
+  if (!draw) { const m = $('#pk-msg'); if (m) m.textContent = 'No cards in this filter.'; return; }
+  _arcBusy = true;
+  const { card, tier } = draw;
+  const tierIdx = Math.max(0, ARC_TIERS.findIndex(t => t.key === tier.key));
+  const chip = $('#pk-chip'), board = $('#pk-board'), msg = $('#pk-msg');
+  const crank = $('#arc-crank'), pk = $('#arc-plinko');
+  if (crank) crank.disabled = true;
+  if (pk) pk.disabled = true;
+  if (msg) msg.textContent = 'Dropping…';
+  // Animate chip bouncing down; final x aligns with the winning tier slot.
+  const bw = board ? board.clientWidth : 280;
+  const startX = bw * (0.35 + Math.random() * 0.3);
+  const endX = ((tierIdx + 0.5) / ARC_TIERS.length) * bw;
+  if (chip) {
+    chip.hidden = false;
+    chip.className = 'pk-chip drop ' + tier.cls;
+    chip.style.setProperty('--pk-x0', startX + 'px');
+    chip.style.setProperty('--pk-x1', endX + 'px');
+  }
+  $$('.pk-slot').forEach(el => el.classList.toggle('lit', el.dataset.tier === tier.key));
+  setTimeout(() => {
+    s.tokens -= 1; s.pulls += 1; s.plinko = (s.plinko || 0) + 1;
+    s.won.push({ i: card.i, pcId: card.pcId, at: Date.now(), how: 'plinko' });
+    if (s.won.length > 200) s.won = s.won.slice(-200);
+    arcadeSet(s);
+    const tok = $('#arc-tok'); if (tok) tok.textContent = s.tokens;
+    if (chip) chip.hidden = true;
+    arcadeReveal(card, tier, 'plinko');
+    if (msg) msg.textContent = `Landed on ${tier.label}.`;
+    _arcBusy = false;
+    const ck = $('#arc-crank'), p2 = $('#arc-plinko');
+    if (ck) ck.disabled = s.tokens <= 0;
+    if (p2) p2.disabled = s.tokens <= 0;
+  }, 1400);
+}
+
+function arcadePool(game) {
+  const g = game || arcadeGet().game || 'all';
+  return (State.cards || []).filter(c => c.price != null && (g === 'all' || c.game === g));
+}
+
+function arcadeReveal(card, tier, how) {
+  const prize = $('#arc-prize');
+  if (prize) prize.innerHTML = `
+    <div class="arc-reveal ${tier.cls}">
+      <div class="arc-glow"></div>
+      <div class="arc-card">${card.img ? `<img src="${esc(card.img)}" alt="${esc(card.name)}" onerror="this.outerHTML=phHTML(${card.i})">` : phHTML(card.i)}</div>
+      <div class="arc-badge">${tier.label}</div>
+      <div class="arc-name">${esc(card.name)}</div>
+      <div class="arc-meta">${gameIcon(card.game)} ${esc(gameShort(card.game))} · ${esc(card.set)}${card.number ? ' · #' + esc(card.number) : ''} · <b style="color:var(--gold)">${money(card.price)}</b></div>
+      <div class="arc-sparks">${'<i></i>'.repeat(8)}</div>
+      <button class="btn sm" id="arc-open">Open card ↗</button>
+    </div>`;
+  const open = $('#arc-open'); if (open) open.onclick = () => openModal(card);
+  const msg = $('#arc-msg');
+  if (msg) msg.textContent = (how === 'plinko' ? 'Plinko landed on ' : '') +
+    ((tier.key === 'legendary' || tier.key === 'epic') ? `🌟 ${tier.label}! Nice pull.` : 'Nice — added to your shelf.');
+  const shelf = $('#arc-shelf');
+  if (shelf) {
+    const t2 = arcTierOf(card);
+    const chip = `<div class="arc-won ${t2.cls}" data-i="${card.i}" title="${esc(card.name)} — ${money(card.price)}">${card.img ? `<img loading="lazy" src="${esc(card.img)}" onerror="this.outerHTML=phThumb(${card.i})">` : phThumb(card.i)}</div>`;
+    if (shelf.querySelector('.reason')) shelf.innerHTML = '';
+    shelf.insertAdjacentHTML('afterbegin', chip);
+    const first = shelf.querySelector('.arc-won'); if (first) first.onclick = () => openModal(card);
+  }
+}
+
+function buildNextSteps() {
+  const steps = [];
+  const used = new Set();
+  const fresh = dataFreshness();
+  const raw = State.cards.filter(c => !c.graded && isPokemonGame(c));
+  const allIn = (State.intel && State.intel.thresholds && State.intel.thresholds.allInGradingCost) || 35;
+  const forSale = State.cards.filter(c => (uget(c).status || '') === 'forsale');
+  const watching = buyWatchGet().items.filter(x => x.status === 'watch');
+
+  // 1. Refresh if stale
+  if (fresh.tone !== 'ok') {
+    steps.push({
+      key: 'refresh', tone: fresh.tone, icon: '↻', kind: 'Catch up',
+      title: fresh.label,
+      detail: 'Drop a new PriceCharting .xlsx into the project, Downloads, or iCloud — then rebuild.',
+      cta: 'Refresh prices', go: () => refreshData(),
+    });
+  }
+
+  // 2. Finish listings already flagged
+  if (forSale.length) {
+    steps.push({
+      key: 'fs', tone: 'sell', icon: '📤', kind: 'Sell',
+      title: `Finish ${forSale.length} flagged listing${forSale.length === 1 ? '' : 's'}`,
+      detail: `${money0(sum(forSale.map(c => c.value)))} marked for sale — post them before hunting new flips.`,
+      cta: 'Open for-sale', go: () => { State.sellTab = 'fs'; renderSell(); switchView('sell'); },
+    });
+  }
+
+  // 3. Best sell (skip if already for-sale heavy and we have that step)
+  const sellPool = raw.filter(c => (uget(c).status || '') !== 'sold' && (uget(c).status || '') !== 'forsale' && c.value >= 40)
+    .sort((a, b) => b.value - a.value);
+  if (sellPool.length && steps.length < 5) {
+    const s = sellPool[0];
+    used.add(s.i);
+    const n = sellNet(s);
+    steps.push({
+      key: 'sell', tone: 'sell', icon: '💸', kind: 'Sell',
+      title: `Cash in ${s.name}${s.number ? ' #' + s.number : ''}`,
+      detail: `${money(s.value)} market · nets ≈ ${money(n.net)} after fees. Strongest available mover.`,
+      cta: 'Build listing', go: () => openListingComposer(s, false),
+    });
+  }
+
+  // 4. Best grade (different card than sell)
+  const gradeCands = raw.filter(c => !used.has(c.i)).map(c => ({ c, a: gradeAdvice(c) }))
+    .filter(x => x.a.verdict === 'strong')
+    .map(x => ({ ...x, upside: x.a.lad.psa10 * (1 - 0.136) - allIn - x.c.price }))
+    .sort((p, q) => q.upside - p.upside);
+  if (gradeCands.length && steps.length < 5) {
+    const g = gradeCands[0];
+    used.add(g.c.i);
+    steps.push({
+      key: 'grade', tone: 'grade', icon: '🔬', kind: 'Grade',
+      title: `Grade ${g.c.name}${g.c.number ? ' #' + g.c.number : ''}`,
+      detail: `PSA 10 ≈ ${money(g.a.lad.psa10)} vs ${money(g.c.price)} raw — ~${money(g.upside)} upside.`,
+      cta: 'Pre-grade', go: () => { switchView('lab'); State.labTab = 'pregrade'; renderLab(); wirePregrade(); },
+    });
+  }
+
+  // 5. Buy / watch
+  if (steps.length < 5) {
+    const picks = (State.plan && State.plan.invest && State.plan.invest.buys) || [];
+    steps.push({
+      key: 'buy', tone: 'buy', icon: '🛒', kind: 'Buy',
+      title: watching.length ? `${watching.length} buy target${watching.length === 1 ? '' : 's'} on watch` : 'Review smart next buys',
+      detail: watching.length
+        ? 'Open your local watchlist — mark bought or skip when you act.'
+        : (picks[0] ? `Top research pick: ${picks[0].item} (${picks[0].range}).` : 'Save buy targets locally — no cloud account.'),
+      cta: 'Open buys', go: () => buyWatchOpen(),
+    });
+  }
+
+  // 6. Scan
+  if (steps.length < 5) {
+    steps.push({
+      key: 'scan', tone: 'scan', icon: '📷', kind: 'Scan',
+      title: 'Identify a card from a photo',
+      detail: 'Mac camera, Continuity, or phone mode — search the full TCGdex codex + your vault.',
+      cta: 'Open Scanner', go: () => switchView('scan'),
+    });
+  }
+
+  // Always ensure a calm “vault is healthy” if somehow empty
+  if (!steps.length) {
+    steps.push({
+      key: 'vault', tone: 'ok', icon: '🗝️', kind: 'Vault',
+      title: 'You’re caught up',
+      detail: 'Browse the vault, or open Sell / Grade when you want the next move.',
+      cta: 'Open vault', go: () => switchView('collection'),
+    });
+  }
+  return steps.slice(0, 5);
+}
+
+function buildPlinkoBoard() {
+  const board = $('#pk-board'); if (!board) return;
+  const rows = 7, cols = 8;
+  let html = '';
+  for (let r = 0; r < rows; r++) {
+    html += `<div class="pk-row" style="padding-left:${(r % 2) * 14}px">`;
+    for (let c = 0; c < cols - (r % 2 ? 1 : 0); c++) html += '<i class="pk-peg"></i>';
+    html += '</div>';
+  }
+  board.innerHTML = html;
+}
+
+function buyWatchGet() {
+  const s = loadJSON(LS_BUYS, { items: [] });
+  if (!Array.isArray(s.items)) s.items = [];
+  return s;
+}
+
+function buyWatchOpen() {
+  const P = State.plan && State.plan.invest;
+  const watched = buyWatchGet().items;
+  const picks = (P && P.buys) || [];
+  const rows = picks.map((b, i) => {
+    const id = 'plan-' + i;
+    const w = watched.find(x => x.id === id);
+    const st = w ? w.status : 'open';
+    return `<div class="buy-row" data-id="${id}">
+      <div class="buy-main"><b>${esc(b.item)}</b><div class="reason">${esc(b.range)} · ${esc(b.horizon)} · ${esc(b.why)}</div></div>
+      <div class="buy-acts">
+        <button class="btn sm ghost buy-act" data-st="watch" ${st === 'watch' ? 'disabled' : ''}>${st === 'watch' ? 'Watching' : 'Watch'}</button>
+        <button class="btn sm ghost buy-act" data-st="bought" ${st === 'bought' ? 'disabled' : ''}>Bought</button>
+        <button class="btn sm ghost buy-act" data-st="skip">Skip</button>
+      </div>
+    </div>`;
+  }).join('') || '<p class="reason">No research buys loaded yet — Refresh data or check game-plan.json.</p>';
+  $('#modalRoot').innerHTML = `<div class="modal-bg" id="modalBg"><div class="modal" style="max-width:720px">
+    <button class="close-x" id="modalClose">×</button>
+    <div class="modal-body" style="padding:26px">
+      <h2 style="font-size:20px;margin:0 0 6px">🛒 Buy &amp; watch targets</h2>
+      <p class="reason" style="margin:0 0 14px">Local only — marks stay on this Mac. Research picks come from your Game Plan invest list.</p>
+      <div class="buy-list">${rows}</div>
+      <p class="reason" style="margin-top:12px">${esc((P && P.thesis) || 'Educational picks — not financial advice.')}</p>
+    </div></div></div>`;
+  $('#modalClose').onclick = closeModal;
+  $('#modalBg').onclick = e => { if (e.target.id === 'modalBg') closeModal(); };
+  $$('#modalRoot .buy-act').forEach(btn => {
+    btn.onclick = () => {
+      const row = btn.closest('.buy-row');
+      const id = row.dataset.id;
+      const s = buyWatchGet();
+      const item = picks[+id.replace('plan-', '')];
+      s.items = s.items.filter(x => x.id !== id);
+      if (btn.dataset.st !== 'skip') {
+        s.items.push({ id, status: btn.dataset.st, title: item ? item.item : id, at: Date.now() });
+      }
+      buyWatchSet(s);
+      buyWatchOpen();
+      if (State.view === 'dashboard') renderDashboard();
+    };
+  });
+}
+
+function buyWatchSet(s) { try { localStorage.setItem(LS_BUYS, JSON.stringify(s)); } catch { /* ignore */ } }
+
+function closeTabMore() {
+  const btn = $('#tabMoreBtn'), menu = $('#tabMoreMenu'), wrap = $('#tabMore');
+  if (menu) menu.hidden = true;
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+  if (wrap) wrap.classList.remove('open');
+}
+
+function countByGame(game) {
+  return (State.cards || []).filter(c => !game || game === 'all' || c.game === game).length;
+}
+
+function dataFreshness() {
+  const gen = (State.cards && State.meta && (State._generatedAt || null)) || null;
+  // prefer collection.generatedAt captured at load
+  const generatedAt = State._colGeneratedAt || null;
+  let touch = null;
+  try { touch = JSON.parse(localStorage.getItem(LS_DATA_TOUCH) || 'null'); } catch { touch = null; }
+  const stamp = (touch && touch.at) || generatedAt;
+  let days = null;
+  if (stamp) {
+    const t = Date.parse(stamp);
+    if (!Number.isNaN(t)) days = Math.max(0, Math.floor((Date.now() - t) / 86400000));
+  }
+  let tone = 'ok', label = 'Prices look current';
+  if (days == null) { tone = 'warn'; label = 'Refresh after your next PriceCharting export'; }
+  else if (days >= 14) { tone = 'bad'; label = `${days} days since last export refresh — catch up`; }
+  else if (days >= 3) { tone = 'warn'; label = `${days} day${days === 1 ? '' : 's'} since last export refresh`; }
+  else if (days === 0) { tone = 'ok'; label = 'Caught up today'; }
+  else { tone = 'ok'; label = `Refreshed ${days} day${days === 1 ? '' : 's'} ago`; }
+  return { days, tone, label, stamp, generatedAt };
+}
+
+function filterCollectionToGame(game) {
+  State.filters.game = game || 'all';
+  switchView('collection');
+  buildToolbar();
+  renderCollection(true);
+}
+
+function gameIcon(g) { return (GAME_META[g] || {}).icon || '🃏'; }
+
+function gameShort(g) { return (GAME_META[g] || {}).short || g || 'Other'; }
+
+function gamesBarsHTML() {
+  const bg = (State.meta && State.meta.byGame) || {};
+  const rows = Object.entries(bg).sort((a, b) => b[1] - a[1]);
+  if (!rows.length) return '<p class="muted" style="font-size:13px">No games yet.</p>';
+  const max = rows[0][1] || 1;
+  return `<div class="bars">${rows.map(([g, v]) => {
+    const n = countByGame(g);
+    return `<div class="bar-row game-row" data-g="${esc(g)}" title="Filter Collection to ${esc(gameShort(g))}" style="cursor:pointer">
+      <div class="bl">${gameIcon(g)} ${esc(gameShort(g))} <span class="reason">· ${n}</span></div>
+      <div class="bar-track"><div class="bar-fill ${isPokemonGame(g) ? 'gold' : ''}" style="width:${Math.max(2, v / max * 100)}%"></div></div>
+      <div class="bv">${money0(v)}</div></div>`;
+  }).join('')}</div>`;
+}
+
+function gamesOwned() {
+  const bg = (State.meta && State.meta.byGame) || {};
+  return Object.keys(bg).sort((a, b) => (bg[b] || 0) - (bg[a] || 0));
+}
+
+function isPokemonGame(gOrCard) {
+  const g = typeof gOrCard === 'string' ? gOrCard : (gOrCard && gOrCard.game);
+  return g === 'Pokémon' || g === 'Pokemon';
+}
+
+function nextStepsHTML() {
+  const steps = buildNextSteps();
+  return `<div class="panel next-steps">
+    <div class="ns-head">
+      <h3>Next steps</h3>
+      <span class="hint">Tap a card — one job each</span>
+    </div>
+    <div class="ns-grid">${steps.map((s, i) => `
+      <button type="button" class="ns-card tone-${esc(s.tone)}" data-ns="${i}">
+        <div class="ns-kind"><span class="ns-ic">${s.icon}</span>${esc(s.kind)}</div>
+        <div class="ns-title">${esc(s.title)}</div>
+        <div class="ns-detail">${esc(s.detail)}</div>
+        <div class="ns-cta">${esc(s.cta)} →</div>
+      </button>`).join('')}
+    </div>
+  </div>`;
+}
+
+function vaultHeroHTML() {
+  const m = State.meta;
+  const fresh = dataFreshness();
+  const series = snapshotSeries();
+  let delta = null;
+  if (series.length >= 2) delta = series[series.length - 1][1] - series[series.length - 2][1];
+  const games = gamesOwned().length;
+  return `<div class="vault-hero">
+    <div class="vh-main">
+      <div class="vh-kicker">Private vault on this Mac · one-time · no subscription</div>
+      <h2 class="vh-title">What should you do today?</h2>
+      <p class="vh-sub">Clear next steps for selling, grading, buying, and keeping prices honest — your data stays on this machine.</p>
+      <div class="vh-meta">
+        <span class="vh-chip gold">${money0(m.totalValue)} portfolio</span>
+        <span class="vh-chip ${m.totalPL >= 0 ? 'up' : 'down'}">${m.totalPL >= 0 ? '+' : ''}${money0(m.totalPL)} P/L</span>
+        <span class="vh-chip">${m.totalCards.toLocaleString()} cards · ${games} game${games === 1 ? '' : 's'}</span>
+        ${delta != null ? `<span class="vh-chip ${delta >= 0 ? 'up' : 'down'}">${delta >= 0 ? '+' : ''}${money(delta)} vs last snapshot</span>` : ''}
+        <span class="vh-chip fresh-${fresh.tone}">${esc(fresh.label)}</span>
+      </div>
+    </div>
+    <div class="vh-aside">
+      <div class="vh-own">
+        <b>You own this</b>
+        <span>No account · local files · optional BYOK live data</span>
+      </div>
+      <button class="btn sm ghost" id="vh-guide">？ 60-second tour</button>
+    </div>
+  </div>`;
+}
+
+function wireNextSteps() {
+  const steps = buildNextSteps();
+  $$('#view-dashboard .ns-card').forEach(el => {
+    el.onclick = () => { const s = steps[+el.dataset.ns]; if (s && s.go) s.go(); };
+  });
+  if ($('#vh-guide')) $('#vh-guide').onclick = () => openWalkthrough(0);
+}
+
+function wireTabMore() {
+  const btn = $('#tabMoreBtn'), menu = $('#tabMoreMenu'), wrap = $('#tabMore');
+  if (!btn || !menu) return;
+  btn.onclick = (e) => {
+    e.stopPropagation();
+    const open = menu.hidden;
+    menu.hidden = !open;
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    wrap.classList.toggle('open', open);
+  };
+  if (!_tabMoreDocWired) {
+    document.addEventListener('click', (e) => {
+      const w = $('#tabMore');
+      if (w && !w.contains(e.target)) closeTabMore();
+    });
+    _tabMoreDocWired = true;
+  }
+}

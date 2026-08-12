@@ -1,4 +1,4 @@
-/* ============== Pokémon Den — Revamp views ==============
+/* ============== Pokémon DenZ — Revamp views ==============
    Adds five tabs on top of app.js (which owns State + helpers):
      🧊 3D Studio   — interactive 3D card viewer + 3D-print STL exports
      🏠 The Den     — a VR-style 3D display room, auto-loaded & editable
@@ -2120,7 +2120,7 @@ async function renderParity() {
 
 function parityWorkOrder(i) {
   return `WORK ORDER — ${i.title} (${i.id})
-Project: Pokémon Den · repo Sparkey333/pokemon-chest · branch claude/pokemon-chest-redesign-31io2c
+Project: Pokémon DenZ · repo Sparkey333/pokemon-chest · branch claude/pokemon-chest-redesign-31io2c
 Current status: ${i.status} · priority ${i.priority} · size ${i.est} · area ${i.area}
 
 SPEC (implement exactly this; no other context needed):

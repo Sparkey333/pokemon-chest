@@ -1,8 +1,16 @@
 # Secrets — your BYOK API keys live here. NEVER commit this.
 settings.local.json
 
+# Python bytecode
+__pycache__/
+*.pyc
+
 # Cached TCGdex set data (re-fetched on demand)
 scripts/cache/
+cache/
+
+# Phone-mode LAN TLS (self-signed, local only)
+lan-tls/
 
 # Cached PriceCharting catalog searches (re-fetched on demand)
 search-cache.json
@@ -28,6 +36,15 @@ __pycache__/
 # by luck rather than by rule.
 Pok*mon *— Pocket.html
 Pocket.html
+# Generated iPhone snapshots (regenerated from data)
+Pok*mon Chest — Pocket.html
+Pok*mon Chest — Deck.html
+
+# Local download / packaging dumps
+artifacts/
+*.zip
 
 # Generated reference/listing images
 listing-photos/
+card-art/
+chest-test.html

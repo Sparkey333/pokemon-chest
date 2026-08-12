@@ -1,25 +1,30 @@
-# Pokémon Den 🔴⚪
+# Pokémon Chest 🔴⚪
 
-A **free, 100% local** database and sell/grade advisor for your Pokémon card
-collection — built from your PriceCharting export. English **and** Japanese, real
-card art, one-click live sold-comp links, grading break-even math, and
-(optionally, bring-your-own-key) live price data and AI recommendations.
+A premium‑style **vault you own** (free from source / one‑time when purchased) for your
+card collection — built from your PriceCharting export. English **and** Japanese, card art,
+one‑click live sold‑comp links, and (optionally, bring‑your‑own‑key) live price data and
+AI recommendations. Runs 100% locally on your Mac: no accounts, no subscriptions, and
+every core feature works with **no API keys at all**.
 
-No accounts. No subscriptions. No telemetry. Every core feature works with **no
-API keys at all**, and your collection never leaves your Mac.
+> Think PriceCharting *Premium* + a sell/grade advisor, but it's yours and it's free.
 
 ---
 
-## ⬇️ Download
+## Run it
 
-Two builds are published as rolling releases. Both are **ad-hoc signed**, not
-notarized — see [Gatekeeper](#gatekeeper-cant-be-verified) below.
+**Easiest:** double‑click **`start.command`**. It launches a tiny local server
+(`server.py`, Python stdlib only) and opens Pokémon Chest in your browser at
+`http://localhost:8787`. Keep the little Terminal window open while you browse; close it
+(or Ctrl‑C) to stop. First time, macOS may ask you to confirm — right‑click → Open, or
+System Settings → Privacy & Security → "Open Anyway".
 
-### 🏠 Pokémon Den — the current line
+**Native app:** once built, open **`Pokémon Chest.app`** (or install from the `.dmg`) —
+same app, no Terminal or browser needed. The Tauri shell in `src-tauri/` wraps the exact
+same local server and UI.
 
-The 3D Den room, Scanner (single card + 9-pocket binder page), Add & Sold
-ledger, Sets completion tracker, price alerts, per-card price history, AI
-pre-grade, Best Sellers and Brand Lab.
+**Download (macOS):** open **[`GET-POKEMON-CHEST.html`](GET-POKEMON-CHEST.html)** (one page, three paths),
+or the rolling release **[chest-latest](https://github.com/Sparkey333/pokemon-chest/releases/tag/chest-latest)**.
+On a Mac you can also double‑click **`build-app.command`** to build a fresh DMG locally.
 
 **[⬇ Download the latest Den build ›](https://github.com/Sparkey333/pokemon-chest/releases/tag/dmg-latest)**
 
@@ -47,7 +52,7 @@ Assets: the universal `.dmg`, a source zip, `GET-POKEMON-CHEST.html`,
 ### Build it yourself (recommended)
 
 Clone the repo, then double-click **`build-app.command`**. It regenerates the
-full icon set from `icon-source.png` and produces `Pokemon Den.app` plus a
+full icon set from `icon-source.png` and produces `Pokémon DenZ.app` plus a
 styled `.dmg` in `src-tauri/target/release/bundle`. A local build signs with
 your own Apple identity, so it opens on a clean double-click and skips the
 Gatekeeper step entirely. (By hand: `cd src-tauri && cargo tauri build`.)
@@ -59,7 +64,7 @@ Any one of these clears it:
 
 1. Double-click **`OPEN-ANYWAY.command`** (in the repo, and on the Chest release), or
 2. System Settings → Privacy & Security → **Open Anyway**, or
-3. `xattr -cr "/Applications/Pokemon Den.app"`
+3. `xattr -cr "/Applications/Pokémon DenZ.app"`
 
 Real notarization needs a paid Apple Developer Program membership; the build
 pipeline is ready to sign, notarize and staple once those credentials exist.
@@ -119,56 +124,76 @@ placeholder exports to download before reading them.
 | **Sell & Grade Guide** | Current grading tiers & costs, when to grade vs. not, grade‑value multiples, marketplace fees, and the best venue per card type — with sources. |
 | **📋 Parity** | The live feature ledger from `data/parity.json` — every feature with status, spec, acceptance criteria and file pointers. |
 
-Every card also gets a tailored grade/sell recommendation, direct live‑comp
-searches, sell math, price history, price alerts, and a private note.
+Every card also gets a tailored grade/sell recommendation, direct live‑comp searches for
+that exact card, sell math, and a private note + "For sale / Sold" tags.
 
 ---
 
-## Keeping inventory current — automatic
+## Keeping prices current — the ↻ Refresh flow
 
 1. On **PriceCharting.com**: Collection → **Download** (Excel).
-2. Leave the `.xlsx` anywhere the app looks — `~/Downloads`, Desktop, Documents,
-   the project folder, or iCloud Drive (any name containing "PriceCharting").
-   **That's it** — the app pulls new cards + prices in on its own within ~20
-   seconds. ↻ Refresh is the manual trigger.
-3. One-off adds without an export: **➕ Add & Sold → search the PriceCharting
-   catalog** and add any card with one click.
+2. Drop the new `.xlsx` into this project folder, **`~/Downloads`**, Desktop,
+   Documents, or **iCloud Drive** (any name containing "PriceCharting").
+3. Click **↻ Refresh** in the app's top bar. It finds the newest export, rebuilds
+   `data/collection.json` (new prices + new cards, re‑fetching card art), and reloads.
+
+Fallback: double‑clicking `refresh-data.command` does exactly the same rebuild from
+Terminal. Your value‑over‑time history, For‑sale / Sold tags, and notes are stored
+privately in your browser and survive every refresh.
+
+### After migrating to iCloud Drive
+
+If this project (or your exports) moved into iCloud:
+
+1. Double‑click **`fix-icloud.command`** once — it scans Desktop / Documents /
+   Downloads / iCloud Drive, downloads cloud‑only placeholders when possible, and
+   seeds a local writable home.
+2. When the project itself lives in iCloud, live writes (settings, rebuilt data,
+   card art) go to **`~/Library/Application Support/PokemonChest`** so iCloud sync
+   doesn't fight the server. Launchers set this automatically.
+3. Then use **`start.command`** as usual.
 
 ---
 
 ## Optional live data & AI (BYOK)
 
-Pokémon Den is fully usable with zero keys. To add live data, open **⚙ Live**
-in-app and paste your own:
+Pokémon Chest is fully usable with zero keys. If you want live data, open **Settings**
+in‑app and paste your own keys (bring‑your‑own‑key):
 
 | Key | Unlocks |
 |-----|---------|
-| **PriceCharting token** | Live prices straight from PriceCharting's API — including **one-click bulk sync** that re-prices the whole collection (raw + graded tiers), plus catalog search and set cost-to-complete. |
+| **PriceCharting token** | Live current prices by product id, plus Scanner catalog search via PriceCharting’s `/api/products` (same connection their site uses). |
 | **Comps API key** | Live sold comps (eBay / TCGplayer / JP marketplaces) without leaving the app. |
-| **Claude or OpenAI key** | AI card identify, binder-page reading, condition pre-grade, and sell/grade recommendations. |
+| **Claude or OpenAI key** | AI sell/grade recommendations per card, plus **photo Identify** in Scanner. Default model: `claude-sonnet-4-6` (Anthropic) or `gpt-4o` (OpenAI). |
 
-Keys are stored **only** in `settings.local.json` — gitignored, never uploaded,
-never bundled into a shipped build. The local server proxies your requests
-straight to each provider; nothing passes through any third party.
+### Scanner + release codex (no key required)
+
+The Scanner tab searches a local **card codex** built from [TCGdex](https://tcgdex.dev) — English and Japanese sets, including special/secret rares past the official set count. Rebuild anytime with **↻ Rebuild Codex** in Scanner, or:
+
+```bash
+python3 scripts/build_codex.py
+```
+
+With a PriceCharting token connected, Scanner also queries their product catalog by name/number (unique product ids). On a Mac, Continuity Camera lists your iPhone; or enable **Phone mode** for a same‑Wi‑Fi LAN link.
+
+Keys are stored **only** in `settings.local.json` in this folder — gitignored, never
+uploaded, and **never bundled into a shipped build**. The local server proxies your
+requests directly to each provider; nothing passes through any third party.
 
 ---
 
 ## Privacy
 
-No accounts, no analytics, no tracking. Your collection, prices, notes, sales
-and photos never leave your Mac. The only network calls are card art from
-[TCGdex](https://tcgdex.dev), the comp links *you* click, and — only if you add
-keys — the BYOK APIs above. An optional local-only error log (off by default,
-⚙ Live) is never transmitted anywhere automatically.
-
-Details: [`LEGAL.md`](LEGAL.md), also readable in-app from the About panel.
-
----
+- **100% local.** Your collection, prices, notes, and history never leave your Mac.
+  The only network calls are card images (from [TCGdex](https://tcgdex.dev), a free open
+  card API), the comp links *you* click, and — only if you add keys — the BYOK APIs above.
+- Card art is baked in for most cards; the rest (mostly generic promos and brand‑new JP
+  sets) show a labelled placeholder that still links to the real PriceCharting page.
 
 ## Files
 
 ```
-Pokemon Den/
+Pokemon Chest/
 ├─ PriceCharting-collection.xlsx   your export (the source of truth)
 ├─ index.html                      the app UI
 ├─ assets/    app.js, revamp.js, a11y.js, pwa.js, styles.css, revamp.css
@@ -176,45 +201,28 @@ Pokemon Den/
 ├─ manifest.webmanifest            install metadata (Android/Chrome)
 ├─ sw.js                           offline shell — never caches live prices
 ├─ data/      collection.json      built from your xlsx (prices, images, links)
-│             codex.json           395 sets / 31,603 EN+JA cards (TCGdex)
-│             parity.json          the live feature ledger
+│             codex.json           full EN+JA Pokémon TCG release index (TCGdex)
 │             selling-intel.json   grading/fee/venue guidance
-│             build-flags.json     build profile (publicArt, shipBuild)
 ├─ scripts/   build_data.py        xlsx → collection.json (+ image matching)
-│             build_codex.py       rebuilds the card codex from TCGdex
-│             mac_paths.py         iCloud/Drive path resolution
+│             build_codex.py       TCGdex EN+JA → data/codex.json
 ├─ server.py                       local server + optional BYOK API proxy
-├─ src-tauri/                      native macOS shell ("Pokémon Den.app")
+├─ src-tauri/                      native macOS shell ("Pokémon DenZ.app")
 │             PrivacyInfo.xcprivacy  Apple privacy manifest (declares: nothing)
 ├─ STORE-LISTING.md                submission copy, review notes, checklist
 ├─ settings.local.json             your BYOK keys (gitignored — never commit)
-├─ start.command                   ▶ launch in the browser
-├─ build-app.command               🔨 build the .app + .dmg
-├─ fix-icloud.command              ☁️ repair paths after an iCloud migration
-├─ OPEN-ANYWAY.command             🔓 clear quarantine + launch
+├─ start.command                   ▶ double‑click to launch in the browser
+├─ refresh-data.command            ↻ fallback data refresh (the in‑app ↻ does this too)
 └─ README.md
 ```
 
----
-
-## Legal
-
-**Unofficial and fan-made.** Not affiliated with, endorsed, sponsored or approved
-by Nintendo, The Pokémon Company, Creatures Inc., GAME FREAK inc., or
-PriceCharting.
-
-**Pokémon © Nintendo / Creatures Inc. / GAME FREAK inc.** Pokémon and all
-character names, card artwork and logos are trademarks and copyrights of their
-owners, used here only to identify cards in a collector's own collection. Card
-images come from [TCGdex](https://tcgdex.dev). Marketplace names are trademarks
-of their respective owners.
-
-"Pokémon Den" / "Pokémon Chest" are working names for personal use. Any public
-product release would ship under an original name without "Pokémon" in it — see
-[`ROADMAP-TO-PUBLISH.md`](ROADMAP-TO-PUBLISH.md).
-
 ## Not financial advice
 
-Grading costs, fees, multiples and venue guidance are compiled from public hobby
-sources and change often. Prices are estimates. **Always check live sold comps
-before you sell or grade** — decisions and outcomes are yours.
+Grading costs, fees, multiples, and venue guidance are compiled from public hobby
+sources and change often. Prices are estimates. **Always check live sold comps before
+you sell or grade** — decisions and outcomes are yours.
+
+---
+
+## Store publishing
+
+See **[STORE.md](STORE.md)** for Mac App Store, direct (Gumroad/Lemon), itch.io, Microsoft Store, and Steam — positioned as a **one-time owned vault**, not a subscription.

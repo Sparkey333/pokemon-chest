@@ -1,8 +1,8 @@
 name: Build macOS DMG
 
-# Builds "Pokemon Den.app" + the styled .dmg on GitHub's macOS machines,
-# so a fresh installer is downloadable without building on your own Mac.
-# Runs on every push to the redesign branch, or on demand (Run workflow).
+# Builds "Pokemon Chest.app" + the .dmg on GitHub's macOS runners, then
+# publishes a rolling chest-latest release (DMG + source zip + guide) so the
+# GET-POKEMON-CHEST.html download buttons always point at a fresh build.
 on:
   workflow_dispatch:
     inputs:
@@ -15,7 +15,9 @@ on:
         type: boolean
         default: false
   push:
-    branches: [claude/pokemon-chest-redesign-31io2c, main]
+    branches:
+      - main
+      - claude/pokemon-chest-redesign-31io2c
     paths:
       - "src-tauri/**"
       - "assets/**"
@@ -24,10 +26,16 @@ on:
       - "index.html"
       - "server.py"
       - "icon-source.png"
+      - "package.json"
+      - "OPEN-ANYWAY.command"
       - ".github/workflows/build-dmg.yml"
 
 permissions:
-  contents: write   # lets the job publish the dmg as a release asset
+  contents: write
+
+concurrency:
+  group: dmg-latest
+  cancel-in-progress: true
 
 jobs:
   dmg:
@@ -70,34 +78,36 @@ jobs:
       - name: Regenerate the full icon set from icon-source.png
         run: npx --yes "@tauri-apps/cli@^2" icon icon-source.png
 
-      # CI has no Apple Developer certificate — ad-hoc sign ("-") instead of the
-      # configured identity. First launch needs right-click -> Open (Gatekeeper).
+      # CI has no Apple Developer certificate secrets in this repo yet — ad-hoc
+      # sign ("-") instead of the configured Apple Development identity.
+      # Gatekeeper still needs Open Anyway once (see OPEN-ANYWAY.command).
+      # When Developer ID + notarization secrets exist, /gitkit switches to them.
       - name: Build app + dmg (universal, ad-hoc signed)
         run: >
           npx --yes "@tauri-apps/cli@^2" build
           --target universal-apple-darwin
-          --config '{"bundle":{"macOS":{"signingIdentity":"-"}}}'
+          --config '{"bundle":{"macOS":{"signingIdentity":"-","hardenedRuntime":false}}}'
 
-      # Primary delivery: a rolling "dmg-latest" release — release assets do NOT
-      # count against the Actions artifact-storage quota (which is what failed
-      # on run #1). Download from the repo's Releases page.
       - name: Zip the source tree (tracked files at this commit)
         run: |
-          git archive --format=zip -o "PokemonDen-source-${GITHUB_SHA:0:7}.zip" "$GITHUB_SHA"
-          ls -lh PokemonDen-source-*.zip
+          git archive --format=zip -o "DenZ-source-${GITHUB_SHA:0:7}.zip" "$GITHUB_SHA"
+          cp "DenZ-source-${GITHUB_SHA:0:7}.zip" DenZ-source-latest.zip
+          ls -lh DenZ-source-*.zip
 
       # An unsigned download people are told to right-click past Gatekeeper is
       # exactly the download that most needs a checksum to verify against.
       - name: Checksum the release assets
         run: |
-          DMG=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg)
-          SRC=$(ls PokemonDen-source-*.zip)
-          # Checksum from inside the dmg's own directory. Post-processing the
-          # path out of shasum's output with sed ate the hash itself, because
-          # `.*/` matches greedily across the whole line — the dmg row shipped
-          # as a bare filename with no hash at all.
-          ( cd "$(dirname "$DMG")" && shasum -a 256 "$(basename "$DMG")" ) > SHA256SUMS.txt
-          shasum -a 256 "$SRC" >> SHA256SUMS.txt
+          DMG=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg | head -1)
+          # Stable asset name (spaces -> dots) so download links and the
+          # checksum file always refer to the same string.
+          DMG_NAME=$(basename "$DMG" | tr ' ' '.')
+          cp "$DMG" "$DMG_NAME"
+          # Checksum by basename only. Stripping the path out of shasum's
+          # output with sed ate the hash itself once already, because `.*/`
+          # matches greedily across the whole line.
+          shasum -a 256 "$DMG_NAME" "DenZ-source-${GITHUB_SHA:0:7}.zip" \
+                        DenZ-source-latest.zip OPEN-ANYWAY.command > SHA256SUMS.txt
           cat SHA256SUMS.txt
           # Fail loudly rather than publish an unverifiable checksum file again.
           while read -r h f; do
@@ -107,23 +117,25 @@ jobs:
             esac
           done < SHA256SUMS.txt
 
-      - name: Publish the dmg + source zip to the dmg-latest release
+      - name: Publish the unified DenZ build to dmg-latest
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          DMG=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg)
-          SRC=$(ls PokemonDen-source-*.zip)
+          VER=$(python3 -c "import json; print(json.load(open('package.json'))['version'])")
+          DMG_NAME=$(ls *.dmg | head -1)
           SUM=$(awk '{print $1}' SHA256SUMS.txt | head -1)
-          echo "publishing: $DMG  +  $SRC"
+          echo "publishing DenZ v$VER: $DMG_NAME"
           gh release delete dmg-latest --cleanup-tag --yes || true
-          gh release create dmg-latest "$DMG" "$SRC" SHA256SUMS.txt OPEN-ANYWAY.command \
+          gh release create dmg-latest "$DMG_NAME" \
+            "DenZ-source-${GITHUB_SHA:0:7}.zip" DenZ-source-latest.zip \
+            SHA256SUMS.txt OPEN-ANYWAY.command \
             --prerelease \
             --target "$GITHUB_SHA" \
-            --title "Pokémon Den — latest macOS build + source" \
+            --title "DenZ v${VER} — latest macOS build + source" \
             --notes "$(printf '%s\n' \
               "Universal (Apple Silicon + Intel) build of commit ${GITHUB_SHA:0:7}." \
               "" \
-              "**First launch** — the build is ad-hoc signed, not notarized, so macOS will say it \"can't be verified\". Any one of these clears it:" \
+              "**First launch** — ad-hoc signed, not notarized, so macOS will say it \"can't be verified\". Any one of these clears it:" \
               "1. Download \`OPEN-ANYWAY.command\` below and double-click it, or" \
               "2. Right-click the app → **Open**, or" \
               "3. System Settings → Privacy & Security → **Open Anyway**" \
@@ -134,13 +146,15 @@ jobs:
               '```' \
               "dmg sha256: \`${SUM}\`")"
 
-      # Best-effort secondary copy; skipped gracefully while the artifact
-      # storage quota is exhausted.
       - name: Upload the dmg as a workflow artifact
         uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
           name: Pokemon-Chest-dmg
-          path: src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          path: |
+            src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+            GET-POKEMON-CHEST.html
+            OPEN-ANYWAY.command
+            SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14
