@@ -1638,6 +1638,146 @@
       "dependsOn": [],
       "demand": "publish-gate",
       "notes": "Shipped 2026-07-28. Emerald Lab compiles the pokeemerald decompilation and runs it in an emulator — an automatic App Store rejection (guideline 2.5.2 executable code / 4.7 emulators) and indefensible in a product that's sold. This is the first of the three store blockers identified in the 2026-07-27 audit; the other two (IP rename, and sandboxing the bundled Python server) remain open. Verified 12/12 across both profiles. Note build_flags() is bundle-only by design — see spec."
+    },
+    {
+      "id": "pwa-installable",
+      "title": "Installable web app (PWA) with offline shell",
+      "icon": "📲",
+      "area": "platform",
+      "status": "shipped",
+      "priority": "P1",
+      "spec": "manifest.webmanifest (name/short_name/id/start_url/scope/display standalone, theme+background #1a1421, 192+512 any and maskable icons in assets/pwa/, three app shortcuts). sw.js: cache named pokechest-shell-v<APP_VERSION>, install pre-caches the shell entry-by-entry so one 404 can't void the whole cache, activate deletes every other cache. Fetch rules, in order: skip non-GET; skip cross-origin (TCGdex art stays in the browser cache, not our quota); NEVER intercept /api/* (live prices and BYOK proxying must always be real); /data/* network-first with cache fallback; everything else stale-while-revalidate. assets/pwa.js registers it on load and exposes PWA/pwaInstall()/pwaIsIOS()/pwaInstallHint(); it no-ops inside Tauri and on file:// because the desktop app IS the installed form. index.html carries the manifest link plus the four iOS-only meta tags (Safari ignores the manifest entirely). server.py sends Cache-Control: no-cache for /sw.js and /manifest.webmanifest so an installed phone can't get pinned to an old build.",
+      "ux": "Open the app on a phone (Scanner → Phone mode QR). iOS: Share → Add to Home Screen. Android/Chrome: an 📲 Install app button appears in the phone-mode panel. Either way it then launches fullscreen with no browser chrome and still opens with no signal.",
+      "files": [
+        "manifest.webmanifest",
+        "sw.js",
+        "assets/pwa.js",
+        "assets/pwa/",
+        "index.html",
+        "server.py"
+      ],
+      "acceptance": [
+        "GET /manifest.webmanifest returns valid JSON with 4 icons and Cache-Control: no-cache.",
+        "GET /sw.js returns JS with Cache-Control: no-cache.",
+        "The service worker registers on localhost and reaches activated with zero pageerrors.",
+        "The SW never caches an /api/ response and never intercepts cross-origin requests.",
+        "pwa.js no-ops when window.__TAURI__ is present.",
+        "All four iOS meta tags and the apple-touch-icon are present in index.html."
+      ],
+      "verify": "scratchpad/verify-ship.js — asserts the manifest parses and its icons resolve 200, the SW registers and activates, /api/ is excluded from the fetch handler, and the iOS tags are in the head.",
+      "est": "M",
+      "dependsOn": [],
+      "demand": "high",
+      "notes": "Ship improvement #1 ✅ 2026-08-01. This is the app's mobile format — a real iOS App Store build needs Xcode on Brandon's Mac plus a paid membership, so home-screen install is the honest shipping path today. Not a substitute for a native build; a stepping stone to one."
+    },
+    {
+      "id": "a11y-keyboard-screenreader",
+      "title": "Accessibility: ARIA tablist, keyboard nav, focus management",
+      "icon": "♿",
+      "area": "platform",
+      "status": "shipped",
+      "priority": "P1",
+      "spec": "assets/a11y.js, loaded last so it decorates finished UI rather than being threaded through 19 render functions. Tabs become role=tab in a role=tablist with aria-controls/aria-selected and a roving tabindex (exactly one tab in the tab order); Arrow/Home/End move between them and switch view. Views become role=tabpanel, aria-labelledby their tab, aria-hidden when inactive. switchView is wrapped (revamp.js already wraps it once; layering is fine) to keep ARIA in sync and announce the new view through a polite live region. Modals are built by innerHTML into #modalRoot from a dozen call sites, so a MutationObserver gives every one of them role=dialog/aria-modal, aria-labelledby its heading, an initial focus on the close button, a Tab focus trap, Escape-to-close and focus restore — with no edits to any of those call sites. revamp.css adds .sr-only, a .skip-link, :focus-visible rings on every interactive surface (not just .btn/.tab), and a prefers-reduced-motion block that kills the Den's auto-spin and smooth scrolling.",
+      "ux": "Tab from the top: a skip link, then the tab strip as one stop with arrows to move between sections. Escape closes any modal and focus returns where it was. Reduced-motion is respected.",
+      "files": [
+        "assets/a11y.js",
+        "assets/revamp.css",
+        "index.html"
+      ],
+      "acceptance": [
+        "#tabs has role=tablist; every .tab has role=tab, aria-controls and aria-selected.",
+        "Exactly one tab has tabindex=0 at any time; the rest are -1.",
+        "ArrowRight on a focused tab moves focus and switches the view.",
+        "Every .view has role=tabpanel; inactive ones carry aria-hidden=true.",
+        "An open modal has role=dialog and aria-modal=true and takes focus; Escape closes it.",
+        "A .skip-link is the first focusable element in the document."
+      ],
+      "verify": "scratchpad/verify-ship.js — walks the tablist contract, drives ArrowRight/Home/End, opens a card modal and asserts dialog semantics plus Escape-to-close, and checks the skip link is first in tab order.",
+      "est": "M",
+      "dependsOn": [],
+      "demand": "medium",
+      "notes": "Ship improvement #3 ✅ 2026-08-01. Both stores check this on review, and 19 unlabelled buttons in a row was the single worst thing about using the app without a mouse."
+    },
+    {
+      "id": "den-vr-cardboard",
+      "title": "VR: stereoscopic Den for a phone headset",
+      "icon": "🥽",
+      "area": "den3d",
+      "status": "shipped",
+      "priority": "P2",
+      "spec": "const VR = { on, ipd: 34 } in revamp.js. denVrEnter() wraps #den-world in .den-eye-l and inserts a deep clone into .den-eye-r; every id is stripped from the clone so no $('#…') lookup can resolve to scenery, and it is aria-hidden. denApply() gains a translateX(±ipd/2) prefix per eye — that lateral camera offset is the whole stereo effect. denVrToggle() requests fullscreen and starts the existing denGyroStart() head tracking on the same user gesture, because iOS requires the DeviceOrientation permission prompt to originate from one. renderDen() resets VR.on (a re-render destroys the eye wrappers) and onfullscreenchange tears stereo down when fullscreen leaves by any route. CSS: .den-vr is a two-column flex, each .den-eye carries its own perspective, and the viewport-spanning vignette and HUD are hidden so they can't straddle the seam.",
+      "ux": "🥽 VR in the Den toolbar splits the room into a stereo pair and goes fullscreen. Drop the phone into any Cardboard-style holder and look around.",
+      "files": [
+        "assets/revamp.js",
+        "assets/revamp.css"
+      ],
+      "acceptance": [
+        "🥽 VR is in the Den toolbar and toggles .den-vr on the viewport.",
+        "In VR the viewport holds exactly two .den-eye children, each containing one world.",
+        "The right-eye clone carries no id attributes anywhere in its subtree.",
+        "The two worlds' transforms differ only by the ±ipd/2 translateX prefix.",
+        "Exiting VR restores a single #den-world as a direct child of the viewport, with no leftover .den-eye.",
+        "Re-rendering the Den while in VR leaves VR.on false rather than stranding the flag."
+      ],
+      "verify": "scratchpad/verify-ship.js — enters VR, asserts the two-eye structure and that the clone is id-free, compares the two transform strings, exits and asserts the DOM is restored, then re-renders and asserts the flag cleared.",
+      "est": "M",
+      "dependsOn": [
+        "den-3d-room"
+      ],
+      "demand": "low",
+      "notes": "✅ 2026-08-01. Deliberately NOT WebXR: the Den is CSS-3D, so navigator.xr would mean rewriting the room in three.js and bundling a renderer. Cardboard-style stereo works today with hardware people already own, and reuses the gyro tracking that was already there. Labelled 'Cardboard-style' in the UI rather than 'VR headset support' so it doesn't over-promise Quest/Vision Pro."
+    },
+    {
+      "id": "release-integrity",
+      "title": "Release integrity: checksums + Gatekeeper opener on every build",
+      "icon": "🔒",
+      "area": "publish",
+      "status": "shipped",
+      "priority": "P1",
+      "spec": "build-dmg.yml gains a checksum step (shasum -a 256 over the dmg and source zip, basenames only) and publishes SHA256SUMS.txt and OPEN-ANYWAY.command alongside them, with release notes carrying the Gatekeeper steps, a 'shasum -a 256 -c SHA256SUMS.txt' line and the dmg's own hash. Also adds a ship_build dispatch input, and — the real fix — the build-profile step now MERGES into data/build-flags.json instead of overwriting it. It previously wrote a fresh {\"publicArt\": true} object, which silently dropped shipBuild, so a public-art dispatch would have shipped the Emerald Lab into a store build.",
+      "ux": "The dmg-latest release now carries the same four assets chest-latest does, and the notes tell you how to verify what you downloaded.",
+      "files": [
+        ".github/workflows/build-dmg.yml",
+        "README.md"
+      ],
+      "acceptance": [
+        "The workflow YAML parses and exposes both public_art and ship_build inputs.",
+        "A completed run publishes dmg, source zip, SHA256SUMS.txt and OPEN-ANYWAY.command to dmg-latest.",
+        "The release notes contain the dmg's sha256 and the verification command.",
+        "Dispatching with public_art=true leaves any pre-existing shipBuild value intact."
+      ],
+      "verify": "python3 -c 'import yaml; yaml.safe_load(open(\".github/workflows/build-dmg.yml\"))' plus a real CI run; confirm the four assets and compare the published digest against the notes.",
+      "est": "S",
+      "dependsOn": [],
+      "demand": "medium",
+      "notes": "Ship improvement #2 ✅ 2026-08-01. An unsigned download that users are told to right-click past Gatekeeper is exactly the download that most needs a checksum. The build-flags overwrite bug was found while editing this file, not reported."
+    },
+    {
+      "id": "store-submission-pack",
+      "title": "App Store submission pack (privacy manifest + listing copy)",
+      "icon": "📋",
+      "area": "publish",
+      "status": "partial",
+      "priority": "P1",
+      "spec": "src-tauri/PrivacyInfo.xcprivacy — required for App Store submission since spring 2024; a build without one is rejected before review. Declares NSPrivacyTracking false, empty tracking domains, empty NSPrivacyCollectedDataTypes (nothing is transmitted, so nothing is collected), and required-reason declarations for FileTimestamp C617.1, UserDefaults CA92.1 and DiskSpace E174.1. STORE-LISTING.md carries the names/IDs table, promotional text, full description, keywords, the App Privacy questionnaire answers, the App Review notes explaining the loopback server and the opt-in LAN mode, the screenshot shot-list, and a pre-submission checklist.",
+      "ux": "Not user-facing — this is the paperwork that makes a submission possible.",
+      "files": [
+        "src-tauri/PrivacyInfo.xcprivacy",
+        "STORE-LISTING.md"
+      ],
+      "acceptance": [
+        "PrivacyInfo.xcprivacy is valid plist XML and parses with plistlib.",
+        "It declares no tracking and no collected data types.",
+        "STORE-LISTING.md exists with description, keywords, review notes and a checklist.",
+        "No listing string contains 'Pokémon' — every app-name slot is the <APP> placeholder."
+      ],
+      "verify": "python3 -c 'import plistlib; plistlib.load(open(\"src-tauri/PrivacyInfo.xcprivacy\",\"rb\"))' and grep the listing for banned strings.",
+      "est": "M",
+      "dependsOn": [
+        "ship-rename-switch"
+      ],
+      "demand": "high",
+      "notes": "✅ 2026-08-01 for the artefacts. PARTIAL, not shipped, and it stays partial until three things Brandon owns are done: the ship name is chosen (every listing string is still <APP>), a paid Apple Developer Program membership exists, and the bundled Python server is either sandboxed or the app ships direct-notarized outside the store instead. See ROADMAP-TO-PUBLISH.md §4."
     }
   ],
   "matrix": {

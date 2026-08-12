@@ -184,6 +184,34 @@ pkmn.gg, Eyevo, PriceCharting app reviews, and app-store/blog comparisons
       and runs an emulator: automatic rejection under guidelines 2.5.2 / 4.7.
       Remaining store blockers: the IP rename, and sandboxing the bundled
       Python server (see §4 — direct notarized distribution avoids the latter).
+- [x] Release integrity ✅ 2026-08-01 — every `dmg-latest` build now publishes
+      `SHA256SUMS.txt` and `OPEN-ANYWAY.command` alongside the dmg and source
+      zip, and the release notes carry the Gatekeeper steps plus a
+      `shasum -a 256 -c` line. Also fixed a latent CI bug: the build-profile
+      step overwrote `data/build-flags.json` wholesale, so a `public_art`
+      dispatch silently dropped `shipBuild` — it merges now, and `ship_build`
+      is its own dispatch input.
+- [x] Installable mobile format ✅ 2026-08-01 — the app is a PWA:
+      `manifest.webmanifest`, a conservative service worker (never caches
+      `/api/*`, network-first on `/data/*`, stale-while-revalidate for the
+      shell, no cross-origin interception), maskable icons, and the four
+      iOS-only meta tags Safari needs. Add it to an iPhone home screen from
+      Scanner → Phone mode and it launches fullscreen and opens offline. Not a
+      native iOS build — that still needs Xcode on the Mac and a paid
+      membership — but it's the real mobile format today.
+- [x] Accessibility pass ✅ 2026-08-01 — the tab strip is a proper ARIA
+      tablist with roving tabindex and arrow-key navigation, views are
+      labelled tabpanels, modals get dialog semantics + focus trap + Escape +
+      focus restore via one MutationObserver (no edits to a dozen call sites),
+      plus a skip link, focus-visible rings on every interactive surface, and
+      `prefers-reduced-motion`.
+- [x] App Store submission paperwork ✅ 2026-08-01 (partial) —
+      `src-tauri/PrivacyInfo.xcprivacy` (required since 2024; declares no
+      tracking, no collected data, and the three required-reason APIs) and
+      `STORE-LISTING.md` (description, keywords, App Privacy answers, App
+      Review notes covering the loopback server and opt-in LAN mode, screenshot
+      shot-list, pre-submission checklist). Stays partial until the name is
+      picked — every listing string is still `<APP>`.
 - [ ] Real signing + notarization in CI (needs Apple cert secrets in repo)
 - [x] Top-5 backlog features above implemented ✅ 2026-08-01 — bulk binder scan
       (#1), AI pre-grade (#2), price alerts (#3), per-card history charts (#4)

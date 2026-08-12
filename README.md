@@ -23,12 +23,14 @@ pre-grade, Best Sellers and Brand Lab.
 
 **[⬇ Download the latest Den build ›](https://github.com/Sparkey333/pokemon-chest/releases/tag/dmg-latest)**
 
-Current: **v2.3.0** — universal (Apple Silicon + Intel), commit `8b5ee95`.
-Assets: `Pokemon.Den_2.3.0_universal.dmg` and `PokemonDen-source-8b5ee95.zip`.
+Current: **v2.4.0** — universal (Apple Silicon + Intel).
+Assets: the universal `.dmg`, a source zip of the exact commit,
+`SHA256SUMS.txt` and `OPEN-ANYWAY.command`.
 
-```
-sha256  5efba33fa6fd133728fdba574e3104ba7ced041f26b29ce312a2aa063d83f615
-        Pokemon.Den_2.3.0_universal.dmg
+Verify what you downloaded — the release notes carry the build's hash, and:
+
+```bash
+shasum -a 256 -c SHA256SUMS.txt
 ```
 
 Every push rebuilds it — `dmg-latest` is always the newest build.
@@ -85,6 +87,12 @@ generated self-signed certificate when `openssl` is available (accept the
 one-time warning; it's your own Mac). Same Wi-Fi, no App Store. Home networks
 only — turn it off when you're done.
 
+Once it's open on the phone, **keep it there**: tap Share ⬆︎ → **Add to Home
+Screen** (Android: your browser's **Install**). It's a full PWA, so it launches
+fullscreen with no browser chrome and still opens when you're out of signal —
+the app shell and your collection are cached locally. Live prices and AI calls
+always go to the network; they're never served from cache.
+
 ☁️ **Moved your files into iCloud Drive?** Run **`fix-icloud.command`**. The app
 detects a project living inside iCloud, routes writable state to
 `~/Library/Application Support/PokemonChest`, and forces cloud-only `.icloud`
@@ -101,7 +109,8 @@ placeholder exports to download before reading them.
 | **🧩 Sets** | Set-completion progress against each set's real size, with the missing-card list, an official/master-set toggle, and a PriceCharting cost-to-complete. Runs off a bundled 31,603-card codex — no API key, works offline. |
 | **➕ Add & Sold** | The ledger: **add cards in‑app** (typed or scanned), **record every sale** (price/fees/venue/date), and **archive** sold cards — kept forever with their photos & sale data on the **Sold Shelf**. Imports an eBay orders CSV or a pasted sale email. Exports a sales CSV. |
 | **📷 Scanner** | Camera capture: hold a card up to your Mac camera (or iPhone via Continuity), snap it, and the photo is **stored with that card's file**. Reads a whole **9-pocket binder page** from one photo. Searches in three tiers — your collection, the bundled codex, then the live PriceCharting catalog. |
-| **🏠 The Den** | Your collection as a walk‑in 3D display room: trophy wall, slab shelf, side gallery, spinning pedestal card, live value ticker, auto-built shelves and a **💸 Sold Shelf**. Drag to look, scroll to walk, click any card. |
+| **🤝 Trade** | Stack what you'd give against what you'd get; the app prices both sides and calls it. Cards come from your collection, the catalog or the offline codex. Unpriced cards are held out of the verdict, not counted as zero — and the closing line compares the trade against what *selling* your side would net after fees. |
+| **🏠 The Den** | Your collection as a walk‑in 3D display room: trophy wall, slab shelf, side gallery, spinning pedestal card, live value ticker, auto-built shelves and a **💸 Sold Shelf**. Drag to look, scroll to walk, click any card. **🥽 VR** splits it into a stereo pair for a Cardboard-style phone headset. |
 | **🧊 3D Studio** | Turn any card into a 3D visual asset — drag/auto‑spin viewer with a holo‑foil effect and a fullscreen **Showcase mode** — plus **3D‑print STL exports** sized to raw / toploader / slab. |
 | **🧪 Grade Lab** | Centering calculator, flaw checklist, **AI photo pre-grade**, and grade-ROI break-even math against the card's grade ladder. |
 | **💰 Best Sellers** | What to sell *right now*: liquidity scoring, the top‑25 **Best‑Sell Board** with fee‑adjusted nets, and playbooks for **eBay auctions, Whatnot live, YouTube, Facebook, TCGplayer, Mercari**. |
@@ -162,7 +171,10 @@ Details: [`LEGAL.md`](LEGAL.md), also readable in-app from the About panel.
 Pokemon Den/
 ├─ PriceCharting-collection.xlsx   your export (the source of truth)
 ├─ index.html                      the app UI
-├─ assets/    app.js, revamp.js, styles.css, revamp.css
+├─ assets/    app.js, revamp.js, a11y.js, pwa.js, styles.css, revamp.css
+│             pwa/                 home-screen icons (any + maskable)
+├─ manifest.webmanifest            install metadata (Android/Chrome)
+├─ sw.js                           offline shell — never caches live prices
 ├─ data/      collection.json      built from your xlsx (prices, images, links)
 │             codex.json           395 sets / 31,603 EN+JA cards (TCGdex)
 │             parity.json          the live feature ledger
@@ -173,6 +185,8 @@ Pokemon Den/
 │             mac_paths.py         iCloud/Drive path resolution
 ├─ server.py                       local server + optional BYOK API proxy
 ├─ src-tauri/                      native macOS shell ("Pokémon Den.app")
+│             PrivacyInfo.xcprivacy  Apple privacy manifest (declares: nothing)
+├─ STORE-LISTING.md                submission copy, review notes, checklist
 ├─ settings.local.json             your BYOK keys (gitignored — never commit)
 ├─ start.command                   ▶ launch in the browser
 ├─ build-app.command               🔨 build the .app + .dmg

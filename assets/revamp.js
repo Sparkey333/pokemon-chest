@@ -377,6 +377,10 @@ const DEN = { yaw: 0, pitch: 4, zoom: 260, posX: 0, drag: null, orbit: false, ra
 
 function renderDen() {
   const el = $('#view-den');
+  // A re-render throws away the whole viewport, eye wrappers included, so the
+  // VR flag has to come down with it or denApply() keeps hunting for a clone
+  // that no longer exists.
+  VR.on = false;
   if (!State.cards.length) return rvEmptyDenState(el, '🏠 The Den');
   const d = RV.den;
   const sel = (id, val, opts, extra) => `<select id="${id}" class="s-inp den-sel" title="${extra || ''}">${opts.map(([v, l]) => `<option value="${v}"${v === String(val) ? ' selected' : ''}>${l}</option>`).join('')}</select>`;
@@ -386,6 +390,7 @@ function renderDen() {
     <div class="sub">Your collection as a walk-in room — <b>WASD/arrows to walk</b>, drag to look, click any card. On a phone, tap 📱 Tilt and move your device to look around. Every display auto-loads and is editable below.</div></div>
     <div class="rv-row" style="flex-wrap:wrap">
       <button class="btn sm" id="den-immerse">⛶ Immersive</button>
+      <button class="btn sm" id="den-vr" title="Split the room into a stereo pair for a phone VR headset (Cardboard-style)">🥽 VR</button>
       <button class="btn sm" id="den-tilt">📱 Tilt</button>
       <button class="btn sm" id="den-orbit">🎥 Auto-orbit</button>
       <button class="btn sm" id="den-cam">📷 Den Cam</button>
@@ -406,6 +411,7 @@ function renderDen() {
     <button class="den-exit btn sm" id="den-exit" hidden>✕ exit</button>
   </div>`;
 
+  $('#den-vr').onclick = () => denVrToggle($('#den-vr'));
   $('#den-cam').onclick = () => switchView('scan');
   $('#den-reset').onclick = () => { DEN.yaw = 0; DEN.pitch = 4; DEN.zoom = 260; DEN.posX = 0; DEN.gyroBase = null; denApply(); };
   $('#den-orbit').onclick = () => { DEN.orbit = !DEN.orbit; $('#den-orbit').classList.toggle('primary', DEN.orbit); denLoop(); };
@@ -423,6 +429,9 @@ function renderDen() {
     vpEl.classList.toggle('den-fs', on);
     $('#den-exit').hidden = !on;
     $('#den-immerse').classList.toggle('primary', on);
+    // Leaving fullscreen by any route (Esc, the system gesture) should drop
+    // stereo too — a split-screen room in a window is nobody's intent.
+    if (!on && VR.on) { denVrExit(); const b = $('#den-vr'); if (b) { b.classList.remove('primary'); b.textContent = '🥽 VR'; } }
   };
   if (!DEN.keysBound) { document.addEventListener('keydown', denKeyHandler); DEN.keysBound = true; }
   $('#den-auto').onchange = e => { RV.den.auto = e.target.checked; rvSaveDen(); renderDen(); };
@@ -450,8 +459,85 @@ function renderDen() {
   denApply();
 }
 function denApply() {
+  const base = `translate3d(${DEN.posX}px, 0, ${DEN.zoom}px) rotateX(${DEN.pitch}deg) rotateY(${DEN.yaw}deg)`;
   const w = $('#den-world');
-  if (w) w.style.transform = `translate3d(${DEN.posX}px, 0, ${DEN.zoom}px) rotateX(${DEN.pitch}deg) rotateY(${DEN.yaw}deg)`;
+  // In VR each eye gets the same camera shifted half an interpupillary
+  // distance sideways — that offset is the entire trick behind stereo depth.
+  if (w) w.style.transform = VR.on ? `translateX(${VR.ipd / 2}px) ${base}` : base;
+  const r = document.querySelector('.den-world-r');
+  if (r) r.style.transform = `translateX(${-VR.ipd / 2}px) ${base}`;
+}
+
+/* ============================================================
+   🥽 VR — the Den in a phone headset.
+
+   The Den is a CSS-3D room, not WebGL, so `navigator.xr` isn't on the
+   table without rewriting the whole thing in three.js. What IS on the
+   table, and what actually works with hardware people own, is the
+   Cardboard approach: split the viewport into two eyes, render the same
+   room twice with a small lateral offset, go fullscreen, and let the
+   existing gyro head-tracking drive the camera. Drop the phone into any
+   $15 holder and it's a real stereoscopic room.
+
+   Called Cardboard mode in the UI, not "VR headset support", because
+   Quest/Vision Pro passthrough want WebXR and this isn't that.
+   ============================================================ */
+const VR = { on: false, ipd: 34 };
+
+function denVrEnter() {
+  const vp = $('#den-vp'), w = $('#den-world');
+  if (!vp || !w || VR.on) return;
+
+  const eyeL = document.createElement('div'); eyeL.className = 'den-eye den-eye-l';
+  const eyeR = document.createElement('div'); eyeR.className = 'den-eye den-eye-r';
+  vp.insertBefore(eyeL, w);
+  eyeL.appendChild(w);
+
+  const clone = w.cloneNode(true);
+  clone.removeAttribute('id');
+  // Duplicate ids would make every $('#…') lookup in the app ambiguous, and
+  // the clone is pure scenery — nothing should ever resolve to it.
+  clone.querySelectorAll('[id]').forEach(n => n.removeAttribute('id'));
+  clone.classList.add('den-world-r');
+  clone.setAttribute('aria-hidden', 'true');
+  eyeR.appendChild(clone);
+  vp.insertBefore(eyeR, eyeL.nextSibling);
+
+  vp.classList.add('den-vr');
+  VR.on = true;
+  denApply();
+}
+
+function denVrExit() {
+  const vp = $('#den-vp'); if (!vp) { VR.on = false; return; }
+  const w = $('#den-world'), eyeL = vp.querySelector('.den-eye-l'), eyeR = vp.querySelector('.den-eye-r');
+  if (w && eyeL) vp.insertBefore(w, eyeL);
+  if (eyeL) eyeL.remove();
+  if (eyeR) eyeR.remove();
+  vp.classList.remove('den-vr');
+  VR.on = false;
+  denApply();
+}
+
+async function denVrToggle(btn) {
+  const vp = $('#den-vp'); if (!vp) return;
+  if (VR.on) {
+    denVrExit();
+    if (document.fullscreenElement) { try { await document.exitFullscreen(); } catch (e) { } }
+    if (btn) { btn.classList.remove('primary'); btn.textContent = '🥽 VR'; }
+    return;
+  }
+  denVrEnter();
+  if (btn) { btn.classList.add('primary'); btn.textContent = '🥽 Exit VR'; }
+  // Fullscreen and the motion-sensor permission both need the user gesture
+  // that got us here, so they have to happen on this tick, not later.
+  try { if (!document.fullscreenElement && vp.requestFullscreen) await vp.requestFullscreen(); } catch (e) { }
+  if (!DEN.gyro) {
+    const tilt = $('#den-tilt');
+    try { await denGyroStart(tilt); } catch (e) { }
+  }
+  if (!DEN.gyro) toast('Stereo view on. Head tracking needs a phone — drag to look on a desktop.');
+  else toast('Drop the phone in a headset holder and look around.');
 }
 /* keyboard walk-through — WASD / arrows move you through the room */
 function denKeyHandler(e) {
@@ -1259,13 +1345,19 @@ async function scRenderLan() {
         <p><b style="color:var(--green)">● Phone mode is ON</b> ${st.tls ? '<span class="reason">(HTTPS — live camera works)</span>' : '<span class="reason">(HTTP — use the “take a photo” button on the phone)</span>'}</p>
         ${st.urls.map(u => `<p style="font-size:16px"><a href="${esc(u)}" target="_blank" rel="noopener"><b>${esc(u)}</b></a></p>`).join('') || '<p class="reason">No LAN IP found — is Wi-Fi on?</p>'}
         <p class="reason">Scan the QR or type the address on your phone (same Wi-Fi).${st.tls ? ' First visit: accept the self-signed certificate warning — it’s your own Mac.' : ''}</p>
+        <p class="reason">📲 <b>Keep it on the phone:</b> once it's open there, add it to the home screen — on iPhone tap Share ⬆︎ → <b>Add to Home Screen</b>; on Android use your browser's <b>Install</b>. It then opens fullscreen like a real app and still loads when you're out of signal.</p>
         <button class="btn ghost sm" id="sc-lan-off" style="margin-top:6px">Turn off</button>
+        <button class="btn sm" id="pwaInstallBtn" style="margin-top:6px" hidden>📲 Install app</button>
       </div>
     </div>`;
   $('#sc-lan-off').onclick = async () => {
     await fetch('/api/lan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ enabled: false }) });
     scRenderLan();
   };
+  // Only Chromium-family browsers hand us an install prompt; elsewhere the
+  // button stays hidden and the copy above is the whole instruction.
+  const pib = $('#pwaInstallBtn');
+  if (pib && window.PWA && window.PWA.prompt) { pib.hidden = false; pib.onclick = () => pwaInstall(); }
 }
 
 /* --- PriceCharting sync --- */

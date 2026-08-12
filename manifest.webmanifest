@@ -1,0 +1,24 @@
+{
+  "name": "Pokémon Den — Collection & Price Tracker",
+  "short_name": "Den",
+  "description": "A free, 100% local database and sell/grade advisor for your Pokémon card collection. Scan cards, track set completion, watch prices, and check trades — no account, no telemetry.",
+  "id": "/",
+  "start_url": "/index.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1a1421",
+  "theme_color": "#1a1421",
+  "categories": ["utilities", "productivity", "lifestyle"],
+  "icons": [
+    { "src": "assets/pwa/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/pwa/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "assets/pwa/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "assets/pwa/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Scan a card", "short_name": "Scan", "url": "/index.html#scan", "description": "Open the camera scanner" },
+    { "name": "Add & Sold", "short_name": "Ledger", "url": "/index.html#ledger", "description": "Add a card or record a sale" },
+    { "name": "Trade Checker", "short_name": "Trade", "url": "/index.html#trade", "description": "Weigh a trade before you agree to it" }
+  ]
+}

@@ -30,7 +30,7 @@ Run:  python3 server.py     (or double-click start.command)
 import os, sys, re, json, html, base64, socket, ssl, time, datetime, ipaddress, subprocess, threading, shutil, shlex, urllib.request, urllib.error, urllib.parse
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "2.3.0"
+VERSION = "2.4.0"
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
 # Writable-home resolution. Normally that's the project folder, but once
@@ -1690,6 +1690,11 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("Referrer-Policy", "no-referrer")
+        # The service worker is the one file that must never be served from a
+        # stale cache: a cached sw.js pins an installed phone to whatever build
+        # it first saw, and no later release can dislodge it.
+        if urllib.parse.urlparse(self.path).path in ("/sw.js", "/manifest.webmanifest"):
+            self.send_header("Cache-Control", "no-cache")
         super().end_headers()
 
     def _json(self, obj, code=200):

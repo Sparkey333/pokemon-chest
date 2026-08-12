@@ -10,6 +10,10 @@ on:
         description: "Public build: ship with NO external catalog card art (user-scanned art only)"
         type: boolean
         default: false
+      ship_build:
+        description: "Store build: strip App-Store-blocking features (removes the Emerald Lab and 404s its routes)"
+        type: boolean
+        default: false
   push:
     branches: [claude/pokemon-chest-redesign-31io2c, main]
     paths:
@@ -44,11 +48,24 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: Public-art build profile (suppress external catalog art)
-        if: ${{ inputs.public_art == true }}
+      # Merge, never overwrite: writing a fresh object here used to drop every
+      # other flag in the file, so a public-art dispatch silently turned
+      # shipBuild off — which is how an App-Store-blocking panel gets into a
+      # store build.
+      - name: Apply build-profile flags
+        if: ${{ inputs.public_art == true || inputs.ship_build == true }}
         run: |
-          echo '{ "publicArt": true }' > data/build-flags.json
-          echo "Built with publicArt:true — external catalog card art suppressed."
+          python3 - <<'PY'
+          import json, pathlib
+          p = pathlib.Path("data/build-flags.json")
+          flags = json.loads(p.read_text()) if p.exists() else {}
+          if "${{ inputs.public_art }}" == "true":
+              flags["publicArt"] = True
+          if "${{ inputs.ship_build }}" == "true":
+              flags["shipBuild"] = True
+          p.write_text(json.dumps(flags, indent=2) + "\n")
+          print("build flags:", flags)
+          PY
 
       - name: Regenerate the full icon set from icon-source.png
         run: npx --yes "@tauri-apps/cli@^2" icon icon-source.png
@@ -69,19 +86,41 @@ jobs:
           git archive --format=zip -o "PokemonDen-source-${GITHUB_SHA:0:7}.zip" "$GITHUB_SHA"
           ls -lh PokemonDen-source-*.zip
 
+      # An unsigned download people are told to right-click past Gatekeeper is
+      # exactly the download that most needs a checksum to verify against.
+      - name: Checksum the release assets
+        run: |
+          DMG=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg)
+          SRC=$(ls PokemonDen-source-*.zip)
+          shasum -a 256 "$DMG" "$SRC" | sed 's#.*/##' > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
       - name: Publish the dmg + source zip to the dmg-latest release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           DMG=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg)
           SRC=$(ls PokemonDen-source-*.zip)
+          SUM=$(awk '{print $1}' SHA256SUMS.txt | head -1)
           echo "publishing: $DMG  +  $SRC"
           gh release delete dmg-latest --cleanup-tag --yes || true
-          gh release create dmg-latest "$DMG" "$SRC" \
+          gh release create dmg-latest "$DMG" "$SRC" SHA256SUMS.txt OPEN-ANYWAY.command \
             --prerelease \
             --target "$GITHUB_SHA" \
             --title "Pokémon Den — latest macOS build + source" \
-            --notes "Universal (Apple Silicon + Intel) build of commit ${GITHUB_SHA:0:7}. Ad-hoc signed — first launch: right-click the app → Open (or build locally via build-app.command for a clean double-click). Source zip attached."
+            --notes "$(printf '%s\n' \
+              "Universal (Apple Silicon + Intel) build of commit ${GITHUB_SHA:0:7}." \
+              "" \
+              "**First launch** — the build is ad-hoc signed, not notarized, so macOS will say it \"can't be verified\". Any one of these clears it:" \
+              "1. Download \`OPEN-ANYWAY.command\` below and double-click it, or" \
+              "2. Right-click the app → **Open**, or" \
+              "3. System Settings → Privacy & Security → **Open Anyway**" \
+              "" \
+              "**Verify the download:**" \
+              '```' \
+              "shasum -a 256 -c SHA256SUMS.txt" \
+              '```' \
+              "dmg sha256: \`${SUM}\`")"
 
       # Best-effort secondary copy; skipped gracefully while the artifact
       # storage quota is exhausted.
