@@ -5,10 +5,18 @@ name: Build macOS DMG
 # GET-POKEMON-CHEST.html download buttons always point at a fresh build.
 on:
   workflow_dispatch:
+    inputs:
+      public_art:
+        description: "Public build: ship with NO external catalog card art (user-scanned art only)"
+        type: boolean
+        default: false
+      ship_build:
+        description: "Store build: strip App-Store-blocking features (removes the Emerald Lab and 404s its routes)"
+        type: boolean
+        default: false
   push:
     branches:
       - main
-      - cursor/card-scan-codex-8306
       - claude/pokemon-chest-redesign-31io2c
     paths:
       - "src-tauri/**"
@@ -19,7 +27,6 @@ on:
       - "server.py"
       - "icon-source.png"
       - "package.json"
-      - "GET-POKEMON-CHEST.html"
       - "OPEN-ANYWAY.command"
       - ".github/workflows/build-dmg.yml"
 
@@ -27,7 +34,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: chest-latest
+  group: dmg-latest
   cancel-in-progress: true
 
 jobs:
@@ -49,6 +56,25 @@ jobs:
         with:
           workspaces: src-tauri
 
+      # Merge, never overwrite: writing a fresh object here used to drop every
+      # other flag in the file, so a public-art dispatch silently turned
+      # shipBuild off — which is how an App-Store-blocking panel gets into a
+      # store build.
+      - name: Apply build-profile flags
+        if: ${{ inputs.public_art == true || inputs.ship_build == true }}
+        run: |
+          python3 - <<'PY'
+          import json, pathlib
+          p = pathlib.Path("data/build-flags.json")
+          flags = json.loads(p.read_text()) if p.exists() else {}
+          if "${{ inputs.public_art }}" == "true":
+              flags["publicArt"] = True
+          if "${{ inputs.ship_build }}" == "true":
+              flags["shipBuild"] = True
+          p.write_text(json.dumps(flags, indent=2) + "\n")
+          print("build flags:", flags)
+          PY
+
       - name: Regenerate the full icon set from icon-source.png
         run: npx --yes "@tauri-apps/cli@^2" icon icon-source.png
 
@@ -64,48 +90,61 @@ jobs:
 
       - name: Zip the source tree (tracked files at this commit)
         run: |
-          git archive --format=zip -o "PokemonChest-source-${GITHUB_SHA:0:7}.zip" "$GITHUB_SHA"
-          cp "PokemonChest-source-${GITHUB_SHA:0:7}.zip" PokemonChest-source-latest.zip
-          ls -lh PokemonChest-source-*.zip
+          git archive --format=zip -o "DenZ-source-${GITHUB_SHA:0:7}.zip" "$GITHUB_SHA"
+          cp "DenZ-source-${GITHUB_SHA:0:7}.zip" DenZ-source-latest.zip
+          ls -lh DenZ-source-*.zip
 
-      - name: Publish DMG + source to chest-latest release
+      # An unsigned download people are told to right-click past Gatekeeper is
+      # exactly the download that most needs a checksum to verify against.
+      - name: Checksum the release assets
+        run: |
+          DMG=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg | head -1)
+          # Stable asset name (spaces -> dots) so download links and the
+          # checksum file always refer to the same string.
+          DMG_NAME=$(basename "$DMG" | tr ' ' '.')
+          cp "$DMG" "$DMG_NAME"
+          # Checksum by basename only. Stripping the path out of shasum's
+          # output with sed ate the hash itself once already, because `.*/`
+          # matches greedily across the whole line.
+          shasum -a 256 "$DMG_NAME" "DenZ-source-${GITHUB_SHA:0:7}.zip" \
+                        DenZ-source-latest.zip OPEN-ANYWAY.command > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          # Fail loudly rather than publish an unverifiable checksum file again.
+          while read -r h f; do
+            case "$h" in
+              [0-9a-f]*) [ ${#h} -eq 64 ] || { echo "bad hash for $f: $h"; exit 1; } ;;
+              *) echo "missing hash for line: $h $f"; exit 1 ;;
+            esac
+          done < SHA256SUMS.txt
+
+      - name: Publish the unified DenZ build to dmg-latest
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           VER=$(python3 -c "import json; print(json.load(open('package.json'))['version'])")
-          DMG=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg | head -1)
-          # Stable asset name (spaces → dots) so download buttons + SHA256SUMS match
-          DMG_NAME=$(basename "$DMG" | tr ' ' '.')
-          cp "$DMG" "$DMG_NAME"
-          SRC_HASH="PokemonChest-source-${GITHUB_SHA:0:7}.zip"
-          SRC_LATEST=PokemonChest-source-latest.zip
-          GUIDE=GET-POKEMON-CHEST.html
-          UNLOCK=OPEN-ANYWAY.command
-          test -f "$DMG_NAME" && test -f "$SRC_HASH" && test -f "$SRC_LATEST" && test -f "$GUIDE" && test -f "$UNLOCK"
-          shasum -a 256 "$DMG_NAME" "$SRC_HASH" "$SRC_LATEST" "$GUIDE" "$UNLOCK" > SHA256SUMS.txt
-          cat SHA256SUMS.txt
-          echo "publishing: $DMG_NAME + source + guide + unlock + checksums (v$VER)"
-          NOTES=$(cat <<EOF
-          Pokémon Chest v${VER} — commit ${GITHUB_SHA:0:7}.
-
-          **Download:** DMG installer, source zip, GET-POKEMON-CHEST.html, OPEN-ANYWAY.command, SHA256SUMS.txt.
-
-          **Gatekeeper (Sequoia “Not Opened / Done only”):**
-          1. Install from the DMG into Applications
-          2. System Settings → Privacy & Security → Open Anyway
-             — or double-click OPEN-ANYWAY.command
-             — or: \`xattr -cr "/Applications/Pokemon Chest.app"\`
-
-          Ad-hoc signed CI build (no Apple notarization ticket yet). Local
-          \`build-app.command\` uses your Apple Development identity when present.
-          EOF
-          )
-          gh release delete chest-latest --cleanup-tag --yes || true
-          gh release create chest-latest "$DMG_NAME" "$SRC_HASH" "$SRC_LATEST" "$GUIDE" "$UNLOCK" SHA256SUMS.txt \
+          DMG_NAME=$(ls *.dmg | head -1)
+          SUM=$(awk '{print $1}' SHA256SUMS.txt | head -1)
+          echo "publishing DenZ v$VER: $DMG_NAME"
+          gh release delete dmg-latest --cleanup-tag --yes || true
+          gh release create dmg-latest "$DMG_NAME" \
+            "DenZ-source-${GITHUB_SHA:0:7}.zip" DenZ-source-latest.zip \
+            SHA256SUMS.txt OPEN-ANYWAY.command \
             --prerelease \
             --target "$GITHUB_SHA" \
-            --title "Pokémon Chest — latest macOS build + source" \
-            --notes "$NOTES"
+            --title "DenZ v${VER} — latest macOS build + source" \
+            --notes "$(printf '%s\n' \
+              "Universal (Apple Silicon + Intel) build of commit ${GITHUB_SHA:0:7}." \
+              "" \
+              "**First launch** — ad-hoc signed, not notarized, so macOS will say it \"can't be verified\". Any one of these clears it:" \
+              "1. Download \`OPEN-ANYWAY.command\` below and double-click it, or" \
+              "2. Right-click the app → **Open**, or" \
+              "3. System Settings → Privacy & Security → **Open Anyway**" \
+              "" \
+              "**Verify the download:**" \
+              '```' \
+              "shasum -a 256 -c SHA256SUMS.txt" \
+              '```' \
+              "dmg sha256: \`${SUM}\`")"
 
       - name: Upload the dmg as a workflow artifact
         uses: actions/upload-artifact@v4

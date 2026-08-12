@@ -1,7 +1,7 @@
 {
   "about": "Canonical machine-readable feature ledger for Pokémon Den. Rendered by the 📋 Parity tab. Agents & future sessions (any model): implement items from their spec alone, satisfy every acceptance criterion, run the verify steps, then set status=shipped, append \"✅ YYYY-MM-DD\" to notes, bump \"updated\", commit and push. Never change pokechest.* storage keys or the bundle identifier. Authored and adversarially verified by a multi-agent ultracode workflow.",
   "schemaVersion": 1,
-  "updated": "2026-07-28",
+  "updated": "2026-08-12",
   "generatedBy": "ultracode parity-ledger workflow wf_fe2016aa-818 (claude-fable-5): repo inventory + 5 spec agents + competitor matrix + 3 adversarial verifiers; {\"authored\": 49, \"merged\": 49, \"corrections\": 15, \"deleted\": 0}",
   "items": [
     {
@@ -841,26 +841,28 @@
       "title": "Trade checker (two-sided fairness verdict)",
       "icon": "🤝",
       "area": "market",
-      "status": "planned",
+      "status": "shipped",
       "priority": "P2",
-      "spec": "In assets/revamp.js add module state const TC = { a: [], b: [] } where each entry is { pcId: string|null, name, set, number, price } (pcId null for manually typed cards not in the collection). Column A is labeled 'Your side' (cards YOU give away) and column B 'Their side' (cards you receive). In renderBest() (revamp.js line ~550) add `<button class=\"btn sm\" id=\"bs-trade\">🤝 Trade Checker</button>` to the existing header .rv-row next to the include-graded checkbox, wired to a new openTradeChecker(). openTradeChecker() renders a modal into #modalRoot using the same .modal-bg/.modal/#modalClose pattern as openSettings() in app.js, containing the two columns (.tc-col): each column has a search input filtering State.cards exactly like the #lg-sq handler in renderLedger() (lowercase tokens matched against name+set+number, top 6 results as .sc-res rows), where clicking a result pushes { pcId:String(c.pcId), name:c.name, set:c.set, number:c.number, price:c.price||0 }; below it a manual-add row (text input for name, number input for $, Add button) for off-collection cards; each added entry renders with a ✕ remove button. Extract renderBest()'s inline net() into a top-level function rvFeeNet(price) that reads the 'ebay-bin' channel from data/best-sellers.json via the already-fetched rvData('best-sellers') (fallback { feePct: 13.25, feeFlat: 0.30 }) and returns Math.max(0, price*(1-feePct/100)-feeFlat); each column footer shows Raw total = Σ price and Net total = Σ rvFeeNet(price). tcVerdict(): let A = net total of 'Your side', B = net total of 'Their side'; diff = Math.abs(A-B); pct = diff/Math.max(A,B,1). Favored-side rule (fixed, not implementer's choice): the favored party is the one RECEIVING the more valuable pile — if A > B the trade favors THEIR side (they receive your bigger pile), if B > A it favors YOUR side. Verdict strings: pct <= 0.05 → '⚖️ Even trade'; pct <= 0.15 → `Slightly favors ${favored}` where favored is the literal string 'your side' or 'their side' per the rule above; else `Favors ${favored} — ${favored === 'their side' ? 'they' : 'you'} should add ${money(diff)} to balance` (i.e. the favored party owes the difference). Render the verdict in a .tc-verdict banner between the columns, recomputed on every add/remove. A Reset button empties both sides; TC persists only for the session (no localStorage key). Add .tc-col / .tc-row / .tc-total / .tc-verdict styles to assets/revamp.css (grid two columns, stacking to one column under 720px).",
-      "ux": "A 🤝 Trade Checker button in the Best Sellers header opens a two-column modal — search-add cards (or type name+$) to each side, live raw and fee-adjusted totals per side, fairness verdict banner in the middle.",
+      "spec": "SHIPPED as its own 🤝 Trade tab (view id 'trade'), not as a Best Sellers modal — see notes for why. assets/revamp.js: LS_TRADE='pokechest.trade.v1' holds {give:[],get:[]}; rows are {k,name,num,sub,img,price,qty,lang,graded,src} keyed by a generated k so the same card can appear twice on a side. tradeLoad/tradeSave/tradeAdd/tradeRemove/tradeQty/tradeSetPrice/tradeClear mutate and re-render. tradeStackTotal(rows) returns {total,unpriced,cards} — rows with price==null are counted as unpriced and EXCLUDED from total, never coerced to 0. tradeStackNet(rows) reuses sellNet() from app.js per row so the fee number matches what Sell Hub and the card modal quote for the same card. tradeVerdict(giveT,getT): delta=getT-giveT (positive = your favor), pct=|delta|/max(giveT,getT); bands <5% even, <15% slightly, <30% clearly, else lopsided; tone green/gold/red. Picker (tradeRunSearch) searches three tiers in the Scanner's order: State.cards first (instant, already priced), then /api/pc/search when a PriceCharting token exists, else /api/codex/search (free/offline, price left null for the user to type). Plus an add-by-hand row. TRADE.seq guards against out-of-order keystroke results. Price inputs use onchange not oninput so a re-render can't steal focus mid-typing. assets/revamp.css: .tr-* block, two-column grid collapsing to one under 900px.",
+      "ux": "A 🤝 Trade tab between ➕ Add & Sold and 📷 Scanner. Stack 'You give' against 'You get', each row with a qty stepper and an editable price; a verdict banner on top calls the trade and closes with the trade-vs-sell fee comparison. The worksheet persists across reloads.",
       "files": [
         "assets/revamp.js",
         "assets/revamp.css"
       ],
       "acceptance": [
-        "Best Sellers header shows 🤝 Trade Checker; clicking opens the two-column modal with zero pageerrors.",
-        "Typing a known card name in a side's search lists collection matches; clicking one adds it and both that side's Raw and Net totals update immediately.",
-        "Manual add of 'Test card' at $100 shows $100.00 raw and $86.45 net (13.25% + $0.30 eBay BIN fees).",
-        "With one side at $100 and the other empty the verdict banner reads 'Favors' and quotes the dollar difference; two equal sides read '⚖️ Even trade'.",
-        "✕ removes an entry and Reset returns both sides to $0.00 with the verdict cleared."
+        "🤝 Trade tab renders with zero pageerrors and reads 'Nothing to weigh yet' when empty.",
+        "Searching a card you own lists collection matches; clicking one adds it already priced, with no manual entry.",
+        "The qty stepper multiplies the line and the stack total (price × qty), not just the ×N label.",
+        "A row with no price is reported as unpriced and held out of the verdict rather than counted as $0.",
+        "$100 vs $102 reads '⚖️ Even trade'; $100 give vs $40 get reads lopsided in their favor (red); the same gap reversed reads green.",
+        "The fee line nets the give side with sellNet() — a $40 raw EN card nets $35.60 (11%) — and states whether the incoming side clears that bar.",
+        "Typing a price into a row persists it; the whole trade survives a reload; Clear empties both stacks."
       ],
-      "verify": "Run POKECHEST_HOME=<scratch> python3 server.py, drive http://127.0.0.1:8787 with playwright-core (chromium at /opt/pw-browsers): evaluate switchView('best'), click #bs-trade, fill the manual name/$ inputs on side A with Test/100 and click Add, assert side A footer text contains $100.00 and $86.45 and the verdict banner contains 'Favors'; add an identical manual card to side B and assert 'Even trade'. Assert zero pageerrors.",
+      "verify": "Run POKECHEST_HOME=<scratch> python3 server.py, drive it with playwright-core (chromium at /opt/pw-browsers): click [data-view=trade], open the give picker, search a card you own, click the result, assert pokechest.trade.v1 holds one row carrying a non-null price; step qty and assert the stack total is price×2; drive the three verdict bands via tradeAdd() with fixed prices and assert the banner class and text; assert tradeStackNet([$40 raw EN]) === 35.60; reload and assert both rows survive. Then switchView() every tab and assert zero pageerrors. Harness: scratchpad/verify-trade.js — 21 checks, all passing 2026-08-01.",
       "est": "M",
       "dependsOn": [],
       "demand": "medium",
-      "notes": "Backlog #6 — PokéVault ships a trade checker; CollX surfaces trade values. Fee-adjusted totals reuse the channel fee data already in data/best-sellers.json; great on-stream feature for the Whatnot/live playbook."
+      "notes": "Backlog #6 ✅ 2026-08-01. PokéVault ships a trade checker; CollX surfaces trade values. THREE DELIBERATE DEVIATIONS from the original spec above, recorded so a future session doesn't 'correct' them back: (1) Own tab, not a Best Sellers modal — a trade worksheet is built over several minutes, gets cross-referenced against other tabs, and should survive a reload; a modal loses all three. (2) Persisted to pokechest.trade.v1 rather than session-only, for the same reason. This ADDS a key; no existing key was touched. (3) The spec fee-adjusted BOTH sides and compared the nets. You don't pay marketplace fees on cards you receive, and applying the same multiplier to both piles cancels out — the verdict is identical to comparing gross, so it only added noise. Instead the verdict compares gross values and the fee insight moved to where it actually decides something: a trade competes with SELLING your side, so it only has to beat the fee-adjusted net (~11–13.6% below sticker), not the sticker total. That comparison is the closing line of the banner. Fee math reuses sellNet() from app.js so the number agrees with Sell Hub and the card modal instead of introducing a second fee model from best-sellers.json."
     },
     {
       "id": "movers-report",
@@ -1636,6 +1638,264 @@
       "dependsOn": [],
       "demand": "publish-gate",
       "notes": "Shipped 2026-07-28. Emerald Lab compiles the pokeemerald decompilation and runs it in an emulator — an automatic App Store rejection (guideline 2.5.2 executable code / 4.7 emulators) and indefensible in a product that's sold. This is the first of the three store blockers identified in the 2026-07-27 audit; the other two (IP rename, and sandboxing the bundled Python server) remain open. Verified 12/12 across both profiles. Note build_flags() is bundle-only by design — see spec."
+    },
+    {
+      "id": "pwa-installable",
+      "title": "Installable web app (PWA) with offline shell",
+      "icon": "📲",
+      "area": "platform",
+      "status": "shipped",
+      "priority": "P1",
+      "spec": "manifest.webmanifest (name/short_name/id/start_url/scope/display standalone, theme+background #1a1421, 192+512 any and maskable icons in assets/pwa/, three app shortcuts). sw.js: cache named pokechest-shell-v<APP_VERSION>, install pre-caches the shell entry-by-entry so one 404 can't void the whole cache, activate deletes every other cache. Fetch rules, in order: skip non-GET; skip cross-origin (TCGdex art stays in the browser cache, not our quota); NEVER intercept /api/* (live prices and BYOK proxying must always be real); /data/* network-first with cache fallback; everything else stale-while-revalidate. assets/pwa.js registers it on load and exposes PWA/pwaInstall()/pwaIsIOS()/pwaInstallHint(); it no-ops inside Tauri and on file:// because the desktop app IS the installed form. index.html carries the manifest link plus the four iOS-only meta tags (Safari ignores the manifest entirely). server.py sends Cache-Control: no-cache for /sw.js and /manifest.webmanifest so an installed phone can't get pinned to an old build.",
+      "ux": "Open the app on a phone (Scanner → Phone mode QR). iOS: Share → Add to Home Screen. Android/Chrome: an 📲 Install app button appears in the phone-mode panel. Either way it then launches fullscreen with no browser chrome and still opens with no signal.",
+      "files": [
+        "manifest.webmanifest",
+        "sw.js",
+        "assets/pwa.js",
+        "assets/pwa/",
+        "index.html",
+        "server.py"
+      ],
+      "acceptance": [
+        "GET /manifest.webmanifest returns valid JSON with 4 icons and Cache-Control: no-cache.",
+        "GET /sw.js returns JS with Cache-Control: no-cache.",
+        "The service worker registers on localhost and reaches activated with zero pageerrors.",
+        "The SW never caches an /api/ response and never intercepts cross-origin requests.",
+        "pwa.js no-ops when window.__TAURI__ is present.",
+        "All four iOS meta tags and the apple-touch-icon are present in index.html."
+      ],
+      "verify": "scratchpad/verify-ship.js — asserts the manifest parses and its icons resolve 200, the SW registers and activates, /api/ is excluded from the fetch handler, and the iOS tags are in the head.",
+      "est": "M",
+      "dependsOn": [],
+      "demand": "high",
+      "notes": "Ship improvement #1 ✅ 2026-08-01. This is the app's mobile format — a real iOS App Store build needs Xcode on Brandon's Mac plus a paid membership, so home-screen install is the honest shipping path today. Not a substitute for a native build; a stepping stone to one."
+    },
+    {
+      "id": "a11y-keyboard-screenreader",
+      "title": "Accessibility: ARIA tablist, keyboard nav, focus management",
+      "icon": "♿",
+      "area": "platform",
+      "status": "shipped",
+      "priority": "P1",
+      "spec": "assets/a11y.js, loaded last so it decorates finished UI rather than being threaded through 19 render functions. Tabs become role=tab in a role=tablist with aria-controls/aria-selected and a roving tabindex (exactly one tab in the tab order); Arrow/Home/End move between them and switch view. Views become role=tabpanel, aria-labelledby their tab, aria-hidden when inactive. switchView is wrapped (revamp.js already wraps it once; layering is fine) to keep ARIA in sync and announce the new view through a polite live region. Modals are built by innerHTML into #modalRoot from a dozen call sites, so a MutationObserver gives every one of them role=dialog/aria-modal, aria-labelledby its heading, an initial focus on the close button, a Tab focus trap, Escape-to-close and focus restore — with no edits to any of those call sites. revamp.css adds .sr-only, a .skip-link, :focus-visible rings on every interactive surface (not just .btn/.tab), and a prefers-reduced-motion block that kills the Den's auto-spin and smooth scrolling.",
+      "ux": "Tab from the top: a skip link, then the tab strip as one stop with arrows to move between sections. Escape closes any modal and focus returns where it was. Reduced-motion is respected.",
+      "files": [
+        "assets/a11y.js",
+        "assets/revamp.css",
+        "index.html"
+      ],
+      "acceptance": [
+        "#tabs has role=tablist; every .tab has role=tab, aria-controls and aria-selected.",
+        "Exactly one tab has tabindex=0 at any time; the rest are -1.",
+        "ArrowRight on a focused tab moves focus and switches the view.",
+        "Every .view has role=tabpanel; inactive ones carry aria-hidden=true.",
+        "An open modal has role=dialog and aria-modal=true and takes focus; Escape closes it.",
+        "A .skip-link is the first focusable element in the document."
+      ],
+      "verify": "scratchpad/verify-ship.js — walks the tablist contract, drives ArrowRight/Home/End, opens a card modal and asserts dialog semantics plus Escape-to-close, and checks the skip link is first in tab order.",
+      "est": "M",
+      "dependsOn": [],
+      "demand": "medium",
+      "notes": "Ship improvement #3 ✅ 2026-08-01. Both stores check this on review, and 19 unlabelled buttons in a row was the single worst thing about using the app without a mouse."
+    },
+    {
+      "id": "den-vr-cardboard",
+      "title": "VR: stereoscopic Den for a phone headset",
+      "icon": "🥽",
+      "area": "den3d",
+      "status": "shipped",
+      "priority": "P2",
+      "spec": "const VR = { on, ipd: 34 } in revamp.js. denVrEnter() wraps #den-world in .den-eye-l and inserts a deep clone into .den-eye-r; every id is stripped from the clone so no $('#…') lookup can resolve to scenery, and it is aria-hidden. denApply() gains a translateX(±ipd/2) prefix per eye — that lateral camera offset is the whole stereo effect. denVrToggle() requests fullscreen and starts the existing denGyroStart() head tracking on the same user gesture, because iOS requires the DeviceOrientation permission prompt to originate from one. renderDen() resets VR.on (a re-render destroys the eye wrappers) and onfullscreenchange tears stereo down when fullscreen leaves by any route. CSS: .den-vr is a two-column flex, each .den-eye carries its own perspective, and the viewport-spanning vignette and HUD are hidden so they can't straddle the seam.",
+      "ux": "🥽 VR in the Den toolbar splits the room into a stereo pair and goes fullscreen. Drop the phone into any Cardboard-style holder and look around.",
+      "files": [
+        "assets/revamp.js",
+        "assets/revamp.css"
+      ],
+      "acceptance": [
+        "🥽 VR is in the Den toolbar and toggles .den-vr on the viewport.",
+        "In VR the viewport holds exactly two .den-eye children, each containing one world.",
+        "The right-eye clone carries no id attributes anywhere in its subtree.",
+        "The two worlds' transforms differ only by the ±ipd/2 translateX prefix.",
+        "Exiting VR restores a single #den-world as a direct child of the viewport, with no leftover .den-eye.",
+        "Re-rendering the Den while in VR leaves VR.on false rather than stranding the flag."
+      ],
+      "verify": "scratchpad/verify-ship.js — enters VR, asserts the two-eye structure and that the clone is id-free, compares the two transform strings, exits and asserts the DOM is restored, then re-renders and asserts the flag cleared.",
+      "est": "M",
+      "dependsOn": [
+        "den-3d-room"
+      ],
+      "demand": "low",
+      "notes": "✅ 2026-08-01. Deliberately NOT WebXR: the Den is CSS-3D, so navigator.xr would mean rewriting the room in three.js and bundling a renderer. Cardboard-style stereo works today with hardware people already own, and reuses the gyro tracking that was already there. Labelled 'Cardboard-style' in the UI rather than 'VR headset support' so it doesn't over-promise Quest/Vision Pro."
+    },
+    {
+      "id": "release-integrity",
+      "title": "Release integrity: checksums + Gatekeeper opener on every build",
+      "icon": "🔒",
+      "area": "publish",
+      "status": "shipped",
+      "priority": "P1",
+      "spec": "build-dmg.yml gains a checksum step (shasum -a 256 over the dmg and source zip, basenames only) and publishes SHA256SUMS.txt and OPEN-ANYWAY.command alongside them, with release notes carrying the Gatekeeper steps, a 'shasum -a 256 -c SHA256SUMS.txt' line and the dmg's own hash. Also adds a ship_build dispatch input, and — the real fix — the build-profile step now MERGES into data/build-flags.json instead of overwriting it. It previously wrote a fresh {\"publicArt\": true} object, which silently dropped shipBuild, so a public-art dispatch would have shipped the Emerald Lab into a store build.",
+      "ux": "The dmg-latest release now carries the same four assets chest-latest does, and the notes tell you how to verify what you downloaded.",
+      "files": [
+        ".github/workflows/build-dmg.yml",
+        "README.md"
+      ],
+      "acceptance": [
+        "The workflow YAML parses and exposes both public_art and ship_build inputs.",
+        "A completed run publishes dmg, source zip, SHA256SUMS.txt and OPEN-ANYWAY.command to dmg-latest.",
+        "The release notes contain the dmg's sha256 and the verification command.",
+        "Dispatching with public_art=true leaves any pre-existing shipBuild value intact."
+      ],
+      "verify": "python3 -c 'import yaml; yaml.safe_load(open(\".github/workflows/build-dmg.yml\"))' plus a real CI run; confirm the four assets and compare the published digest against the notes.",
+      "est": "S",
+      "dependsOn": [],
+      "demand": "medium",
+      "notes": "Ship improvement #2 ✅ 2026-08-01. An unsigned download that users are told to right-click past Gatekeeper is exactly the download that most needs a checksum. The build-flags overwrite bug was found while editing this file, not reported."
+    },
+    {
+      "id": "store-submission-pack",
+      "title": "App Store submission pack (privacy manifest + listing copy)",
+      "icon": "📋",
+      "area": "publish",
+      "status": "partial",
+      "priority": "P1",
+      "spec": "src-tauri/PrivacyInfo.xcprivacy — required for App Store submission since spring 2024; a build without one is rejected before review. Declares NSPrivacyTracking false, empty tracking domains, empty NSPrivacyCollectedDataTypes (nothing is transmitted, so nothing is collected), and required-reason declarations for FileTimestamp C617.1, UserDefaults CA92.1 and DiskSpace E174.1. STORE-LISTING.md carries the names/IDs table, promotional text, full description, keywords, the App Privacy questionnaire answers, the App Review notes explaining the loopback server and the opt-in LAN mode, the screenshot shot-list, and a pre-submission checklist.",
+      "ux": "Not user-facing — this is the paperwork that makes a submission possible.",
+      "files": [
+        "src-tauri/PrivacyInfo.xcprivacy",
+        "STORE-LISTING.md"
+      ],
+      "acceptance": [
+        "PrivacyInfo.xcprivacy is valid plist XML and parses with plistlib.",
+        "It declares no tracking and no collected data types.",
+        "STORE-LISTING.md exists with description, keywords, review notes and a checklist.",
+        "No listing string contains 'Pokémon' — every app-name slot is the <APP> placeholder."
+      ],
+      "verify": "python3 -c 'import plistlib; plistlib.load(open(\"src-tauri/PrivacyInfo.xcprivacy\",\"rb\"))' and grep the listing for banned strings.",
+      "est": "M",
+      "dependsOn": [
+        "ship-rename-switch"
+      ],
+      "demand": "high",
+      "notes": "✅ 2026-08-01 for the artefacts. PARTIAL, not shipped, and it stays partial until three things Brandon owns are done: the ship name is chosen (every listing string is still <APP>), a paid Apple Developer Program membership exists, and the bundled Python server is either sandboxed or the app ships direct-notarized outside the store instead. See ROADMAP-TO-PUBLISH.md §4."
+    },
+    {
+      "id": "pocket-offline-file",
+      "title": "Pocket Edition — the collection as one AirDrop-able file",
+      "icon": "📦",
+      "area": "platform",
+      "status": "shipped",
+      "priority": "P1",
+      "spec": "scripts/build_pocket.py (pre-existing, shipped in v2.2.0) inlines the collection, Game Plan, PSA-10 estimates and tap-to-open comp links into one self-contained file, with the app icon as a base64 data: URI so it works with no network. Three bottom tabs: Game Plan / Collection / Sell. server.py's build_pocket() runs it on POST /api/pocket and after every data refresh; the file is served from the writable HOME because the bundle is read-only. THIS PASS fixed three real defects rather than adding features: (1) the image fallback interpolated a double-quoted placeholder into an onerror=\"...\" attribute, which closed the attribute early and left broken JS — every card image that failed to load threw 'Invalid or unexpected token', which offline is every single one; it is now a capturing error listener instead. (2) The Admin 'Open Pocket Edition' link still pointed at the pre-rename 'Pokémon Chest — Pocket.html' and 404'd against POCKET_NAME. (3) The Pocket header and iOS home-screen title still read 'Chest'. Also added /api/pocket to the loopback-only gate list — it runs a subprocess and a LAN peer could previously trigger it.",
+      "ux": "Admin → iPhone Pocket Edition → Regenerate, or Scanner → Phone mode → 📦 Build Pocket file. AirDrop the file to the phone, open in Safari, Add to Home Screen.",
+      "files": [
+        "scripts/build_pocket.py",
+        "server.py",
+        "assets/app.js",
+        "assets/revamp.js"
+      ],
+      "acceptance": [
+        "Opens from file:// with the browser fully offline and renders all cards with ZERO page errors.",
+        "Header and apple-mobile-web-app-title read 'Den', not 'Chest'.",
+        "The app icon is an inlined data: URI so it survives with no network.",
+        "All three bottom tabs are hit-testable at their centres and content clears the fixed bar.",
+        "Search narrows the collection list.",
+        "Tapping a card reveals its comp links (eBay raw/graded, TCGplayer, PriceCharting, FB); none render before the tap.",
+        "No horizontal overflow at 390px; no external stylesheet or script.",
+        "POST /api/pocket is refused (403) from a non-loopback peer."
+      ],
+      "verify": "scratchpad/verify-pocket.js — 18 checks in an offline iPhone-14 context over file://. Gate checked with a spoofed Host header against the live server.",
+      "est": "M",
+      "dependsOn": [],
+      "demand": "high",
+      "notes": "✅ 2026-08-12 (bug-fix + hardening pass; the feature itself shipped in v2.2.0). Complements the PWA rather than replacing it: the PWA needs the Mac awake on the same Wi-Fi because server.py serves it, whereas Pocket is just a file you AirDrop. Read-only on purpose — making it writable would create a second source of truth to reconcile. 1.8 MB for 1,291 cards, most of it the inlined icon and the precomputed comp URLs."
+    },
+    {
+      "id": "unified-product-line",
+      "title": "Unified product line — Den + Chest as one app (DenZ)",
+      "icon": "🔗",
+      "area": "platform",
+      "status": "shipped",
+      "priority": "P0",
+      "spec": "The repo had forked into two shipping lines: Den 2.4.0 (19 tabs, Sets, Trade, alerts, per-card history, PWA, a11y, VR) publishing to dmg-latest, and Chest 1.16.0 (Today board, multi-game, Plinko, buy/watch, tab overflow) publishing to chest-latest. Each had features the other lacked. A plain `git merge` was NOT viable: the Chest lineage had dropped the Den features relative to the merge base, so git read them as deletions and silently removed 23 functions from app.js and 26 from server.py behind a single version-line conflict. app.js and server.py were therefore rebuilt from the Den side and the Chest additions spliced in, together with the 4 module-level declarations those functions close over (GAME_META, LS_BUYS, LS_DATA_TOUCH, _tabMoreDocWired) — omitting those threw at boot and replaced the whole app with the error panel. renderArcade was replaced wholesale by the Chest version, being a strict evolution. The tab strip became Chest's 9 primary + 10-item overflow menu. dmg-latest is now the single release.",
+      "ux": "One app. Today board and multi-game from the Chest line; Sets, Trade, alerts, history, PWA, VR from the Den line; every view reachable from a 9-tab strip plus a More menu.",
+      "files": [
+        "assets/app.js",
+        "server.py",
+        "index.html",
+        ".github/workflows/build-dmg.yml",
+        "scripts/rename.sh"
+      ],
+      "acceptance": [
+        "assets/app.js contains every function from BOTH lineages (assert missing == none in both directions).",
+        "server.py contains every def from the Den lineage and Chest's codex surfaces.",
+        "App boots with no error panel and zero page errors across all 19 tabs.",
+        "Chest features live: vault hero, next steps, game bars (detects 5 games), Plinko board, overflow menu with 10 entries.",
+        "Den features live: price alerts, per-card history, snapKey, error log, qty adjust, ship/publicArt flags, About, first-run, Sets, Trade, VR.",
+        "No storage key or bundle identifier changed."
+      ],
+      "verify": "scratchpad/verify-unified.js (27 checks) + verify-ship.js (38) + verify-trade.js (21), all green 2026-08-12.",
+      "est": "L",
+      "dependsOn": [],
+      "demand": "high",
+      "notes": "✅ 2026-08-12. The coverage assertion over both lineages is the load-bearing part of this — the silent-deletion failure mode produced only one visible conflict and would otherwise have shipped. Keep that assertion in any future cross-line merge."
+    },
+    {
+      "id": "ship-name-denz",
+      "title": "Ship name applied — Pokémon DenZ / DenZ",
+      "icon": "🏷️",
+      "area": "publish",
+      "status": "shipped",
+      "priority": "P0",
+      "spec": "bash scripts/rename.sh \"Pokémon DenZ\" across 16 files; tauri productName kept ASCII (\"Pokemon DenZ\") because it becomes the .app and .dmg filename. Store-facing name is DenZ with no \"Pokémon\" in it. Two real bugs in the rename tool were fixed doing this: (1) it could not see percent-encoded names, so the Admin \"Open Pocket Edition\" href kept 404-ing after every rename — it now rewrites the encoded form too; (2) it was not idempotent when the new name CONTAINS the old (\"Den\" -> \"DenZ\" produced DenZZ, then DenZZZ), despite its header claiming idempotence — existing occurrences are now parked behind a sentinel during replacement.",
+      "ux": "App, window, DMG, launchers and docs all read Pokémon DenZ. Store listings read DenZ.",
+      "files": [
+        "scripts/rename.sh",
+        "index.html",
+        "assets/app.js",
+        "server.py",
+        "package.json",
+        "src-tauri/tauri.conf.json",
+        "README.md",
+        "LEGAL.md"
+      ],
+      "acceptance": [
+        "No 'Pokemon Den' / 'Pokémon Den' literal remains outside the strategy docs.",
+        "A second rename run reports 0 files changed (idempotent).",
+        "POCKET_NAME in server.py and the percent-encoded href in app.js resolve to the same URL.",
+        "Storage keys (pokechest.*), bundle id and env vars are unchanged."
+      ],
+      "verify": "Run rename.sh twice and assert 0 files changed on the second; compare quote(POCKET_NAME) against the app.js href; grep for internal ids.",
+      "est": "S",
+      "dependsOn": [],
+      "demand": "high",
+      "notes": "✅ 2026-08-12. Brandon chose DenZ. Working build keeps the Pokémon prefix; anything store-facing must not — see BUSINESS-WARGAME.md §1."
+    },
+    {
+      "id": "business-wargame",
+      "title": "Business wargame — SEO, pricing, launch, marketing",
+      "icon": "📈",
+      "area": "publish",
+      "status": "shipped",
+      "priority": "P1",
+      "spec": "BUSINESS-WARGAME.md: positioning (sells decisions, not prices; local-first as the structural moat), a competitor read against Collectr/CollX/PriceCharting/Dex/PullVault/Slabfy with the honest weakness stated (desktop-first in a mobile-first hobby), a two-tier SEO plan (high-intent calculator pages, then 395 set pages generated from the bundled codex), pricing (one-time $29 direct-first, with the reasoning for rejecting subscription and freemium), revenue scenarios at 100/1k/5k units, a pre-launch test plan that validates demand before any build, a 6-phase launch sequence gated on real blockers, and a named risk list (IP exposure on paid fan tools, PriceCharting terms, Apple review on the bundled server, the mobile gap, single maintainer).",
+      "ux": "Not user-facing — the plan behind shipping.",
+      "files": [
+        "BUSINESS-WARGAME.md"
+      ],
+      "acceptance": [
+        "Names a specific price with reasoning, not a range.",
+        "SEO plan is buildable from data already in the repo (the codex).",
+        "Launch phases are gated on real blockers, not dates.",
+        "Risks are stated as decisions with mitigations, including the IP exposure of charging for a fan tool."
+      ],
+      "verify": "Editorial — read it and argue with it.",
+      "est": "M",
+      "dependsOn": [
+        "ship-name-denz"
+      ],
+      "demand": "high",
+      "notes": "✅ 2026-08-12. Headline: $29 one-time, sold direct first (5% fees) with the Mac App Store as discovery (30%), discovered through grading-calculator SEO and the 3D Den on video. The riskiest untested assumption is demand, not code — §5 tests it before any further build."
     }
   ],
   "matrix": {

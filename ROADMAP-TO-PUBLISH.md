@@ -1,7 +1,9 @@
-# Pokémon Den → a publishable app: the roadmap
+# DenZ → a publishable app: the roadmap
 
-Working name **Pokémon Den** (personal build). This doc holds the strategy:
-naming, store paths, and the open questions that need Brandon's answers.
+Working name **Pokémon DenZ** (personal build); ship name **DenZ**. This doc
+holds the strategy: naming, store paths, and the open questions that need
+Brandon's answers. Go-to-market — SEO, pricing, launch, marketing — lives in
+[`BUSINESS-WARGAME.md`](BUSINESS-WARGAME.md).
 
 > **The canonical execution tracker is `data/parity.json`**, rendered live in
 > the app's **📋 Parity** tab — every feature with status, executable spec,
@@ -11,23 +13,30 @@ naming, store paths, and the open questions that need Brandon's answers.
 
 ---
 
-## 1 · Naming
+## 1 · Naming — decided
 
-"Pokémon" in a public product name will be refused by Apple/Google review and
-invites a Nintendo C&D. Personal build keeps **Pokémon Den**; for shipping, the
-strongest safe candidates (all keep the Den/3D identity):
+**Ship name: DenZ.** Chosen 2026-08-12. Applied with
+`bash scripts/rename.sh "Pokémon DenZ"` — the local build keeps the Pokémon
+prefix, and every store-facing string is `DenZ` with no "Pokémon"/"Poké" in it.
 
-| Name | Why it works | Check before committing |
-|------|--------------|------------------------|
-| **Card Den** ⭐ recommended | Short, ownable, ties the 3D Den + multi-TCG future (Magic/sports already in your export) | USPTO + App Store search, carddow?.com/cardden.app domain |
-| **The Amber Den** | Your own DarkHearts world — real brand equity, zero IP risk | You already own the concept; check app-store name collision |
-| **DenKeeper** | One word, verb-y, "keeper of the den/collection" | Domain + trademark |
-| **Collector's Den** | Instantly clear to shoppers | More generic, harder to trademark |
-| **Vaulted** / **Chestbound** | Punchy backups from Brand Lab | Both need clearance |
+That distinction is not cosmetic: "Pokémon" in a public product name gets a
+listing refused by Apple and Google review, and is the most likely trigger for a
+Nintendo takedown — which matters more, not less, once money changes hands
+(see [`BUSINESS-WARGAME.md`](BUSINESS-WARGAME.md) §7).
 
-Mechanics: the display name is a plain string everywhere (one `sed` swap —
-internal ids stay `pokechest.*` forever for data compatibility). Ship builds can
-rename in one commit.
+**Still to do before taking payment:**
+
+- [ ] USPTO TESS search for "DenZ" in software/class 9 and 42
+- [ ] App Store + Google Play name search
+- [ ] Domain — `denz.app` is the realistic target
+- [ ] Check against the competitor set (Collectr, Dex, Shiny, PullVault,
+      PokéVault, CollectorVault, CollX, pkmn.gg, Slabfy, Pokellector) — none
+      collide on "DenZ", but confirm rather than assume
+
+Mechanics: the display name is a plain string everywhere. Internal ids stay
+`pokechest.*` forever for data compatibility, and `rename.sh` cannot reach them.
+Earlier candidates, kept only as fallbacks if clearance fails: Vitrine, Longbox,
+Compsheet, Curio, Backroom, Atrium, Under Glass, Sleeved, Mintwright, Hoardly.
 
 ## 2 · Researched feature backlog (competitor + community sweep)
 
@@ -60,8 +69,18 @@ pkmn.gg, Eyevo, PriceCharting app reviews, and app-store/blog comparisons
    Computed from the bundled codex, so it needs no API key and works
    offline. Sets the codex lacks a card list for are shown flagged rather
    than silently dropped.
-6. **Trade checker** — two stacks side-by-side with live values and a fairness
-   verdict (PokéVault). Great for live streams too.
+6. **Trade checker** ✅ 2026-08-01 — new **🤝 Trade** tab: stack what you'd give
+   against what you'd get, and the app prices both sides and calls it.
+   Cards come from the same three tiers the Scanner uses — your own
+   collection (already priced), the PriceCharting catalog when a token is
+   connected, then the bundled codex (free/offline, you type the price) —
+   plus an add-by-hand row. Qty steppers, per-row price overrides, and the
+   worksheet persists across reloads. Cards the app can't price are held
+   *out* of the verdict and flagged rather than counted as $0. The verdict
+   bands at 5 / 15 / 30% of the larger side, and the closing line is the
+   trade-specific one: selling your side would cost ~11–13.6% in
+   marketplace fees, so a trade only has to beat the **fee-adjusted net**,
+   not the sticker total, to be the better move.
 7. **Multi-TCG expansion** — Magic, Yu-Gi-Oh!, sports (Collectr's moat; your
    export already carries a `game` field — the UI just filters it today).
 8. **Cloud backup / multi-device sync** — top complaint category everywhere;
@@ -122,7 +141,12 @@ pkmn.gg, Eyevo, PriceCharting app reviews, and app-store/blog comparisons
 | **Nintendo Switch** | ❌ Not realistic — closed platform, Nintendo licensing required, and a Pokémon-adjacent fan app would never pass. The Steam build is the way to get it on a TV. | — |
 
 **Gate to "objectively acceptable to publish" (the routine works this list):**
-- [ ] Ship-name chosen + swapped — the swap is now **one command**: `bash scripts/rename.sh "Card Den"` ✅ tool ready 2026-07-20 (still needs Brandon to pick the name)
+- [x] Ship-name chosen + swapped ✅ 2026-08-12 — **Pokémon DenZ** locally,
+      **DenZ** for anything store-facing. Applied with
+      `bash scripts/rename.sh "Pokémon DenZ"`, which gained two fixes in the
+      process: it now rewrites percent-encoded occurrences (the Admin
+      "Open Pocket Edition" link had been 404-ing after every rename) and it
+      is genuinely idempotent when the new name contains the old.
 - [x] LEGAL.md surfaced in-app (About panel) ✅ 2026-07-19
 - [x] Replace scraped/linked card art default with user-scanned images or a
       licensed/open source in the public build — `publicArt` build flag
@@ -152,8 +176,38 @@ pkmn.gg, Eyevo, PriceCharting app reviews, and app-store/blog comparisons
       and runs an emulator: automatic rejection under guidelines 2.5.2 / 4.7.
       Remaining store blockers: the IP rename, and sandboxing the bundled
       Python server (see §4 — direct notarized distribution avoids the latter).
+- [x] Release integrity ✅ 2026-08-01 — every `dmg-latest` build now publishes
+      `SHA256SUMS.txt` and `OPEN-ANYWAY.command` alongside the dmg and source
+      zip, and the release notes carry the Gatekeeper steps plus a
+      `shasum -a 256 -c` line. Also fixed a latent CI bug: the build-profile
+      step overwrote `data/build-flags.json` wholesale, so a `public_art`
+      dispatch silently dropped `shipBuild` — it merges now, and `ship_build`
+      is its own dispatch input.
+- [x] Installable mobile format ✅ 2026-08-01 — the app is a PWA:
+      `manifest.webmanifest`, a conservative service worker (never caches
+      `/api/*`, network-first on `/data/*`, stale-while-revalidate for the
+      shell, no cross-origin interception), maskable icons, and the four
+      iOS-only meta tags Safari needs. Add it to an iPhone home screen from
+      Scanner → Phone mode and it launches fullscreen and opens offline. Not a
+      native iOS build — that still needs Xcode on the Mac and a paid
+      membership — but it's the real mobile format today.
+- [x] Accessibility pass ✅ 2026-08-01 — the tab strip is a proper ARIA
+      tablist with roving tabindex and arrow-key navigation, views are
+      labelled tabpanels, modals get dialog semantics + focus trap + Escape +
+      focus restore via one MutationObserver (no edits to a dozen call sites),
+      plus a skip link, focus-visible rings on every interactive surface, and
+      `prefers-reduced-motion`.
+- [x] App Store submission paperwork ✅ 2026-08-01 (partial) —
+      `src-tauri/PrivacyInfo.xcprivacy` (required since 2024; declares no
+      tracking, no collected data, and the three required-reason APIs) and
+      `STORE-LISTING.md` (description, keywords, App Privacy answers, App
+      Review notes covering the loopback server and opt-in LAN mode, screenshot
+      shot-list, pre-submission checklist). Stays partial until the name is
+      picked — every listing string is still `<APP>`.
 - [ ] Real signing + notarization in CI (needs Apple cert secrets in repo)
-- [ ] Top-5 backlog features above implemented
+- [x] Top-5 backlog features above implemented ✅ 2026-08-01 — bulk binder scan
+      (#1), AI pre-grade (#2), price alerts (#3), per-card history charts (#4)
+      and set completion (#5) all shipped; trade checker (#6) landed with them.
 - [ ] Beta round (TestFlight / direct DMG) with 5–10 collectors
 
 ## 5 · Open questions for Brandon
@@ -162,7 +216,8 @@ pkmn.gg, Eyevo, PriceCharting app reviews, and app-store/blog comparisons
    I don't know this one and can't see your Mac from the cloud session. Is it a
    publishing tool / a typo (Gatekeeper? Codegate?)? Tell me what it is and I'll
    wire the pipeline to it.
-2. **Ship name**: Card Den, The Amber Den, DenKeeper — pick one (or veto all)?
+2. **Ship name**: ✅ answered — **DenZ**. Remaining naming work is clearance
+   (USPTO, App Store/Play search, `denz.app`) before money changes hands.
 3. **Audience for v1 public**: sellers (current strength) or collectors
    (set-completion/scanning)? Decides which backlog features go first.
 4. **Apple Developer Program**: you have a development cert — do you also have a

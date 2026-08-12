@@ -27,6 +27,15 @@ src-tauri/gen/
 # OS cruft
 .DS_Store
 
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Generated iPhone snapshot (regenerated from data). The pattern only
+# matched the pre-rename filename, so the Den-named build was untracked
+# by luck rather than by rule.
+Pok*mon *— Pocket.html
+Pocket.html
 # Generated iPhone snapshots (regenerated from data)
 Pok*mon Chest — Pocket.html
 Pok*mon Chest — Deck.html

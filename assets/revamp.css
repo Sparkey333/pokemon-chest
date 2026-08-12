@@ -359,3 +359,82 @@
 .set-missrow{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;
   padding:3px 6px;border-radius:5px;background:rgba(255,255,255,.03)}
 .set-pstat{margin-left:8px}
+
+/* ---------- 🤝 Trade Checker ---------- */
+.tr-verdict{margin-top:16px;padding:16px 18px;border-radius:14px;
+  border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.03)}
+.tr-verdict.tr-green{border-color:var(--green-dim);background:rgba(66,214,164,.09)}
+.tr-verdict.tr-gold{border-color:var(--gold-dim);background:rgba(255,211,106,.09)}
+.tr-verdict.tr-red{border-color:var(--red-dim);background:rgba(255,127,127,.09)}
+.tr-vhead{font-size:19px;font-weight:800;letter-spacing:.2px}
+.tr-vnums{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin:8px 0 2px;font-size:15px}
+.tr-vnums b{font-size:19px}
+.tr-vs{opacity:.5;font-size:12px;text-transform:uppercase;letter-spacing:1px}
+.tr-vdetail{margin:6px 0 0;font-size:13.5px;opacity:.92}
+.tr-vfee,.tr-vwarn{margin-top:8px}
+
+.tr-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;align-items:start}
+.tr-stack{margin:0}
+.tr-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.tr-tot{font-size:22px;font-weight:800;text-align:right;white-space:nowrap;color:var(--gold)}
+.tr-tot.tr-tot-get{color:var(--green)}
+.tr-tot .reason{font-size:11px;font-weight:500}
+.tr-rows{display:grid;gap:6px;margin:10px 0}
+.tr-row{display:grid;grid-template-columns:34px 1fr auto auto auto;align-items:center;gap:8px;
+  padding:6px;border-radius:8px;background:rgba(255,255,255,.035)}
+.tr-thumb{width:34px;height:47px;object-fit:cover;border-radius:4px;background:rgba(255,255,255,.05)}
+.tr-noart{display:flex;align-items:center;justify-content:center;font-size:17px;opacity:.4}
+.tr-id{min-width:0;font-size:12.5px;line-height:1.35;overflow:hidden}
+.tr-qty{display:flex;align-items:center;gap:3px}
+.tr-qn{font-size:12px;min-width:26px;text-align:center;opacity:.85}
+.tr-price{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.tr-pin{width:74px;padding:3px 6px;font-size:12px;text-align:right}
+.tr-line{font-size:12px;font-weight:700;color:var(--gold)}
+.tr-line.tr-unp{color:var(--muted);font-weight:500;font-style:italic}
+.tr-grp{padding:6px 8px 2px;text-transform:uppercase;letter-spacing:.6px;font-size:10.5px}
+.tr-pick:empty{display:none}
+.tr-res{max-height:300px;overflow-y:auto}
+
+@media (max-width:900px){
+  .tr-grid{grid-template-columns:1fr}
+  .tr-row{grid-template-columns:30px 1fr auto auto}
+  .tr-price{grid-column:2/-1;flex-direction:row;align-items:center;justify-content:flex-end;gap:8px}
+}
+
+/* ---------- accessibility ---------- */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+  clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
+.skip-link{position:absolute;left:8px;top:-48px;z-index:999;padding:9px 14px;border-radius:0 0 8px 8px;
+  background:var(--accent);color:#1a1421;font-weight:700;text-decoration:none;transition:top .15s ease}
+.skip-link:focus{top:0}
+/* Every interactive surface, not just .btn/.tab — the app is full of
+   clickable cards, chips, summaries and inputs that had no focus ring. */
+a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,
+summary:focus-visible,[tabindex]:focus-visible,.card:focus-visible,.chip:focus-visible,
+.sc-res:focus-visible,.pr-chip:focus-visible,.close-x:focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px}
+.view:focus{outline:none}
+.view:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+
+/* Respect the OS setting. The Den's auto-spin, the featured-card rotation and
+   the smooth scroll are the motion that actually makes people queasy. */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{
+    animation-duration:.001ms !important;animation-iteration-count:1 !important;
+    transition-duration:.001ms !important;scroll-behavior:auto !important}
+  .den-feat-spin{animation:none !important}
+}
+
+/* ---------- 🥽 VR — Cardboard-style stereo pair ---------- */
+.den-viewport.den-vr{display:flex;gap:2px;cursor:default;background:#000}
+.den-eye{position:relative;flex:1 1 50%;min-width:0;overflow:hidden;
+  perspective:1050px;background:var(--den-bg,#0a0e16)}
+.den-eye+.den-eye{border-left:2px solid #000}
+/* Restore the centering the world had from .den-viewport, now per eye. */
+.den-vr .den-world,.den-vr .den-world-r{position:absolute;left:50%;top:50%}
+/* The vignette overlay and the HUD are drawn on the viewport, which now spans
+   both eyes — they'd sit across the seam. */
+.den-vr::before{display:none}
+.den-vr .den-hud{display:none}
+.den-vr .den-exit{top:8px;right:8px;z-index:6;opacity:.55;font-size:11px}
+.den-vr .den-exit:hover{opacity:1}

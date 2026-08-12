@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Apple privacy manifest. Required for App Store submission since spring 2024;
+  a build without one is rejected before review even starts.
+
+  This app collects nothing. Every declaration below is therefore a negative
+  one, and the required-reason APIs are declared for the ordinary local-file
+  and preferences work the app does — not for fingerprinting.
+
+  If a future build adds analytics, crash upload, or any network call that
+  isn't user-initiated, this file has to change with it.
+-->
+<plist version="1.0">
+<dict>
+    <!-- No IDFA, no ad networks, no cross-app tracking of any kind. -->
+    <key>NSPrivacyTracking</key>
+    <false/>
+    <key>NSPrivacyTrackingDomains</key>
+    <array/>
+
+    <!-- Nothing leaves the device, so nothing is "collected" in Apple's sense.
+         Bring-your-own-key requests go from the user's own machine straight to
+         the provider they chose; we are not an intermediary and store nothing. -->
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array/>
+
+    <key>NSPrivacyAccessedAPITypes</key>
+    <array>
+        <dict>
+            <!-- Reading and writing the user's own collection data, card
+                 photos, and the PriceCharting export they downloaded. -->
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>C617.1</string>
+            </array>
+        </dict>
+        <dict>
+            <!-- App settings and view state stored on-device. -->
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>CA92.1</string>
+            </array>
+        </dict>
+        <dict>
+            <!-- Checking there is room before writing card photos and the
+                 bundled card codex to disk. -->
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryDiskSpace</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>E174.1</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>

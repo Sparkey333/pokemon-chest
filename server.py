@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Pokémon Chest local backend
+Pokémon DenZ local backend
 ===========================
 Serves the static app AND proxies the optional BYOK live-data integrations so
 your API keys never touch the browser and never hit CORS. With no keys set, the
@@ -16,51 +16,56 @@ Keys live in settings.local.json (gitignored, never bundled). Endpoints:
   GET  /api/config            -> which integrations are configured (booleans only)
   POST /api/config            -> save keys / provider choices
   GET  /api/price?id=<pcId>   -> PriceCharting price+graded tiers for one card
-  GET  /api/products?q=…      -> PriceCharting product catalog search (same API they use)
-  GET  /api/codex?q=…         -> search the local TCGdex EN+JA card codex (all sets/rares)
-  GET  /api/codex/meta        -> codex coverage stats
-  POST /api/codex/refresh     -> rebuild data/codex.json from TCGdex
   POST /api/comps             -> live sold comps (eBay/TCGplayer/JP) via a comps API
   POST /api/ai                -> a written sell/grade recommendation (Claude or OpenAI)
-  POST /api/ai/identify       -> identify a card from a photo (vision AI, BYOK)
-  GET|/POST /api/lan          -> phone-mode LAN status / enable (iPhone scan on same Wi-Fi)
   POST /api/refresh           -> rebuild data/collection.json from the newest export
+  POST /api/import            -> save an uploaded .xlsx export + rebuild (first-run onboarding)
   GET  /data/collection.json  -> POKECHEST_HOME copy when present, else bundled file
 
-Env:  POKECHEST_HOME (writable home; default: this script's directory, or
-                      ~/Library/Application Support/PokemonChest when the
-                      project lives in iCloud Drive)
+Env:  POKECHEST_HOME (writable home; default: this script's directory)
       POKECHEST_PORT (port; POKEVAULT_PORT kept as a legacy fallback)
 
 Run:  python3 server.py     (or double-click start.command)
 """
-import os, sys, re, json, html, base64, socket, ipaddress, subprocess, threading, shutil, shlex, ssl, urllib.request, urllib.error, urllib.parse
+import os, sys, re, json, html, base64, socket, ssl, time, datetime, ipaddress, subprocess, threading, shutil, shlex, urllib.request, urllib.error, urllib.parse
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "1.16.0"
+VERSION = "2.5.0"
 ROOT = os.path.dirname(os.path.abspath(__file__))
+
+# Writable-home resolution. Normally that's the project folder, but once
+# Desktop/Documents (or the whole checkout) migrate into iCloud Drive, writing
+# there is unreliable — files become cloud-only *.icloud placeholders. When the
+# project is detected inside iCloud we fall back to
+# ~/Library/Application Support/PokemonChest and seed it from the project once.
+# POKECHEST_HOME always wins if set, so every existing launcher and every test
+# harness behaves exactly as before. The import is optional: without
+# scripts/mac_paths.py the old ROOT behaviour is kept verbatim.
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 try:
     from mac_paths import (  # noqa: E402
-        resolve_writable_home, seed_home_from_root, path_report,
-        deliver_destinations, is_under_icloud,
+        resolve_writable_home, seed_home_from_root, path_report, is_under_icloud,
+        find_pricecharting_xlsx as _find_pc_xlsx,
     )
 except ImportError:
-    resolve_writable_home = seed_home_from_root = path_report = None
-    deliver_destinations = is_under_icloud = None
+    resolve_writable_home = seed_home_from_root = path_report = is_under_icloud = None
+    _find_pc_xlsx = None
 
 def _resolve_home():
     env = (os.environ.get("POKECHEST_HOME") or "").strip()
     if env:
         return os.path.abspath(env), "POKECHEST_HOME env"
     if resolve_writable_home:
-        home, why = resolve_writable_home(ROOT)
-        if home != ROOT and seed_home_from_root:
-            seeded = seed_home_from_root(home, ROOT)
-            if seeded:
-                print(f"  Seeded Application Support from iCloud project: {', '.join(seeded)}", flush=True)
-            os.environ["POKECHEST_HOME"] = home
-        return home, why
+        try:
+            home, why = resolve_writable_home(ROOT)
+            if home != ROOT and seed_home_from_root:
+                seeded = seed_home_from_root(home, ROOT)
+                if seeded:
+                    print(f"  Seeded Application Support from iCloud project: {', '.join(seeded)}", flush=True)
+                os.environ["POKECHEST_HOME"] = home
+            return home, why
+        except Exception:
+            pass                                    # never let path probing stop the app
     return ROOT, "project folder"
 
 HOME, _HOME_REASON = _resolve_home()
@@ -69,10 +74,27 @@ CARD_ART_DIR = os.path.join(HOME, "card-art")           # your live saves (writa
 BUNDLED_ART_DIR = os.path.join(ROOT, "card-art")        # baked-in defaults (ship with the build)
 LISTING_DIR = os.path.join(HOME, "listing-photos")      # YOUR OWN photos of each card, for selling
 PORT = int(os.environ.get("POKECHEST_PORT") or os.environ.get("POKEVAULT_PORT") or "8787")
-POCKET_NAME = "Pokémon Chest — Pocket.html"
-MOBILE_NAME = "Pokémon Chest — Deck.html"
+POCKET_NAME = "Pokémon DenZ — Pocket.html"
 
 # ---------------------------------------------------------------- settings ---
+def build_flags():
+    """data/build-flags.json — the build profile. shipBuild:true marks an
+    App-Store/public build, where the Emerald Lab routes are refused outright
+    (it compiles + runs a GBA decompilation: an automatic store rejection).
+
+    Read from ROOT (the app bundle) ONLY, never from the writable HOME: a
+    build profile is a property of the build, not a user preference, so
+    dropping a file in ~ must not be able to turn a ship build back into a
+    personal one. The browser reads the same bundled file over HTTP."""
+    try:
+        with open(os.path.join(ROOT, "data", "build-flags.json"), encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def ship_build():
+    return bool(build_flags().get("shipBuild"))
+
 def load_settings():
     try:
         with open(SETTINGS, encoding="utf-8") as f:
@@ -121,336 +143,65 @@ def cents(v):
     except (TypeError, ValueError):
         return None
 
-# --------------------------------------------------------------- card codex ---
-# Full EN+JA Pokémon TCG release index (TCGdex). Powers Scanner search when you
-# don't have a PriceCharting token, and complements /api/products when you do.
-_CODEX = {"data": None, "mtime": None, "path": None}
-_CODEX_LOCK = threading.Lock()
+# ------------------------------------------------------------ search cache ---
+# The Scanner (single-card + 9-pocket binder) and the Add & Sold ledger all
+# funnel card lookups through the same PriceCharting catalog search. Caching
+# results locally means: (1) repeat/similar searches across a scan session
+# are instant instead of round-tripping every keystroke, (2) a stale-but-
+# present cache still resolves a search when the network is flaky mid-scan,
+# and (3) fewer live PriceCharting calls overall. Keyed by normalized query,
+# capped and LRU-evicted by last-used time so a long scanning session doesn't
+# grow the file unbounded.
+SEARCH_CACHE_FILE = os.path.join(HOME, "search-cache.json")
+SEARCH_CACHE_TTL = 7 * 24 * 3600      # catalog names/sets barely change; prices drift, so...
+SEARCH_CACHE_PRICE_TTL = 6 * 3600     # ...refresh just the price fields sooner than a full re-search
+SEARCH_CACHE_MAX = 400
+_search_cache_lock = threading.Lock()
 
-def _codex_paths():
-    """Prefer a rebuilt copy under HOME, else the bundled data/codex.json."""
-    live = os.path.join(HOME, "data", "codex.json")
-    bundled = os.path.join(ROOT, "data", "codex.json")
-    return live if os.path.isfile(live) else bundled
-
-def _load_codex(force=False):
-    path = _codex_paths()
-    if not os.path.isfile(path):
-        return None
+def _search_cache_load():
     try:
-        mtime = os.path.getmtime(path)
-    except OSError:
-        return None
-    with _CODEX_LOCK:
-        if (not force and _CODEX["data"] is not None
-                and _CODEX["path"] == path and _CODEX["mtime"] == mtime):
-            return _CODEX["data"]
-        try:
-            with open(path, encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception:
-            return _CODEX["data"]
-        _CODEX.update(data=data, mtime=mtime, path=path)
-        return data
-
-def codex_meta():
-    d = _load_codex()
-    if not d:
-        return {"ok": False, "error": "Codex not built yet — open Scanner and click Rebuild Codex, or run scripts/build_codex.py."}
-    return {"ok": True, "meta": d.get("meta") or {}, "generatedAt": d.get("generatedAt"),
-            "source": d.get("source"), "path": _CODEX.get("path")}
-
-def codex_search(q, *, lang=None, special=None, limit=24):
-    """Token search over the local TCGdex codex. No keys required.
-
-    Ranking prefers exact collector-number hits and name-prefix matches so
-    queries like "charizard 4" surface Base Set #4 ahead of unrelated #1s.
-    Number tokens may match the card's localId even when other tokens only
-    partially hit (helps special rares and sparse JA name coverage).
-    """
-    d = _load_codex()
-    if not d:
-        return {"ok": False, "error": "Codex missing — run Rebuild Codex first.", "results": []}
-    q = (q or "").strip().lower()
-    if not q:
-        return {"ok": True, "results": [], "meta": d.get("meta")}
-    toks = [t for t in re.split(r"\s+", q) if t]
-    num_toks = [t for t in toks if re.fullmatch(r"[a-z]{0,4}\d+[a-z]?\d*", t) or re.fullmatch(r"\d+[a-z]?", t)]
-    text_toks = [t for t in toks if t not in num_toks]
-
-    def _hay_has_token(hay, t):
-        """Substring match, but bare digits must be whole tokens (avoid '4' ∈ '2024')."""
-        if not t:
-            return False
-        if t.isdigit():
-            return bool(re.search(rf"(?<!\d){re.escape(t)}(?!\d)", hay))
-        return t in hay
-
-    scored = []
-    for c in d.get("cards") or []:
-        if lang and c.get("lang") != lang:
-            continue
-        if special is True and not c.get("special"):
-            continue
-        hay = c.get("q") or ""
-        name = (c.get("name") or "").lower()
-        num = str(c.get("number") or "").lower()
-        num_compact = num.lstrip("0") or num
-        # Number-like tokens must hit the collector number (not set ids like swsh4.5).
-        # Text tokens match the full haystack (name/set/id).
-        ok = True
-        for t in num_toks:
-            tc = t.lstrip("0") or t
-            # Exact collector-number match only (never substring: "4" must not hit "74").
-            if t == num or tc == num_compact:
-                continue
-            ok = False
-            break
-        if not ok:
-            continue
-        for t in text_toks:
-            if not _hay_has_token(hay, t):
-                ok = False
-                break
-        if not ok:
-            continue
-        score = 0
-        if num_toks and any((t == num or (t.lstrip("0") or t) == num_compact) for t in num_toks):
-            score += 50
-        if text_toks and all(t in name for t in text_toks):
-            score += 30
-        if text_toks and name.startswith(text_toks[0]):
-            score += 10
-        if c.get("special"):
-            score += 2
-        if c.get("img"):
-            score += 1
-        scored.append((score, c))
-    scored.sort(key=lambda x: -x[0])
-    out = []
-    for score, c in scored[:limit]:
-        out.append({
-            "id": c.get("id"), "name": c.get("name"), "number": c.get("number"),
-            "set": c.get("set"), "setId": c.get("setId"), "lang": c.get("lang"),
-            "year": c.get("year"), "special": bool(c.get("special")),
-            "img": c.get("img"),
-            "source": "codex",
-        })
-    return {"ok": True, "results": out, "count": len(out), "q": q}
-
-def refresh_codex():
-    """Rebuild data/codex.json from TCGdex (EN+JA)."""
-    script = os.path.join(ROOT, "scripts", "build_codex.py")
-    if not os.path.isfile(script):
-        return {"ok": False, "error": f"builder not found: {script}"}
-    env = dict(os.environ)
-    env["POKECHEST_HOME"] = HOME
-    try:
-        os.makedirs(os.path.join(HOME, "data"), exist_ok=True)
-        proc = subprocess.run(
-            [sys.executable, script],
-            capture_output=True, text=True, env=env, cwd=HOME, timeout=600)
-    except subprocess.TimeoutExpired:
-        return {"ok": False, "error": "codex rebuild timed out after 10 minutes"}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
-    report = None
-    for line in (proc.stdout or "").splitlines():
-        if line.startswith("REPORT_JSON="):
-            try:
-                report = json.loads(line[len("REPORT_JSON="):])
-            except Exception:
-                pass
-    if proc.returncode != 0:
-        err = (proc.stderr or proc.stdout or "codex rebuild failed").strip()[-800:]
-        return {"ok": False, "error": err}
-    _load_codex(force=True)
-    return {"ok": True, "report": report or codex_meta().get("meta")}
-
-def pc_search(q, token):
-    """Search PriceCharting's /api/products — the same catalog their site/app uses."""
-    q = (q or "").strip()
-    if not q:
-        return {"ok": True, "products": []}
-    url = "https://www.pricecharting.com/api/products?" + urllib.parse.urlencode({"t": token, "q": q})
-    d = http_json(url)
-    if d.get("status") == "error":
-        return {"ok": False, "error": d.get("error-message", "PriceCharting error")}
-    out = []
-    for p in (d.get("products") or [])[:20]:
-        name = p.get("product-name") or ""
-        m = re.search(r"#\s*([A-Za-z0-9/\-]+)\s*$", name)
-        pid = p.get("id")
-        out.append({
-            "id": pid,
-            "pcId": pid,
-            "name": re.sub(r"\s*#\s*[A-Za-z0-9/\-]+\s*$", "", name).strip() or name,
-            "number": m.group(1) if m else None,
-            "set": p.get("console-name") or "",
-            "price": cents(p.get("loose-price")),
-            "pcUrl": f"https://www.pricecharting.com/game/{pid}" if pid else None,
-            "source": "pricecharting",
-        })
-    return {"ok": True, "products": out}
-
-AI_IDENTIFY_SYSTEM = (
-    "You identify trading cards from a photo. Look at the card and respond with ONLY a JSON object, "
-    "no prose, no code fences: {\"name\": card name, \"number\": collector number without the set-size "
-    "denominator, \"set\": set name, \"lang\": \"en\" or \"ja\", \"game\": e.g. \"Pokémon\", "
-    "\"graded\": true/false (is it in a grading slab), \"rarity\": rarity if visible or null, "
-    "\"confidence\": 0-1}. Use null for anything unreadable."
-)
-
-def ai_identify(payload, settings):
-    """Vision identify — BYOK Claude/OpenAI. Used by Scanner after a Mac/iPhone snap."""
-    provider = settings.get("ai_provider", "anthropic")
-    key = settings.get("ai_key")
-    model = settings.get("ai_model") or ("claude-sonnet-4-6" if provider == "anthropic" else "gpt-4o")
-    data_url = (payload.get("dataUrl") or "")
-    m = re.match(r"data:(image/[a-z+.-]+);base64,(.+)$", data_url, re.S)
-    if not m:
-        return {"ok": False, "error": "Send the photo as a data URL."}
-    media_type, b64 = m.group(1), m.group(2).strip()
-    if len(b64) > 12 * 1024 * 1024:
-        return {"ok": False, "error": "Photo too large (12 MB max)."}
-    prompt = "Identify this trading card. Prefer Pokémon TCG when ambiguous."
-    if provider == "anthropic":
-        d = http_json(
-            "https://api.anthropic.com/v1/messages", method="POST",
-            headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-            body={"model": model, "max_tokens": 300, "system": AI_IDENTIFY_SYSTEM,
-                  "messages": [{"role": "user", "content": [
-                      {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": b64}},
-                      {"type": "text", "text": prompt}]}]})
-        text = "".join(b.get("text", "") for b in d.get("content", []) if b.get("type") == "text")
-    elif provider == "openai":
-        d = http_json(
-            "https://api.openai.com/v1/chat/completions", method="POST",
-            headers={"Authorization": f"Bearer {key}", "content-type": "application/json"},
-            body={"model": model, "max_tokens": 300,
-                  "messages": [{"role": "system", "content": AI_IDENTIFY_SYSTEM},
-                               {"role": "user", "content": [
-                                   {"type": "image_url", "image_url": {"url": data_url}},
-                                   {"type": "text", "text": prompt}]}]})
-        text = d["choices"][0]["message"]["content"]
-    else:
-        return {"ok": False, "error": f"Unknown AI provider: {provider}"}
-    j = re.search(r"\{.*\}", text, re.S)
-    if not j:
-        return {"ok": False, "error": "The model returned no JSON.", "raw": text[:300]}
-    try:
-        guess = json.loads(j.group(0))
+        with open(SEARCH_CACHE_FILE, encoding="utf-8") as f:
+            return json.load(f)
     except Exception:
-        return {"ok": False, "error": "Could not parse the model's JSON.", "raw": text[:300]}
-    return {"ok": True, "guess": guess, "provider": provider, "model": model}
+        return {}
 
-# ------------------------------------------------------ LAN / phone access ---
-# Opt-in second listener on 0.0.0.0 so your iPhone (same Wi-Fi) can open the app
-# and scan cards. HTTPS via a local self-signed cert when openssl is available
-# (live camera needs a secure context on phones). Home networks only.
-LAN = {"enabled": False, "server": None, "thread": None, "port": PORT + 1,
-       "scheme": "http", "tls": False, "error": None}
-LAN_LOCK = threading.Lock()
-TLS_DIR = os.path.join(HOME, "lan-tls")
+def _search_cache_save(cache):
+    os.makedirs(HOME, exist_ok=True)
+    tmp = SEARCH_CACHE_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(cache, f)
+    os.replace(tmp, SEARCH_CACHE_FILE)
 
-def _is_private_ip(ip):
-    try:
-        a = ipaddress.ip_address(ip.strip("[]"))
-        return a.is_private or a.is_loopback or a.is_link_local
-    except ValueError:
-        return False
+def _search_cache_key(q):
+    return re.sub(r"\s+", " ", (q or "").strip().lower())
 
-def _lan_ips():
-    ips = []
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.settimeout(2)
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
-        if ip and not ip.startswith("127."):
-            ips.append(ip)
-    except Exception:
-        pass
-    try:
-        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
-            ip = info[4][0]
-            if ip not in ips and not ip.startswith("127."):
-                ips.append(ip)
-    except Exception:
-        pass
-    priv = [ip for ip in ips if _is_private_ip(ip)]
-    return priv or ips
+def search_cache_get(q):
+    """Returns (products, stale) from cache, or (None, False) on a miss."""
+    key = _search_cache_key(q)
+    if not key:
+        return None, False
+    with _search_cache_lock:
+        cache = _search_cache_load()
+        entry = cache.get(key)
+        if not entry:
+            return None, False
+        age = time.time() - entry.get("ts", 0)
+        entry["lastUsed"] = time.time()
+        cache[key] = entry
+        _search_cache_save(cache)
+    return entry.get("products"), age > SEARCH_CACHE_PRICE_TTL
 
-def _ensure_lan_cert(ips):
-    cert, key = os.path.join(TLS_DIR, "cert.pem"), os.path.join(TLS_DIR, "key.pem")
-    if os.path.isfile(cert) and os.path.isfile(key):
-        return cert, key
-    openssl = shutil.which("openssl")
-    if not openssl:
-        return None
-    os.makedirs(TLS_DIR, exist_ok=True)
-    san = ",".join(["DNS:localhost", "IP:127.0.0.1"] + [f"IP:{ip}" for ip in ips])
-    base = [openssl, "req", "-x509", "-newkey", "rsa:2048", "-sha256", "-nodes",
-            "-days", "825", "-keyout", key, "-out", cert, "-subj", "/CN=Pokemon Chest LAN"]
-    try:
-        subprocess.run(base + ["-addext", f"subjectAltName={san}"],
-                       check=True, capture_output=True, timeout=60)
-        return cert, key
-    except Exception:
-        try:
-            subprocess.run(base, check=True, capture_output=True, timeout=60)
-            return cert, key
-        except Exception:
-            return None
-
-def lan_start():
-    with LAN_LOCK:
-        if LAN["server"] is not None:
-            LAN["enabled"] = True
-            return lan_status()
-        LAN["error"] = None
-        ips = _lan_ips()
-        try:
-            srv = ThreadingHTTPServer(("0.0.0.0", LAN["port"]), Handler)
-            pair = _ensure_lan_cert(ips)
-            if pair:
-                ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-                ctx.load_cert_chain(pair[0], pair[1])
-                srv.socket = ctx.wrap_socket(srv.socket, server_side=True)
-                LAN["scheme"], LAN["tls"] = "https", True
-            else:
-                LAN["scheme"], LAN["tls"] = "http", False
-            t = threading.Thread(target=srv.serve_forever, daemon=True)
-            t.start()
-            LAN.update(server=srv, thread=t, enabled=True)
-        except Exception as e:
-            LAN.update(server=None, thread=None, enabled=False, error=str(e))
-    s = load_settings()
-    s["lan_mode"] = bool(LAN["enabled"])
-    _write_settings(s)
-    return lan_status()
-
-def lan_stop():
-    with LAN_LOCK:
-        srv = LAN["server"]
-        LAN.update(server=None, thread=None, enabled=False, error=None)
-        if srv is not None:
-            try:
-                threading.Thread(target=srv.shutdown, daemon=True).start()
-            except Exception:
-                pass
-    s = load_settings()
-    s["lan_mode"] = False
-    _write_settings(s)
-    return lan_status()
-
-def lan_status():
-    ips = _lan_ips()
-    urls = [f"{LAN['scheme']}://{ip}:{LAN['port']}" for ip in ips] if LAN["enabled"] else []
-    return {"ok": True, "enabled": LAN["enabled"], "port": LAN["port"],
-            "scheme": LAN["scheme"], "tls": LAN["tls"], "ips": ips, "urls": urls,
-            "error": LAN["error"]}
+def search_cache_put(q, products):
+    key = _search_cache_key(q)
+    if not key:
+        return
+    with _search_cache_lock:
+        cache = _search_cache_load()
+        cache[key] = {"products": products, "ts": time.time(), "lastUsed": time.time()}
+        if len(cache) > SEARCH_CACHE_MAX:
+            for k in sorted(cache, key=lambda k: cache[k].get("lastUsed", 0))[:len(cache) - SEARCH_CACHE_MAX]:
+                cache.pop(k, None)
+        _search_cache_save(cache)
 
 # ------------------------------------------------------------- integrations ---
 def pricecharting_price(pc_id, token):
@@ -885,6 +636,35 @@ def ai_recommend(payload, settings):
     return {"ok": False, "error": f"Unknown AI provider: {provider}"}
 
 # ----------------------------------------------------------------- refresh ---
+def import_export(payload):
+    """First-run onboarding: accept an uploaded PriceCharting .xlsx export,
+    save it into HOME, and rebuild the collection from it. Returns
+    {ok:true, report:{...}} on success or {ok:false, error} — never raises."""
+    name = (payload.get("name") or "").strip()
+    data_b64 = payload.get("dataB64") or ""
+    if not name or "/" in name or "\\" in name or ".." in name or name.startswith("."):
+        return {"ok": False, "error": "Invalid file name."}
+    if not name.lower().endswith(".xlsx"):
+        return {"ok": False, "error": "Only a PriceCharting .xlsx export is supported here — for a plain CSV, use ➕ Add & Sold to add cards by hand for now."}
+    try:
+        raw = base64.b64decode(data_b64, validate=True)
+    except Exception:
+        return {"ok": False, "error": "Could not decode the uploaded file."}
+    if not raw:
+        return {"ok": False, "error": "The uploaded file is empty."}
+    if len(raw) > 25 * 1024 * 1024:
+        return {"ok": False, "error": "File is too large (max 25 MB)."}
+    try:
+        os.makedirs(HOME, exist_ok=True)
+        dest = os.path.join(HOME, name)
+        tmp = dest + ".tmp"
+        with open(tmp, "wb") as f:
+            f.write(raw)
+        os.replace(tmp, dest)
+    except Exception as e:
+        return {"ok": False, "error": f"Could not save the file: {e}"}
+    return refresh_data()
+
 def refresh_data():
     """Rebuild collection data by running scripts/build_data.py as a subprocess.
     Always returns a JSON-able dict — {ok:true, report:{...}} or {ok:false, error}."""
@@ -938,11 +718,13 @@ def build_pocket():
                               capture_output=True, text=True, env=env, cwd=HOME, timeout=120)
         if proc.returncode != 0:
             return {"ok": False, "error": (proc.stderr or proc.stdout or "pocket build failed").strip().splitlines()[-1]}
-        out = os.path.join(HOME, "Pokémon Chest — Pocket.html")
+        out = os.path.join(HOME, "Pokémon DenZ — Pocket.html")
         kb = os.path.getsize(out) // 1024 if os.path.isfile(out) else 0
-        return {"ok": True, "file": "Pokémon Chest — Pocket.html", "kb": kb}
+        return {"ok": True, "file": "Pokémon DenZ — Pocket.html", "kb": kb}
     except Exception as e:
         return {"ok": False, "error": str(e)}
+
+MOBILE_NAME = "Pokémon DenZ — Deck.html"
 
 def build_mobile():
     """Build the self-contained MOBILE app (swipe deck + deck builder + 3D battle
@@ -970,30 +752,27 @@ def build_mobile():
     return {"ok": True, "file": MOBILE_NAME, "path": out, "kb": kb, "report": report or {}}
 
 def deliver_mobile():
-    """Copy the built mobile app to Desktop / iCloud Drive / Documents so the
-    Files app on iPhone (and AirDrop) can pick it up — works after iCloud migration."""
+    """Copy the built mobile app to the user's own devices/paths: iCloud Drive
+    (→ Files app on iPhone) and the Desktop (→ AirDrop). Local copies only."""
     out = os.path.join(HOME, MOBILE_NAME)
     if not os.path.isfile(out):
         r = build_mobile()
         if not r.get("ok"):
             return r
     delivered = []
-    targets = deliver_destinations(MOBILE_NAME) if deliver_destinations else [
-        ("Desktop (AirDrop it)", os.path.join(os.path.expanduser("~/Desktop"), MOBILE_NAME)),
-    ]
-    seen = set()
-    for label, dst in targets:
-        key = os.path.realpath(dst) if os.path.exists(os.path.dirname(dst)) else dst
-        if key in seen:
-            continue
-        seen.add(key)
+    desk = os.path.join(os.path.expanduser("~/Desktop"), MOBILE_NAME)
+    try:
+        shutil.copy2(out, desk); delivered.append({"where": "Desktop (AirDrop it)", "path": desk})
+    except Exception as e:
+        delivered.append({"where": "Desktop", "error": str(e)})
+    icloud = os.path.expanduser("~/Library/Mobile Documents/com~apple~CloudDocs")
+    if os.path.isdir(icloud):
+        dst = os.path.join(icloud, MOBILE_NAME)
         try:
-            os.makedirs(os.path.dirname(dst), exist_ok=True)
-            shutil.copy2(out, dst)
-            delivered.append({"where": label, "path": dst})
+            shutil.copy2(out, dst); delivered.append({"where": "iCloud Drive (Files app on iPhone)", "path": dst})
         except Exception as e:
-            delivered.append({"where": label, "error": str(e)})
-    ok = any("path" in d for d in delivered)
+            delivered.append({"where": "iCloud Drive", "error": str(e)})
+    ok = any("path" in d for d in delivered)     # honest: true only if a copy landed
     return {"ok": ok, "delivered": delivered,
             **({} if ok else {"error": "Could not copy anywhere — use “Reveal file” and move it manually."})}
 
@@ -1035,7 +814,7 @@ def secret_save(label, value):
     try:
         subprocess.run(
             ["security", "add-generic-password", "-U", "-s", KEYCHAIN_SERVICE,
-             "-a", label, "-j", "Pokémon Chest secure input", "-w", value],
+             "-a", label, "-j", "Pokémon DenZ secure input", "-w", value],
             check=True, capture_output=True, text=True, timeout=20)
     except FileNotFoundError:
         return {"ok": False, "error": "macOS 'security' tool not found (this feature is macOS-only)."}
@@ -1093,6 +872,632 @@ def secret_copy(label):
             else {"ok": False, "error": "Clipboard copy failed."}
     except Exception as e:
         return {"ok": False, "error": str(e)}
+
+# ------------------------------------------------------ LAN / phone access ---
+# Opt-in second listener on 0.0.0.0 so your phone (same Wi-Fi) can open the app
+# and scan cards straight into the collection. HTTPS via a locally generated
+# self-signed cert when the openssl CLI is available (live camera preview on
+# phones requires a secure context); plain-HTTP LAN still works for the
+# file-input "take photo" flow. Never expose this port beyond your home router.
+LAN = {"enabled": False, "server": None, "thread": None, "port": PORT + 1,
+       "scheme": "http", "tls": False, "error": None}
+LAN_LOCK = threading.Lock()
+TLS_DIR = os.path.join(HOME, "lan-tls")
+
+def _is_private_ip(ip):
+    try:
+        a = ipaddress.ip_address(ip.strip("[]"))
+        return a.is_private or a.is_loopback or a.is_link_local
+    except ValueError:
+        return False
+
+def _lan_ips():
+    """Best-effort list of this machine's private IPv4 addresses."""
+    ips = []
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(2)
+        s.connect(("8.8.8.8", 80))          # no packets sent — just picks a route
+        ip = s.getsockname()[0]
+        s.close()
+        if ip and not ip.startswith("127."):
+            ips.append(ip)
+    except Exception:
+        pass
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            ip = info[4][0]
+            if ip not in ips and not ip.startswith("127."):
+                ips.append(ip)
+    except Exception:
+        pass
+    priv = [ip for ip in ips if _is_private_ip(ip)]
+    return priv or ips
+
+def _ensure_lan_cert(ips):
+    """Self-signed cert for LAN HTTPS. Returns (cert, key) paths or None."""
+    cert, key = os.path.join(TLS_DIR, "cert.pem"), os.path.join(TLS_DIR, "key.pem")
+    if os.path.isfile(cert) and os.path.isfile(key):
+        return cert, key
+    openssl = shutil.which("openssl")
+    if not openssl:
+        return None
+    os.makedirs(TLS_DIR, exist_ok=True)
+    san = ",".join(["DNS:localhost", "IP:127.0.0.1"] + [f"IP:{ip}" for ip in ips])
+    base = [openssl, "req", "-x509", "-newkey", "rsa:2048", "-sha256", "-nodes",
+            "-days", "825", "-keyout", key, "-out", cert, "-subj", "/CN=Pokémon DenZ LAN"]
+    try:
+        subprocess.run(base + ["-addext", f"subjectAltName={san}"],
+                       check=True, capture_output=True, timeout=60)
+        return cert, key
+    except Exception:
+        try:  # older LibreSSL without -addext — cert still enables HTTPS
+            subprocess.run(base, check=True, capture_output=True, timeout=60)
+            return cert, key
+        except Exception:
+            return None
+
+def lan_start():
+    with LAN_LOCK:
+        if LAN["server"] is not None:
+            LAN["enabled"] = True
+            return lan_status()
+        LAN["error"] = None
+        ips = _lan_ips()
+        try:
+            srv = ThreadingHTTPServer(("0.0.0.0", LAN["port"]), Handler)
+            pair = _ensure_lan_cert(ips)
+            if pair:
+                ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+                ctx.load_cert_chain(pair[0], pair[1])
+                srv.socket = ctx.wrap_socket(srv.socket, server_side=True)
+                LAN["scheme"], LAN["tls"] = "https", True
+            else:
+                LAN["scheme"], LAN["tls"] = "http", False
+            t = threading.Thread(target=srv.serve_forever, daemon=True)
+            t.start()
+            LAN.update(server=srv, thread=t, enabled=True)
+        except Exception as e:
+            LAN.update(server=None, thread=None, enabled=False, error=str(e))
+    s = load_settings()
+    s["lan_mode"] = bool(LAN["enabled"])
+    _write_settings(s)
+    return lan_status()
+
+def lan_stop():
+    with LAN_LOCK:
+        srv = LAN["server"]
+        LAN.update(server=None, thread=None, enabled=False, error=None)
+        if srv is not None:
+            try:
+                threading.Thread(target=srv.shutdown, daemon=True).start()
+            except Exception:
+                pass
+    s = load_settings()
+    s["lan_mode"] = False
+    _write_settings(s)
+    return lan_status()
+
+def lan_status():
+    ips = _lan_ips()
+    urls = [f"{LAN['scheme']}://{ip}:{LAN['port']}" for ip in ips] if LAN["enabled"] else []
+    return {"ok": True, "enabled": LAN["enabled"], "port": LAN["port"],
+            "scheme": LAN["scheme"], "tls": LAN["tls"], "ips": ips, "urls": urls,
+            "error": LAN["error"]}
+
+# ------------------------------------------------- PriceCharting bulk sync ---
+# With your own PriceCharting API token, re-price the WHOLE collection straight
+# from their Product API (no export download needed) and rewrite the live
+# data/collection.json. The xlsx export flow stays as the no-key fallback.
+PC_SYNC = {"running": False, "total": 0, "done": 0, "updated": 0, "errors": 0,
+           "startedAt": None, "finishedAt": None, "value": None, "lastError": None}
+PC_LOCK = threading.Lock()
+
+def _live_collection_path():
+    p = os.path.join(HOME, "data", "collection.json")
+    return p if os.path.isfile(p) else os.path.join(ROOT, "data", "collection.json")
+
+def _pc_pick_price(card, tiers):
+    """Map PriceCharting graded tiers onto this card's actual condition."""
+    def first(*keys):
+        for k in keys:
+            v = tiers.get(k)
+            if v:
+                return v
+        return None
+    if card.get("graded"):
+        try:
+            g = float(card.get("grade") or 0)
+        except (TypeError, ValueError):
+            g = 0
+        if g >= 10:
+            return first("psa10", "grade9_5", "grade9", "ungraded")
+        if g >= 9.5:
+            return first("grade9_5", "psa10", "grade9", "ungraded")
+        if g >= 9:
+            return first("grade9", "grade9_5", "ungraded")
+        if g >= 7:
+            return first("grade7to8", "grade9", "ungraded")
+        return first("ungraded", "grade7to8")
+    return first("ungraded")
+
+def _pc_recompute_meta(cards, old_meta):
+    tot_val = sum(c.get("value") or 0 for c in cards)
+    tot_cost = sum((c.get("cost") or 0) * (c.get("qty") or 1) for c in cards)
+    by_lang, by_set, by_game = {}, {}, {}
+    for c in cards:
+        v = c.get("value") or 0
+        by_lang[c.get("lang") or "en"] = by_lang.get(c.get("lang") or "en", 0) + v
+        by_set[c.get("set") or "?"] = by_set.get(c.get("set") or "?", 0) + v
+        by_game[c.get("game") or "?"] = by_game.get(c.get("game") or "?", 0) + v
+    m = dict(old_meta or {})
+    m.update({
+        "totalCards": sum(c.get("qty") or 1 for c in cards),
+        "totalEntries": len(cards),
+        "totalValue": round(tot_val, 2),
+        "totalCost": round(tot_cost, 2),
+        "totalPL": round(tot_val - tot_cost, 2),
+        "byLang": {k: round(v, 2) for k, v in by_lang.items()},
+        "byGame": {k: round(v, 2) for k, v in sorted(by_game.items(), key=lambda x: -x[1])},
+        "topSets": sorted(({"set": k, "value": round(v, 2)} for k, v in by_set.items()),
+                          key=lambda x: -x["value"])[:15],
+    })
+    return m
+
+def _pc_sync_worker(token):
+    try:
+        with open(_live_collection_path(), encoding="utf-8") as f:
+            col = json.load(f)
+        cards = col.get("cards") or []
+        with PC_LOCK:
+            PC_SYNC["total"] = len(cards)
+        for c in cards:
+            with PC_LOCK:
+                PC_SYNC["done"] += 1
+            pcid = c.get("pcId")
+            if not pcid:
+                continue
+            try:
+                r = pricecharting_price(str(pcid), token)
+                if r.get("ok"):
+                    p = _pc_pick_price(c, r.get("tiers") or {})
+                    if p is not None and p != c.get("price"):
+                        qty = c.get("qty") or 1
+                        cost = (c.get("cost") or 0) * qty
+                        c["price"] = p
+                        c["value"] = round(p * qty, 2)
+                        c["pl"] = round(c["value"] - cost, 2)
+                        c["plPct"] = round(c["pl"] / cost * 100, 1) if cost else None
+                        with PC_LOCK:
+                            PC_SYNC["updated"] += 1
+                else:
+                    with PC_LOCK:
+                        PC_SYNC["errors"] += 1
+                        PC_SYNC["lastError"] = r.get("error")
+            except Exception as e:
+                with PC_LOCK:
+                    PC_SYNC["errors"] += 1
+                    PC_SYNC["lastError"] = str(e)
+            time.sleep(0.12)          # be polite to the API (~8 req/s)
+        col["meta"] = _pc_recompute_meta(cards, col.get("meta"))
+        col["pcSyncedAt"] = datetime.datetime.now().isoformat(timespec="seconds")
+        out = os.path.join(HOME, "data", "collection.json")
+        os.makedirs(os.path.dirname(out), exist_ok=True)
+        tmp = out + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(col, f, ensure_ascii=False)
+        os.replace(tmp, out)
+        with PC_LOCK:
+            PC_SYNC["value"] = col["meta"]["totalValue"]
+    except Exception as e:
+        with PC_LOCK:
+            PC_SYNC["lastError"] = str(e)
+    finally:
+        with PC_LOCK:
+            PC_SYNC["running"] = False
+            PC_SYNC["finishedAt"] = datetime.datetime.now().isoformat(timespec="seconds")
+
+def pc_sync_start():
+    s = load_settings()
+    token = s.get("pricecharting_token")
+    if not token:
+        return {"ok": False, "error": "Add your PriceCharting token in ⚙ Live first."}
+    with PC_LOCK:
+        if PC_SYNC["running"]:
+            return dict(PC_SYNC, ok=True, alreadyRunning=True)
+        PC_SYNC.update(running=True, total=0, done=0, updated=0, errors=0,
+                       startedAt=datetime.datetime.now().isoformat(timespec="seconds"),
+                       finishedAt=None, value=None, lastError=None)
+    threading.Thread(target=_pc_sync_worker, args=(token,), daemon=True).start()
+    return dict(PC_SYNC, ok=True)
+
+def pc_sync_status():
+    with PC_LOCK:
+        return dict(PC_SYNC, ok=True)
+
+# ---------------------------------------------------------------- card codex ---
+# data/codex.json: every EN + JA Pokémon TCG set and card from TCGdex
+# (395 sets / 31,603 cards, secret + special rares included). Built by
+# scripts/build_codex.py, no API key required. This is the ONLY card lookup
+# that needs neither a PriceCharting token nor a network connection, so it
+# backstops both the collection search and the paid catalog search.
+CODEX = {"data": None, "loaded": False}
+CODEX_LOCK = threading.Lock()
+
+def _codex_load():
+    """Lazy-load + memoize codex.json (7.6 MB) on first search, not at boot."""
+    with CODEX_LOCK:
+        if CODEX["loaded"]:
+            return CODEX["data"]
+        CODEX["loaded"] = True
+        for p in (os.path.join(HOME, "data", "codex.json"),
+                  os.path.join(ROOT, "data", "codex.json")):
+            try:
+                with open(p, encoding="utf-8") as f:
+                    CODEX["data"] = json.load(f)
+                break
+            except Exception:
+                continue
+        return CODEX["data"]
+
+CODEX_IDX = {"bySet": None, "sets": None}
+
+def _codex_index():
+    """Memoized {lang:setId -> [cards]} and {lang:setId -> set meta} views."""
+    if CODEX_IDX["bySet"] is not None:
+        return CODEX_IDX["bySet"], CODEX_IDX["sets"]
+    d = _codex_load()
+    by_set, sets = {}, {}
+    if d:
+        for c in d.get("cards", []):
+            by_set.setdefault(f"{c.get('lang')}:{c.get('setId')}", []).append(c)
+        for s in d.get("sets", []):
+            sets[f"{s.get('lang')}:{s.get('id')}"] = s
+    CODEX_IDX["bySet"], CODEX_IDX["sets"] = by_set, sets
+    return by_set, sets
+
+def _num_key(n):
+    """Match build_data.py's set_card_index(): strip leading zeros so '004',
+    '4' and 4 all collide."""
+    s = str(n if n is not None else "").strip().lstrip("0")
+    return s or "0"
+
+def codex_completion(payload):
+    """Given {owned: {'<lang>:<setId>': [numbers…]}} return per-set completion
+    computed entirely from the bundled codex — no network, no API key. Each
+    card is returned already flagged owned/not so the client can render both
+    the official-set and master-set views without a second round trip."""
+    d = _codex_load()
+    if not d:
+        return {"ok": False, "error": "codex.json not found — run scripts/build_codex.py"}
+    by_set, sets = _codex_index()
+    owned = (payload or {}).get("owned") or {}
+    out = []
+    for key, nums in owned.items():
+        meta, cards = sets.get(key), by_set.get(key)
+        if not meta:
+            continue
+        have = {_num_key(n) for n in (nums or [])}
+        # 111 of the codex's 395 sets carry set metadata but no card list (the
+        # codex build couldn't fetch their cards). Those are still reported —
+        # with the real denominator and an owned count — flagged partial, so a
+        # set never silently vanishes from the tracker just because we can't
+        # enumerate which specific cards are missing.
+        out.append({
+            "key": key, "id": meta.get("id"), "lang": meta.get("lang"),
+            "name": meta.get("name"), "year": meta.get("year"),
+            "official": meta.get("official"), "total": meta.get("total"),
+            "partial": not cards,
+            "ownedCount": len(have),
+            "cards": [{"n": c.get("number"), "name": c.get("name"),
+                       "sp": bool(c.get("special")),
+                       "own": _num_key(c.get("number")) in have} for c in (cards or [])],
+        })
+    out.sort(key=lambda s: -(sum(1 for c in s["cards"] if c["own"]) or s["ownedCount"]))
+    return {"ok": True, "sets": out,
+            "partialSets": sum(1 for s in out if s["partial"])}
+
+def codex_search(q, limit=25, special_only=False):
+    """Token-AND over each card's prebuilt lowercase `q` field — same matching
+    rule the collection search uses, so results feel identical."""
+    d = _codex_load()
+    if not d:
+        return {"ok": False, "error": "codex.json not found — run scripts/build_codex.py"}
+    terms = [t for t in re.split(r"\s+", (q or "").strip().lower()) if t]
+    if not terms:
+        return {"ok": True, "cards": [], "meta": d.get("meta", {})}
+    out = []
+    for c in d.get("cards", []):
+        if special_only and not c.get("special"):
+            continue
+        hay = c.get("q") or ""
+        if all(t in hay for t in terms):
+            out.append(c)
+            if len(out) >= limit:
+                break
+    return {"ok": True, "cards": out, "meta": d.get("meta", {})}
+
+# ---- codex meta + rebuild (from the Chest line) -----------------------------
+def codex_meta():
+    """Summary of the bundled card codex — set/card counts for the Admin panel."""
+    d = _codex_load()
+    if not d:
+        return {"ok": False, "error": "codex.json not found — run scripts/build_codex.py"}
+    return {"ok": True, "meta": d.get("meta", {})}
+
+def refresh_codex():
+    """Re-run scripts/build_codex.py to pull the newest TCGdex sets, then drop
+    the in-process cache so the next search sees the new file."""
+    script = os.path.join(ROOT, "scripts", "build_codex.py")
+    if not os.path.isfile(script):
+        return {"ok": False, "error": f"builder not found: {script}"}
+    env = dict(os.environ)
+    env["POKECHEST_HOME"] = HOME
+    try:
+        os.makedirs(HOME, exist_ok=True)
+        proc = subprocess.run([sys.executable, script], capture_output=True,
+                              text=True, env=env, cwd=HOME, timeout=1800)
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "codex rebuild timed out after 30 minutes"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    if proc.returncode != 0:
+        lines = [l for l in (proc.stderr or proc.stdout or "").strip().splitlines() if l.strip()]
+        return {"ok": False, "error": lines[-1] if lines else "codex rebuild failed"}
+    with CODEX_LOCK:
+        CODEX["data"] = None
+        CODEX["loaded"] = False
+    CODEX_IDX["bySet"] = None
+    CODEX_IDX["sets"] = None
+    return codex_meta()
+
+def pc_search(q, token):
+    """Search PriceCharting's product catalog — powers no-typing card adds,
+    the AI-identify -> catalog-match handoff in the Scanner, and binder-scan
+    add. Backed by search_cache_get/put: a fresh cache hit skips the network
+    entirely; a stale hit still answers immediately (stale:True) and a
+    background refresh brings it current for next time; a miss searches live
+    and seeds the cache for every future scan session."""
+    q = (q or "").strip()
+    if not q:
+        return {"ok": True, "products": []}
+    cached, stale = search_cache_get(q)
+    if cached is not None and not stale:
+        return {"ok": True, "products": cached, "cached": True}
+    try:
+        url = "https://www.pricecharting.com/api/products?" + urllib.parse.urlencode({"t": token, "q": q})
+        d = http_json(url)
+        if d.get("status") == "error":
+            if cached is not None:
+                return {"ok": True, "products": cached, "cached": True, "stale": True}
+            return {"ok": False, "error": d.get("error-message", "PriceCharting error")}
+        out = []
+        for p in (d.get("products") or [])[:12]:
+            name = p.get("product-name") or ""
+            m = re.search(r"#\s*([A-Za-z0-9-]+)\s*$", name)
+            out.append({
+                "id": p.get("id"),
+                "name": re.sub(r"\s*#\s*[A-Za-z0-9-]+\s*$", "", name).strip(),
+                "number": m.group(1) if m else None,
+                "set": p.get("console-name") or "",
+                "price": cents(p.get("loose-price")),
+            })
+        search_cache_put(q, out)
+        return {"ok": True, "products": out}
+    except Exception:
+        # Network hiccup mid-scan: a stale cache hit beats a hard failure.
+        if cached is not None:
+            return {"ok": True, "products": cached, "cached": True, "stale": True}
+        raise
+
+# ------------------------------------------------- AI card identification ---
+AI_IDENTIFY_SYSTEM = (
+    "You identify trading cards from a photo. Look at the card and respond with ONLY a JSON object, "
+    "no prose, no code fences: {\"name\": card name, \"number\": collector number without the set-size "
+    "denominator, \"set\": set name, \"lang\": \"en\" or \"ja\", \"game\": e.g. \"Pokémon\", "
+    "\"graded\": true/false (is it in a grading slab), \"confidence\": 0-1}. Use null for anything unreadable.")
+
+AI_IDENTIFY_GRID_SYSTEM = (
+    "You identify trading cards from a photo of a 9-pocket binder page (3x3 grid). Respond with ONLY a "
+    "JSON array, no prose, no code fences: up to 9 objects, one per occupied pocket, row-major starting "
+    "top-left: {\"slot\": 1-9, \"name\": card name, \"number\": collector number without the set-size "
+    "denominator, \"set\": set name, \"lang\": \"en\" or \"ja\", \"game\": e.g. \"Pokémon\", "
+    "\"graded\": true/false, \"confidence\": 0-1}. Omit empty pockets entirely. Use null for anything "
+    "unreadable on a card you can otherwise see.")
+
+def ai_identify(payload, settings):
+    provider = settings.get("ai_provider", "anthropic")
+    key = settings.get("ai_key")
+    model = settings.get("ai_model") or ("claude-sonnet-4-6" if provider == "anthropic" else "gpt-4o")
+    data_url = (payload.get("dataUrl") or "")
+    m = re.match(r"data:(image/[a-z+.-]+);base64,(.+)$", data_url, re.S)
+    if not m:
+        return {"ok": False, "error": "Send the photo as a data URL."}
+    media_type, b64 = m.group(1), m.group(2).strip()
+    grid = payload.get("mode") == "grid"
+    system = AI_IDENTIFY_GRID_SYSTEM if grid else AI_IDENTIFY_SYSTEM
+    prompt = "Identify every card in this 3x3 binder-page photo." if grid else "Identify this trading card."
+    max_tokens = 2000 if grid else 300
+    if provider == "anthropic":
+        d = http_json(
+            "https://api.anthropic.com/v1/messages", method="POST",
+            headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+            body={"model": model, "max_tokens": max_tokens, "system": system,
+                  "messages": [{"role": "user", "content": [
+                      {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": b64}},
+                      {"type": "text", "text": prompt}]}]})
+        text = "".join(b.get("text", "") for b in d.get("content", []) if b.get("type") == "text")
+    elif provider == "openai":
+        d = http_json(
+            "https://api.openai.com/v1/chat/completions", method="POST",
+            headers={"Authorization": f"Bearer {key}", "content-type": "application/json"},
+            body={"model": model, "max_tokens": max_tokens,
+                  "messages": [{"role": "system", "content": system},
+                               {"role": "user", "content": [
+                                   {"type": "image_url", "image_url": {"url": data_url}},
+                                   {"type": "text", "text": prompt}]}]})
+        text = d["choices"][0]["message"]["content"]
+    else:
+        return {"ok": False, "error": f"Unknown AI provider: {provider}"}
+    if grid:
+        j = re.search(r"\[.*\]", text, re.S)
+        if not j:
+            return {"ok": False, "error": "The model returned no JSON.", "raw": text[:300]}
+        try:
+            guesses = json.loads(j.group(0))
+        except Exception:
+            return {"ok": False, "error": "Could not parse the model's JSON.", "raw": text[:300]}
+        if not isinstance(guesses, list):
+            return {"ok": False, "error": "Model returned JSON, but not an array.", "raw": text[:300]}
+        return {"ok": True, "guesses": guesses, "provider": provider, "model": model}
+    j = re.search(r"\{.*\}", text, re.S)
+    if not j:
+        return {"ok": False, "error": "The model returned no JSON.", "raw": text[:300]}
+    try:
+        guess = json.loads(j.group(0))
+    except Exception:
+        return {"ok": False, "error": "Could not parse the model's JSON.", "raw": text[:300]}
+    return {"ok": True, "guess": guess, "provider": provider, "model": model}
+
+# ------------------------------------------------------- AI condition pre-grade ---
+AI_GRADE_SYSTEM = (
+    "You pre-grade trading cards from a photo like a PSA grader. Respond with ONLY a JSON "
+    "object, no prose: {\"centering\":{\"lr\":\"55/45\",\"tb\":\"60/40\",\"worstPct\":60},"
+    "\"corners\":0-10,\"edges\":0-10,\"surface\":0-10,\"flaws\":[short strings],\"estGrade\":1-10,"
+    "\"confidence\":0-1}. worstPct is the worst-axis border percentage. Use null for anything unreadable.")
+
+def ai_grade(payload, settings):
+    """Modeled exactly on ai_identify: same provider branches, same data-url regex,
+    same error shape — only the system prompt, token budget, and JSON-object (not
+    array) parsing differ."""
+    provider = settings.get("ai_provider", "anthropic")
+    key = settings.get("ai_key")
+    model = settings.get("ai_model") or ("claude-sonnet-4-6" if provider == "anthropic" else "gpt-4o")
+    data_url = (payload.get("dataUrl") or "")
+    m = re.match(r"data:(image/[a-z+.-]+);base64,(.+)$", data_url, re.S)
+    if not m:
+        return {"ok": False, "error": "Send the photo as a data URL."}
+    media_type, b64 = m.group(1), m.group(2).strip()
+    system = AI_GRADE_SYSTEM
+    prompt = "Pre-grade this trading card."
+    max_tokens = 500
+    if provider == "anthropic":
+        d = http_json(
+            "https://api.anthropic.com/v1/messages", method="POST",
+            headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+            body={"model": model, "max_tokens": max_tokens, "system": system,
+                  "messages": [{"role": "user", "content": [
+                      {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": b64}},
+                      {"type": "text", "text": prompt}]}]})
+        text = "".join(b.get("text", "") for b in d.get("content", []) if b.get("type") == "text")
+    elif provider == "openai":
+        d = http_json(
+            "https://api.openai.com/v1/chat/completions", method="POST",
+            headers={"Authorization": f"Bearer {key}", "content-type": "application/json"},
+            body={"model": model, "max_tokens": max_tokens,
+                  "messages": [{"role": "system", "content": system},
+                               {"role": "user", "content": [
+                                   {"type": "image_url", "image_url": {"url": data_url}},
+                                   {"type": "text", "text": prompt}]}]})
+        text = d["choices"][0]["message"]["content"]
+    else:
+        return {"ok": False, "error": f"Unknown AI provider: {provider}"}
+    j = re.search(r"\{.*\}", text, re.S)
+    if not j:
+        return {"ok": False, "error": "The model returned no JSON.", "raw": text[:300]}
+    try:
+        grade = json.loads(j.group(0))
+    except Exception:
+        return {"ok": False, "error": "Could not parse the model's JSON.", "raw": text[:300]}
+    return {"ok": True, "grade": grade, "provider": provider, "model": model}
+
+# --------------------------------------------------- auto inventory import ---
+# Watches for a new/updated PriceCharting export (project folder, POKECHEST_HOME,
+# ~/Downloads) and rebuilds the collection automatically — download the export,
+# and the app pulls the new inventory in on its own, no clicks, no typing.
+AUTOSYNC = {"enabled": True, "running": False, "lastCheck": None, "lastImport": None,
+            "lastReport": None, "lastError": None, "source": None, "seq": 0}
+AUTOSYNC_LOCK = threading.Lock()
+
+def _newest_export():
+    """Newest PriceCharting .xlsx. Prefers the iCloud-aware finder, which also
+    searches Desktop/Documents/iCloud Drive and forces cloud-only *.icloud
+    placeholders to download before reading them — without that, an export that
+    migrated into iCloud is invisible to the watcher. Falls back to the original
+    HOME/ROOT/~Downloads scan if mac_paths isn't present or errors."""
+    if _find_pc_xlsx:
+        try:
+            best, _diag = _find_pc_xlsx(ROOT, HOME)
+            if best:
+                return best
+        except Exception:
+            pass
+    files = []
+    seen = set()
+    for d in (HOME, ROOT, os.path.expanduser("~/Downloads")):
+        d = os.path.abspath(d)
+        if d in seen or not os.path.isdir(d):
+            continue
+        seen.add(d)
+        try:
+            names = os.listdir(d)
+        except OSError:
+            continue
+        for f in names:
+            if f.lower().endswith(".xlsx") and not f.startswith("~$") \
+                    and "pricecharting" in f.lower():
+                files.append(os.path.join(d, f))
+    return max(files, key=os.path.getmtime) if files else None
+
+def _built_mtime():
+    for p in (os.path.join(HOME, "data", "collection.json"),
+              os.path.join(ROOT, "data", "collection.json")):
+        if os.path.isfile(p):
+            return os.path.getmtime(p)
+    return 0
+
+def _autosync_tick():
+    src = _newest_export()
+    AUTOSYNC["lastCheck"] = datetime.datetime.now().isoformat(timespec="seconds")
+    if not src or os.path.getmtime(src) <= _built_mtime():
+        return
+    with PC_LOCK:
+        if PC_SYNC["running"]:      # don't fight the price-sync writer
+            return
+    AUTOSYNC["running"] = True
+    try:
+        r = refresh_data()
+        if r.get("ok"):
+            AUTOSYNC.update(source=os.path.basename(src), lastReport=r.get("report"),
+                            lastImport=datetime.datetime.now().isoformat(timespec="seconds"),
+                            lastError=None)
+            AUTOSYNC["seq"] += 1
+        else:
+            AUTOSYNC["lastError"] = r.get("error")
+    finally:
+        AUTOSYNC["running"] = False
+
+def _autosync_loop():
+    time.sleep(6)                   # let the server settle before the first pass
+    while True:
+        try:
+            AUTOSYNC["enabled"] = bool(load_settings().get("autosync", True))
+            if AUTOSYNC["enabled"]:
+                with AUTOSYNC_LOCK:
+                    _autosync_tick()
+        except Exception as e:
+            AUTOSYNC["lastError"] = str(e)
+        time.sleep(20)
+
+def autosync_status():
+    return dict(AUTOSYNC, ok=True)
+
+def autosync_set(enabled):
+    s = load_settings()
+    s["autosync"] = bool(enabled)
+    _write_settings(s)
+    AUTOSYNC["enabled"] = bool(enabled)
+    return autosync_status()
 
 # ------------------------------------------------------------- emerald lab ---
 # Build the open-source pokeemerald decompilation into a fresh, legal ROM and run
@@ -1184,7 +1589,7 @@ def _emerald_install_worker():
             _log("macOS will ask for your password ONCE — it goes straight to the")
             _log("system installer and is never seen or stored by this app.")
             inner = f"{DKP_PACMAN} -Sy --noconfirm && {DKP_PACMAN} -S --noconfirm gba-dev devkitarm-rules"
-            prompt = "Pokémon Chest needs your Mac password once to install the Game Boy Advance toolchain (devkitARM)."
+            prompt = "Pokémon DenZ needs your Mac password once to install the Game Boy Advance toolchain (devkitARM)."
             esc_cmd = inner.replace("\\", "\\\\").replace('"', '\\"')
             esc_prompt = prompt.replace("\\", "\\\\").replace('"', '\\"')
             osa = f'do shell script "{esc_cmd}" with administrator privileges with prompt "{esc_prompt}"'
@@ -1204,7 +1609,7 @@ def _emerald_install_worker():
                 add += "export DEVKITARM=/opt/devkitpro/devkitARM\n"
             if add:
                 with open(zshrc, "a", encoding="utf-8") as f:
-                    f.write("\n# Added by Pokémon Chest — Emerald Lab\n" + add)
+                    f.write("\n# Added by Pokémon DenZ — Emerald Lab\n" + add)
                 _log("Added DEVKITPRO/DEVKITARM to ~/.zshrc ✓")
         except Exception as e:
             _log(f"(could not update ~/.zshrc: {e})")
@@ -1285,12 +1690,46 @@ def emerald_log(since):
                 "running": EMERALD["running"], "phase": EMERALD["phase"], "lastOk": EMERALD["ok"]}
 
 # ----------------------------------------------------------------- handler ---
+# Hardening: request bodies are capped (an image-upload xlsx/base64 payload
+# tops out well under this), and endpoints that touch the Keychain, run
+# subprocesses, open Finder, or reconfigure the server itself only answer to
+# connections from this Mac — a phone on the LAN listener gets 403 for those.
+BODY_MAX = 48 * 1024 * 1024
+
+class PayloadTooLarge(Exception):
+    pass
+
+# Paths the static file server must never serve, even to localhost: BYOK keys,
+# the LAN TLS private key, the raw export, and any dot-path (.git, .DS_Store…).
+def _static_blocked(path):
+    parts = [p for p in urllib.parse.unquote(path).split("/") if p]
+    if any(p.startswith(".") for p in parts):
+        return True
+    low = [p.lower() for p in parts]
+    if low and (low[0].startswith("settings.local.json") or low[0] == "lan-tls"):
+        return True
+    if low and low[-1].endswith(".xlsx"):
+        return True
+    return False
+
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *a, **k):
         super().__init__(*a, directory=ROOT, **k)
 
     def log_message(self, *a):  # quieter console
         pass
+
+    def end_headers(self):
+        # On every response, static files included.
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
+        # The service worker is the one file that must never be served from a
+        # stale cache: a cached sw.js pins an installed phone to whatever build
+        # it first saw, and no later release can dislodge it.
+        if urllib.parse.urlparse(self.path).path in ("/sw.js", "/manifest.webmanifest"):
+            self.send_header("Cache-Control", "no-cache")
+        super().end_headers()
 
     def _json(self, obj, code=200):
         body = json.dumps(obj).encode()
@@ -1303,7 +1742,26 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _read_body(self):
         n = int(self.headers.get("Content-Length", 0))
+        if n > BODY_MAX:
+            raise PayloadTooLarge()
         return json.loads(self.rfile.read(n) or b"{}") if n else {}
+
+    def _ship_blocked(self, path):
+        """Emerald Lab is stripped from ship builds — refuse its routes there
+        so the flag isn't just a hidden UI panel."""
+        if path.startswith("/api/emerald") and ship_build():
+            self._json({"ok": False, "error": "not available in this build"}, 404)
+            return True
+        return False
+
+    def _loopback_only(self):
+        """This-Mac-only controls: Keychain, subprocess runners, Finder reveals,
+        key writes, LAN on/off. The phone (LAN listener) can browse and scan,
+        never administer."""
+        if self.client_address[0] in ("127.0.0.1", "::1", "::ffff:127.0.0.1"):
+            return True
+        self._json({"ok": False, "error": "forbidden: only available on the Mac itself, not over LAN"}, 403)
+        return False
 
     def _guard(self, ok, what):
         if not ok:
@@ -1331,9 +1789,10 @@ class Handler(SimpleHTTPRequestHandler):
     def _local_ok(self):
         """Reject API calls that don't come from this machine's own app.
 
-        Host must be localhost (defeats DNS rebinding), OR — when phone-mode LAN
-        is enabled — a private LAN IP so the iPhone on the same Wi-Fi can scan.
-        Origin, when present, must match the same rule.
+        Host must be localhost (defeats DNS rebinding); if the browser attached
+        an Origin header (it always does on cross-origin requests), it must be
+        a localhost origin too (defeats cross-site requests from web pages).
+        Non-browser local tools (curl) send no Origin and pass.
         """
         host = (self.headers.get("Host") or "").split(":")[0].strip("[]").lower()
         host_ok = host in ("127.0.0.1", "localhost", "::1") \
@@ -1355,15 +1814,10 @@ class Handler(SimpleHTTPRequestHandler):
         path = urllib.parse.urlparse(self.path).path
         if path.startswith("/api/") and not self._local_ok():
             return
+        if self._ship_blocked(path):
+            return
         if path == "/api/health":
-            payload = {"ok": True, "version": VERSION, "home": HOME, "homeReason": _HOME_REASON,
-                       "projectInICloud": bool(is_under_icloud and is_under_icloud(ROOT))}
-            if path_report:
-                try:
-                    payload["paths"] = path_report(ROOT, HOME)
-                except Exception as e:
-                    payload["pathsError"] = str(e)
-            return self._json(payload)
+            return self._json({"ok": True, "version": VERSION})
         if path == "/api/config":
             return self._json(config_view(load_settings()))
         if path == "/api/emerald/status":
@@ -1371,7 +1825,36 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/emerald/log":
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             return self._json(emerald_log((qs.get("since") or ["0"])[0]))
+        if path == "/api/lan":
+            return self._json(lan_status())
+        if path == "/api/pc/sync/status":
+            return self._json(pc_sync_status())
+        if path == "/api/autosync":
+            return self._json(autosync_status())
+        if path == "/api/pc/search":
+            s = load_settings()
+            if not self._guard(s.get("pricecharting_token"), "pricecharting_token"):
+                return
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            try:
+                return self._json(pc_search((qs.get("q") or [""])[0], s["pricecharting_token"]))
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)}, 200)
+        if path == "/api/codex/meta":
+            return self._json(codex_meta())
+        if path == "/api/codex/search":
+            # No guard: the codex is bundled local data, needs no key and no network.
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            try:
+                return self._json(codex_search(
+                    (qs.get("q") or [""])[0],
+                    limit=min(100, max(1, int((qs.get("limit") or ["25"])[0] or 25))),
+                    special_only=(qs.get("special") or [""])[0] in ("1", "true", "yes")))
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)}, 200)
         if path == "/api/secrets":
+            if not self._loopback_only():
+                return
             return self._json(secret_list())
         if path == "/api/cardart":
             return self._json(card_art_list())
@@ -1424,46 +1907,25 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(pricecharting_price(pid, s["pricecharting_token"]))
             except Exception as e:
                 return self._json({"ok": False, "error": str(e)}, 200)
-        if path == "/api/products":
-            s = load_settings()
-            if not self._guard(s.get("pricecharting_token"), "pricecharting_token"):
-                return
-            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-            q = (qs.get("q") or [""])[0]
-            try:
-                return self._json(pc_search(q, s["pricecharting_token"]))
-            except Exception as e:
-                return self._json({"ok": False, "error": str(e)}, 200)
-        if path == "/api/codex/meta":
-            return self._json(codex_meta())
-        if path == "/api/codex":
-            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-            q = (qs.get("q") or [""])[0]
-            lang = (qs.get("lang") or [""])[0] or None
-            if lang == "all":
-                lang = None
-            special = None
-            if (qs.get("special") or [""])[0] in ("1", "true", "yes"):
-                special = True
-            try:
-                limit = min(60, max(1, int((qs.get("limit") or ["24"])[0])))
-            except ValueError:
-                limit = 24
-            return self._json(codex_search(q, lang=lang, special=special, limit=limit))
-        if path == "/api/lan":
-            return self._json(lan_status())
-        if path == "/data/codex.json":
-            live = os.path.join(HOME, "data", "codex.json")
-            if self._serve_file(live, "application/json"):
-                return
+        if _static_blocked(path):
+            return self._json({"ok": False, "error": "forbidden"}, 403)
         return super().do_GET()  # static files
 
     def do_POST(self):
         path = urllib.parse.urlparse(self.path).path
         if not self._local_ok():
             return
+        if self._ship_blocked(path):
+            return
+        if (path.startswith(("/api/secrets", "/api/emerald")) or path.endswith("/reveal")
+                or path in ("/api/config", "/api/lan", "/api/import", "/api/mobile/deliver",
+                            "/api/pocket", "/api/codex/refresh")):
+            if not self._loopback_only():
+                return
         try:
             payload = self._read_body()
+        except PayloadTooLarge:
+            return self._json({"ok": False, "error": "payload too large"}, 413)
         except Exception:
             return self._json({"ok": False, "error": "bad JSON body"}, 400)
         if path == "/api/config":
@@ -1471,6 +1933,56 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/refresh":
             try:
                 return self._json(refresh_data())
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)}, 200)
+        if path == "/api/import":
+            try:
+                return self._json(import_export(payload))
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)}, 200)
+        if path == "/api/lan":
+            try:
+                return self._json(lan_start() if payload.get("enabled") else lan_stop())
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)}, 200)
+        if path == "/api/pc/sync":
+            try:
+                return self._json(pc_sync_start())
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)}, 200)
+        if path == "/api/autosync":
+            return self._json(autosync_set(payload.get("enabled", True)))
+        if path == "/api/codex/completion":
+            # Bundled local data — no key, no network, so no _guard here.
+            try:
+                return self._json(codex_completion(payload))
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)}, 200)
+        if path == "/api/ai/identify":
+            s = load_settings()
+            if not self._guard(s.get("ai_key"), "ai_key"):
+                return
+            try:
+                return self._json(ai_identify(payload, s))
+            except urllib.error.HTTPError as e:
+                detail = e.read().decode("utf-8", "replace")[:400]
+                return self._json({"ok": False, "error": f"{e.code} {detail}"}, 200)
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)}, 200)
+        if path == "/api/ai/grade":
+            s = load_settings()
+            if not self._guard(s.get("ai_key"), "ai_key"):
+                return
+            try:
+                return self._json(ai_grade(payload, s))
+            except urllib.error.HTTPError as e:
+                detail = e.read().decode("utf-8", "replace")[:400]
+                return self._json({"ok": False, "error": f"{e.code} {detail}"}, 200)
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)}, 200)
+        if path == "/api/codex/refresh":
+            try:
+                return self._json(refresh_codex())
             except Exception as e:
                 return self._json({"ok": False, "error": str(e)}, 200)
         if path == "/api/pocket":
@@ -1555,27 +2067,6 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json({"ok": False, "error": f"{e.code} {detail}"}, 200)
             except Exception as e:
                 return self._json({"ok": False, "error": str(e)}, 200)
-        if path == "/api/ai/identify":
-            s = load_settings()
-            if not self._guard(s.get("ai_key"), "ai_key"):
-                return
-            try:
-                return self._json(ai_identify(payload, s))
-            except urllib.error.HTTPError as e:
-                detail = e.read().decode("utf-8", "replace")[:400]
-                return self._json({"ok": False, "error": f"{e.code} {detail}"}, 200)
-            except Exception as e:
-                return self._json({"ok": False, "error": str(e)}, 200)
-        if path == "/api/codex/refresh":
-            try:
-                return self._json(refresh_codex())
-            except Exception as e:
-                return self._json({"ok": False, "error": str(e)}, 200)
-        if path == "/api/lan":
-            try:
-                return self._json(lan_start() if payload.get("enabled") else lan_stop())
-            except Exception as e:
-                return self._json({"ok": False, "error": str(e)}, 200)
         return self._json({"ok": False, "error": "not found"}, 404)
 
 
@@ -1585,27 +2076,20 @@ if __name__ == "__main__":
     # "Open Pocket Edition" link works on first launch of the bundled app.
     if not os.path.isfile(os.path.join(HOME, POCKET_NAME)):
         try:
+            import threading
             threading.Thread(target=build_pocket, daemon=True).start()
         except Exception:
             pass
-    # Warm the card codex in the background so the first Scanner search is fast.
-    try:
-        threading.Thread(target=lambda: _load_codex(), daemon=True).start()
-    except Exception:
-        pass
-    if load_settings().get("lan_mode"):
-        try:
-            st = lan_start()
-            for u in st.get("urls") or []:
-                print(f"  LAN (phone) → {u}")
-        except Exception:
-            pass
     print("┌──────────────────────────────────────────────┐")
-    print(f"│  Pokémon Chest running → http://localhost:{PORT} │")
+    print(f"│  Pokémon DenZ running → http://localhost:{PORT} │")
     print("│  Keep this window open. Close it to stop.    │")
     print("└──────────────────────────────────────────────┘")
-    if HOME != ROOT:
-        print(f"  Writable home → {HOME}")
-        print(f"  ({_HOME_REASON})")
+    # Phone/LAN mode survives restarts: re-arm it if it was on last time.
+    if load_settings().get("lan_mode"):
+        st = lan_start()
+        for u in st.get("urls", []):
+            print(f"  LAN (phone) → {u}")
+    # Auto inventory import: new PriceCharting exports are pulled in on their own.
+    threading.Thread(target=_autosync_loop, daemon=True).start()
     print(f"POKECHEST_READY port={PORT}", flush=True)
     server.serve_forever()

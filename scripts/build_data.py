@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Pokémon Den data builder
+Pokémon DenZ data builder
 ==========================
 Reads the PriceCharting collection export (.xlsx) and produces data/collection.json:
 a clean, enriched record per card with card images (TCGdex, EN + JA), P/L, a

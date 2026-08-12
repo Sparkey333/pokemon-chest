@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the Pokémon Den app icon (1024x1024 PNG) with no dependencies.
+"""Generate the Pokémon DenZ app icon (1024x1024 PNG) with no dependencies.
 
 A gold treasure chest with a pokéball clasp on a dark rounded-square tile —
 matches the in-app dark "vault" theme. Output: icon-source.png in the project
