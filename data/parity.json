@@ -1,7 +1,7 @@
 {
   "about": "Canonical machine-readable feature ledger for Pokémon Den. Rendered by the 📋 Parity tab. Agents & future sessions (any model): implement items from their spec alone, satisfy every acceptance criterion, run the verify steps, then set status=shipped, append \"✅ YYYY-MM-DD\" to notes, bump \"updated\", commit and push. Never change pokechest.* storage keys or the bundle identifier. Authored and adversarially verified by a multi-agent ultracode workflow.",
   "schemaVersion": 1,
-  "updated": "2026-08-01",
+  "updated": "2026-08-12",
   "generatedBy": "ultracode parity-ledger workflow wf_fe2016aa-818 (claude-fable-5): repo inventory + 5 spec agents + competitor matrix + 3 adversarial verifiers; {\"authored\": 49, \"merged\": 49, \"corrections\": 15, \"deleted\": 0}",
   "items": [
     {
@@ -1778,6 +1778,37 @@
       ],
       "demand": "high",
       "notes": "✅ 2026-08-01 for the artefacts. PARTIAL, not shipped, and it stays partial until three things Brandon owns are done: the ship name is chosen (every listing string is still <APP>), a paid Apple Developer Program membership exists, and the bundled Python server is either sandboxed or the app ships direct-notarized outside the store instead. See ROADMAP-TO-PUBLISH.md §4."
+    },
+    {
+      "id": "pocket-offline-file",
+      "title": "Pocket Edition — the collection as one AirDrop-able file",
+      "icon": "📦",
+      "area": "platform",
+      "status": "shipped",
+      "priority": "P1",
+      "spec": "scripts/build_pocket.py (pre-existing, shipped in v2.2.0) inlines the collection, Game Plan, PSA-10 estimates and tap-to-open comp links into one self-contained file, with the app icon as a base64 data: URI so it works with no network. Three bottom tabs: Game Plan / Collection / Sell. server.py's build_pocket() runs it on POST /api/pocket and after every data refresh; the file is served from the writable HOME because the bundle is read-only. THIS PASS fixed three real defects rather than adding features: (1) the image fallback interpolated a double-quoted placeholder into an onerror=\"...\" attribute, which closed the attribute early and left broken JS — every card image that failed to load threw 'Invalid or unexpected token', which offline is every single one; it is now a capturing error listener instead. (2) The Admin 'Open Pocket Edition' link still pointed at the pre-rename 'Pokémon Chest — Pocket.html' and 404'd against POCKET_NAME. (3) The Pocket header and iOS home-screen title still read 'Chest'. Also added /api/pocket to the loopback-only gate list — it runs a subprocess and a LAN peer could previously trigger it.",
+      "ux": "Admin → iPhone Pocket Edition → Regenerate, or Scanner → Phone mode → 📦 Build Pocket file. AirDrop the file to the phone, open in Safari, Add to Home Screen.",
+      "files": [
+        "scripts/build_pocket.py",
+        "server.py",
+        "assets/app.js",
+        "assets/revamp.js"
+      ],
+      "acceptance": [
+        "Opens from file:// with the browser fully offline and renders all cards with ZERO page errors.",
+        "Header and apple-mobile-web-app-title read 'Den', not 'Chest'.",
+        "The app icon is an inlined data: URI so it survives with no network.",
+        "All three bottom tabs are hit-testable at their centres and content clears the fixed bar.",
+        "Search narrows the collection list.",
+        "Tapping a card reveals its comp links (eBay raw/graded, TCGplayer, PriceCharting, FB); none render before the tap.",
+        "No horizontal overflow at 390px; no external stylesheet or script.",
+        "POST /api/pocket is refused (403) from a non-loopback peer."
+      ],
+      "verify": "scratchpad/verify-pocket.js — 18 checks in an offline iPhone-14 context over file://. Gate checked with a spoofed Host header against the live server.",
+      "est": "M",
+      "dependsOn": [],
+      "demand": "high",
+      "notes": "✅ 2026-08-12 (bug-fix + hardening pass; the feature itself shipped in v2.2.0). Complements the PWA rather than replacing it: the PWA needs the Mac awake on the same Wi-Fi because server.py serves it, whereas Pocket is just a file you AirDrop. Read-only on purpose — making it writable would create a second source of truth to reconcile. 1.8 MB for 1,291 cards, most of it the inlined icon and the precomputed comp URLs."
     }
   ],
   "matrix": {

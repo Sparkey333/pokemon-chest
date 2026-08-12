@@ -1348,6 +1348,8 @@ async function scRenderLan() {
         <p class="reason">📲 <b>Keep it on the phone:</b> once it's open there, add it to the home screen — on iPhone tap Share ⬆︎ → <b>Add to Home Screen</b>; on Android use your browser's <b>Install</b>. It then opens fullscreen like a real app and still loads when you're out of signal.</p>
         <button class="btn ghost sm" id="sc-lan-off" style="margin-top:6px">Turn off</button>
         <button class="btn sm" id="pwaInstallBtn" style="margin-top:6px" hidden>📲 Install app</button>
+        <button class="btn sm" id="sc-pocket" style="margin-top:6px" title="Write your whole collection to one file you can AirDrop">📦 Build Pocket file</button>
+        <span class="reason" id="sc-pocket-stat"></span>
       </div>
     </div>`;
   $('#sc-lan-off').onclick = async () => {
@@ -1358,6 +1360,21 @@ async function scRenderLan() {
   // button stays hidden and the copy above is the whole instruction.
   const pib = $('#pwaInstallBtn');
   if (pib && window.PWA && window.PWA.prompt) { pib.hidden = false; pib.onclick = () => pwaInstall(); }
+
+  // Pocket: no Wi-Fi, no Mac awake — just a file. The counterpart to phone
+  // mode rather than a replacement for it.
+  const pk = $('#sc-pocket'), pkStat = $('#sc-pocket-stat');
+  if (pk) pk.onclick = async () => {
+    pk.disabled = true; pkStat.textContent = 'Building…';
+    try {
+      const j = await (await fetch('/api/pocket', { method: 'POST' })).json();
+      if (j.ok) {
+        pkStat.innerHTML = `✅ <b>Pocket.html</b> (${j.kb} KB) — AirDrop it to your phone`;
+        toast('Pocket file written — AirDrop it to your phone and open it from Files.');
+      } else { pkStat.textContent = '✕ ' + (j.error || 'failed'); }
+    } catch (e) { pkStat.textContent = '✕ ' + e.message; }
+    pk.disabled = false;
+  };
 }
 
 /* --- PriceCharting sync --- */

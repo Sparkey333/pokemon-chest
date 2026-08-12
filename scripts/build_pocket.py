@@ -153,7 +153,7 @@ HTML = """<!DOCTYPE html><html lang="en"><head>
 <title>Pokémon Den — Pocket</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Chest">
+<meta name="apple-mobile-web-app-title" content="Den">
 <meta name="theme-color" content="#0a0e16">
 <link rel="apple-touch-icon" href="__ICON__">
 <link rel="icon" href="__ICON__">
@@ -204,7 +204,7 @@ table{width:100%;border-collapse:collapse;font-size:12.5px}
 td{padding:6px 8px;border-bottom:1px solid var(--bd);vertical-align:top}
 td b{color:var(--gold)}
 </style></head><body>
-<div class="top"><img src="__ICON__" alt=""><h1>Pokémon <span>Chest</span></h1>
+<div class="top"><img src="__ICON__" alt=""><h1>Pokémon <span>Den</span></h1>
   <div class="val"><small>Portfolio</small><b id="pv"></b></div></div>
 <main>
   <section id="v-plan" class="view on"></section>
@@ -223,7 +223,16 @@ const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const money=(n,d=0)=>n==null?'—':'$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const ph='<div class="ph"></div>';
-function thumb(c){return c.img?`<img src="${c.img}" loading="lazy" onerror="this.outerHTML='${ph}'">`:ph}
+// The placeholder contains double quotes, so interpolating it into an
+// onerror="..." attribute closed the attribute early and left broken JS behind
+// — every card image that failed to load threw "Invalid or unexpected token",
+// which offline means every single one. Bind the fallback as a real listener
+// instead of round-tripping markup through an HTML attribute.
+function thumb(c){return c.img?`<img src="${c.img}" loading="lazy" class="thumb-fb">`:ph}
+document.addEventListener('error',function(e){
+  var t=e.target;
+  if(t&&t.tagName==='IMG'&&t.classList.contains('thumb-fb')) t.outerHTML=ph;
+},true);
 function plBadge(c){if(c.pl==null)return'';const u=c.pl>=0;return `<div class="pl ${u?'up':'dn'}">${u?'▲':'▼'} ${money(Math.abs(c.pl))}</div>`}
 async function copy(t,el){try{await navigator.clipboard.writeText(t);if(el){const o=el.textContent;el.textContent='✓ copied';setTimeout(()=>el.textContent=o,1200)}}catch(e){alert('Copy: \\n\\n'+t)}}
 

@@ -1882,7 +1882,7 @@ class Handler(SimpleHTTPRequestHandler):
         if self._ship_blocked(path):
             return
         if (path.startswith(("/api/secrets", "/api/emerald")) or path.endswith("/reveal")
-                or path in ("/api/config", "/api/lan", "/api/import", "/api/mobile/deliver")):
+                or path in ("/api/config", "/api/lan", "/api/import", "/api/mobile/deliver", "/api/pocket")):
             if not self._loopback_only():
                 return
         try:

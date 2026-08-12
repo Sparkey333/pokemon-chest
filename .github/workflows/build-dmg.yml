@@ -92,8 +92,20 @@ jobs:
         run: |
           DMG=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg)
           SRC=$(ls PokemonDen-source-*.zip)
-          shasum -a 256 "$DMG" "$SRC" | sed 's#.*/##' > SHA256SUMS.txt
+          # Checksum from inside the dmg's own directory. Post-processing the
+          # path out of shasum's output with sed ate the hash itself, because
+          # `.*/` matches greedily across the whole line — the dmg row shipped
+          # as a bare filename with no hash at all.
+          ( cd "$(dirname "$DMG")" && shasum -a 256 "$(basename "$DMG")" ) > SHA256SUMS.txt
+          shasum -a 256 "$SRC" >> SHA256SUMS.txt
           cat SHA256SUMS.txt
+          # Fail loudly rather than publish an unverifiable checksum file again.
+          while read -r h f; do
+            case "$h" in
+              [0-9a-f]*) [ ${#h} -eq 64 ] || { echo "bad hash for $f: $h"; exit 1; } ;;
+              *) echo "missing hash for line: $h $f"; exit 1 ;;
+            esac
+          done < SHA256SUMS.txt
 
       - name: Publish the dmg + source zip to the dmg-latest release
         env:

@@ -2500,7 +2500,9 @@ function renderAdmin() {
         <li>It’s a <b>snapshot</b> — tap <b>Regenerate</b> below (or refresh prices) after you update your collection, then re-AirDrop.</li>
       </ol>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px">
-        <a class="btn sm gold" href="/Pok%C3%A9mon%20Chest%20%E2%80%94%20Pocket.html" target="_blank" rel="noopener">Open Pocket Edition ↗</a>
+        <!-- Percent-encoded "Pokémon Den — Pocket.html". This still said "Chest"
+             after the rename, so the link 404'd against POCKET_NAME in server.py. -->
+        <a class="btn sm gold" href="/Pok%C3%A9mon%20Den%20%E2%80%94%20Pocket.html" target="_blank" rel="noopener">Open Pocket Edition ↗</a>
         ${liveOn ? '<button class="btn sm" id="ad-pocket">↻ Regenerate from latest data</button>' : '<span class="reason">Launch via start.command to regenerate from inside the app.</span>'}
         <span class="reason" id="ad-pocket-status"></span>
       </div>
